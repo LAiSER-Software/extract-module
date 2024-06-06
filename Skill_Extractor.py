@@ -23,9 +23,7 @@ Output/Return Format:
 ----------------------------
 - Description of the output files or data formats produced by the module.
 
-"""
 
-"""
 Revision History:
 -----------------
 Rev No.     Date            Author              Description
@@ -40,10 +38,8 @@ TODO:
 """
 
 # native packages
-import json
 
 # installed packages
-import numpy as np
 import pandas as pd
 import spacy
 from spacy.matcher import PhraseMatcher
@@ -52,10 +48,10 @@ from skillNer.skill_extractor_class import SkillExtractor
 
 # internal packages
 from params import DATA_PATH, SKILL_TAXONOMY, SIMILARITY_THRESHOLD
-from utils import get_embedding, cosine_similarity
+from utils import Utils
 
 
-class Skill_Extractor():
+class Skill_Extractor:
     """
     Class to extract skills from text and align them to existing taxonomy
 
@@ -73,7 +69,7 @@ class Skill_Extractor():
         contains skill information from taxonomy
 
     ner_extractor: SkillNER object
-        exctractor object initialised with NLP, PhraseMatcher and Skill DB
+        extractor object initialised with NLP, PhraseMatcher and Skill DB
 
     Parameters
     ----------
@@ -94,7 +90,7 @@ class Skill_Extractor():
 
     def __init__(self, taxonomy='LIGHTCAST'):
         """
-        Class contructor
+        Class constructor
 
         Parameters
         ----------
@@ -133,20 +129,20 @@ class Skill_Extractor():
         Notes
         -----
             The Function is designed only to return list of skills based on selected taxonomy database.
-            The output might change if the taxonomy parameter of the class is provided with diferent input.
+            The output might change if the taxonomy parameter of the class is provided with different input.
 
         """
         # Function implementation here
 
         extracted_skills_set = set()
-
+        annotations = None
         try:
             annotations = self.ner_extractor.annotate(input_text)
         except ValueError as e:
             print(f"Skipping example, ValueError encountered: {e}")
         except Exception as e:
             print(f"Skipping example, An unexpected error occurred: {e}")
-        
+
         for item in annotations['results']['full_matches']:
             extracted_skills_set.add(item['doc_node_value'])
 
@@ -155,17 +151,15 @@ class Skill_Extractor():
             extracted_skills_set.add(item['doc_node_value'])
 
         return list(extracted_skills_set)
-    
 
-    
-    def get_aligned_skills(self, skills, output_taxonomy = 'OSN'):
+    def get_aligned_skills(self, skills, output_taxonomy='OSN'):
         """
         This function aligns the skills provided to the desired taxonomy
 
         Parameters
         ----------
         skills : list
-            List of skill extracted from Job Descriptions / Syllabus.
+            Provide list of skill extracted from Job Descriptions / Syllabus.
 
         output_taxonomy : text, optional
             Name of output skill database/taxonomy
@@ -176,12 +170,12 @@ class Skill_Extractor():
         list: List of taxonomy skills from text
 
         """
-        key_series = None
         if output_taxonomy == 'OSN':
             osn_comp_df = pd.read_csv(DATA_PATH + "osn_comp.csv")
             osn_pub_df = pd.read_csv(DATA_PATH + "osn_pr.csv")
             osn_ind_df = pd.read_csv(DATA_PATH + "osn_ind.csv")
-            osn = osn_comp_df._append(osn_pub_df,ignore_index=True)._append(osn_ind_df,ignore_index=True)
+            osn = osn_comp_df._append(osn_pub_df, ignore_index=True)
+            osn = osn._append(osn_ind_df, ignore_index=True)
             key_series = osn["RSD Name"]
         else:
             skill_df = pd.read_json(DATA_PATH + 'skill_db_relax_20.json').T
@@ -192,13 +186,14 @@ class Skill_Extractor():
         # Create an empty list for the skills that match
         skill_matches = []
         nlp = self.nlp
-        
+        utils = Utils(nlp)
+
         # Iterate through each skill in extracted_skills_list
         for extracted_skill in skills:
             # Check if extracted_skill contains non-whitespace characters
             if extracted_skill.strip():
                 # Calculate GloVe embedding for the extracted skill
-                extracted_embedding = get_embedding(extracted_skill, nlp)
+                extracted_embedding = utils.get_embedding(extracted_skill)
 
                 # Initialize variables to store the best match and its similarity score
                 best_match = None
@@ -206,22 +201,22 @@ class Skill_Extractor():
 
                 # Iterate through each keyword in key_series (skills from taxonomy)
                 for key_skill in key_series:
-                    # Calculate GloVe embedding for the keywords/skills from taxn
-                    key_embedding = get_embedding(key_skill, nlp)
+                    # Calculate embedding for the keywords/skills from taxonomy
+                    key_embedding = utils.get_embedding(key_skill)
 
                     # Calculate cosine similarity between extracted skill and keyword skill
-                    similarity = cosine_similarity(extracted_embedding, key_embedding)
+                    similarity = utils.cosine_similarity(extracted_embedding, key_embedding)
 
                     # If the similarity score is above the threshold and the skill is not already matched
                     if similarity >= SIMILARITY_THRESHOLD and key_skill not in matched_skills_set:
-                        if similarity > best_similarity :
+                        if similarity > best_similarity:
                             best_similarity = similarity
                             best_match = key_skill
 
                         # Update the set of previously matched skills
                         matched_skills_set.add(key_skill)
 
-                # If a best match was found, add it to the list of matched skills
+                # If best match was found, add it to the list of matched skills
                 if best_match:
                     skill_matches.append(best_match)
 

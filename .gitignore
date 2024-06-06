@@ -1,5 +1,5 @@
-.ipynb_checkpoints
 dev_try
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

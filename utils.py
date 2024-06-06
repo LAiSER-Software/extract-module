@@ -1,7 +1,7 @@
 """
 Module Description:
 -------------------
-A Class with utility fuctions
+A Class with utility functions
 
 Ownership:
 ----------
@@ -30,19 +30,11 @@ TODO:
 import numpy as np
 
 
-
-class Utils():
+class Utils:
     """
     A utility class for LAISER.
 
     ...
-
-    Attributes
-    ----------
-    attribute1 : type
-        Short description
-    attribute2 : type
-        Short description
 
     Parameters (optional from __init__ function)
     ----------
@@ -54,15 +46,12 @@ class Utils():
         
     Methods
     -------
-    function_name(param3, param4='default_value')
-        Function Description and purpose
+    get_embedding(input_text)
+        Creates vector embeddings for input text based on nlp object
 
     ....
 
     """
-
-    attribute1 = None
-    attribute2 = None
 
     def __init__(self, nlp):
         """
@@ -71,7 +60,6 @@ class Utils():
         Parameters
         ----------
         nlp : spacy nlp model
-        param2 : type, optional
         """
         # Initialization of objects here
         self.nlp = nlp
@@ -84,7 +72,7 @@ class Utils():
         Parameters
         ----------
         input_text : text
-            text to be vectorized, usually skill, extracted of referenced
+            Provide text to be vectorized, usually skill, extracted of referenced
 
         Returns
         -------
@@ -96,15 +84,14 @@ class Utils():
         if len(doc) == 0:
             return np.zeros(300)  # Return zeros for empty texts
         return np.mean([word.vector for word in doc], axis=0)
-    
+
     def cosine_similarity(self, vec1, vec2):
         """
         Calculates cosine similarity between 2 vectors
 
         Parameters
         ----------
-        vec1, vec2 : numpy array
-            numpy array of vectorized text
+        vec1, vec2 : numpy array of vectorized text
 
         Returns
         -------
