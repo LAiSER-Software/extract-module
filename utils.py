@@ -20,7 +20,7 @@ Revision History:
 -----------------
 Rev No.     Date            Author              Description
 [1.0.0]     06/01/2024      Vedant M.           Initial Version
-
+[1.0.1]     06/08/2024      Satya Phanindra K.  Handle 0 norm vectors in cosine similarity
 
 TODO:
 -----
@@ -88,13 +88,17 @@ class Utils:
     def cosine_similarity(self, vec1, vec2):
         """
         Calculates cosine similarity between 2 vectors
-
+    
         Parameters
         ----------
         vec1, vec2 : numpy array of vectorized text
-
+    
         Returns
         -------
         numeric value
         """
-        return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+        vec1_norm = np.linalg.norm(vec1)
+        vec2_norm = np.linalg.norm(vec2)
+        if vec1_norm == 0 or vec2_norm == 0:
+            return 0  # Return 0 if either vector has zero norm
+        return np.dot(vec1, vec2) / (vec1_norm * vec2_norm)

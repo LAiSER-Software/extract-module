@@ -29,6 +29,7 @@ Revision History:
 Rev No.     Date            Author              Description
 [1.0.0]     05/30/2024      Vedant M.           Initial Version 
 [1.0.1]     06/01/2024      Vedant M.           Referencing utils.py and params.py
+[1.0.2]     06/08/2024      Satya Phanindra K.  Modify get_aligned_skills function to JSON output
 
 
 TODO:
@@ -143,8 +144,8 @@ class Skill_Extractor:
         except Exception as e:
             print(f"Skipping example, An unexpected error occurred: {e}")
 
-        for item in annotations['results']['full_matches']:
-            extracted_skills_set.add(item['doc_node_value'])
+        # for item in annotations['results']['full_matches']:
+        #     extracted_skills_set.add(item['doc_node_value'])
 
         # get ngram_scored
         for item in annotations['results']['ngram_scored']:
@@ -155,69 +156,82 @@ class Skill_Extractor:
     def get_aligned_skills(self, skills, output_taxonomy='OSN'):
         """
         This function aligns the skills provided to the desired taxonomy
-
+    
         Parameters
         ----------
         skills : list
             Provide list of skill extracted from Job Descriptions / Syllabus.
-
+    
         output_taxonomy : text, optional
             Name of output skill database/taxonomy
             Available Taxonomy are LIGHTCAST, ESCO, OSN defaults to 'OSN'
-
+    
         Returns
         -------
-        list: List of taxonomy skills from text
-
+        list: List of taxonomy skills from text in JSON format
+            [
+                {
+                    "SkillName": "Skill1",
+                    "SkillID": "ID1",
+                    "corr_coeff": similarity_score
+                },
+                ...
+            ]
+    
         """
         if output_taxonomy == 'OSN':
-            osn_comp_df = pd.read_csv(DATA_PATH + "osn_comp.csv")
-            osn_pub_df = pd.read_csv(DATA_PATH + "osn_pr.csv")
-            osn_ind_df = pd.read_csv(DATA_PATH + "osn_ind.csv")
-            osn = osn_comp_df._append(osn_pub_df, ignore_index=True)
-            osn = osn._append(osn_ind_df, ignore_index=True)
-            key_series = osn["RSD Name"]
+            osn_comp_df = pd.read_csv(DATA_PATH + "osn_comp_prepped.csv")
+            osn_pub_df = pd.read_csv(DATA_PATH + "osn_pr_prepped.csv")
+            osn_ind_df = pd.read_csv(DATA_PATH + "osn_ind_prepped.csv")
+            osn = pd.concat([osn_comp_df, osn_pub_df, osn_ind_df], ignore_index=True)
+            key_series = osn[["RSD Name", "ID"]]
         else:
             skill_df = pd.read_json(DATA_PATH + 'skill_db_relax_20.json').T
-            key_series = skill_df['skill_name'].reset_index().drop(['index'], axis=1)
-
+            key_series = skill_df[['skill_name', 'id']].reset_index().drop(['index'], axis=1)
+    
         # Initialize an empty set to track previously matched skills
         matched_skills_set = set()
         # Create an empty list for the skills that match
         skill_matches = []
         nlp = self.nlp
         utils = Utils(nlp)
-
+    
         # Iterate through each skill in extracted_skills_list
         for extracted_skill in skills:
             # Check if extracted_skill contains non-whitespace characters
             if extracted_skill.strip():
                 # Calculate GloVe embedding for the extracted skill
                 extracted_embedding = utils.get_embedding(extracted_skill)
-
+    
                 # Initialize variables to store the best match and its similarity score
                 best_match = None
                 best_similarity = 0.0
-
+    
                 # Iterate through each keyword in key_series (skills from taxonomy)
-                for key_skill in key_series:
+                for index, row in key_series.iterrows():
+                    key_skill, key_id = row["RSD Name"], row["ID"]
                     # Calculate embedding for the keywords/skills from taxonomy
                     key_embedding = utils.get_embedding(key_skill)
-
+    
                     # Calculate cosine similarity between extracted skill and keyword skill
                     similarity = utils.cosine_similarity(extracted_embedding, key_embedding)
-
+    
                     # If the similarity score is above the threshold and the skill is not already matched
                     if similarity >= SIMILARITY_THRESHOLD and key_skill not in matched_skills_set:
                         if similarity > best_similarity:
                             best_similarity = similarity
                             best_match = key_skill
-
+                            best_id = key_id
+    
                         # Update the set of previously matched skills
                         matched_skills_set.add(key_skill)
-
+    
                 # If best match was found, add it to the list of matched skills
                 if best_match:
-                    skill_matches.append(best_match)
-
+                    skill_matches.append({
+                        "SkillName": best_match,
+                        "SkillID": best_id,
+                        "corr_coeff": best_similarity
+                    })
+    
         return skill_matches

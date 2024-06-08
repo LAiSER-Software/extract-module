@@ -29,11 +29,11 @@ TODO:
 
 import json
 
-DATA_PATH = 'data/'
+DATA_PATH = './data/'
 
 with open(DATA_PATH+'skill_db_relax_20.json') as json_file:
     SKILL_TAXONOMY = json.load(json_file)
 
 
-SIMILARITY_THRESHOLD = 0.05
+SIMILARITY_THRESHOLD = 0.65
 
