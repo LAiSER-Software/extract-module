@@ -38,7 +38,7 @@ Revision History:
 -----------------
 Rev No.     Date            Author              Description
 [1.0.0]     06/01/2024      Vedant M.           Initial Version
-[1.0.0]     06/10/2024      Vedant M.           added logging function
+[1.0.1]     06/10/2024      Vedant M.           added logging function
 
 
 TODO:
@@ -66,7 +66,7 @@ def cosine_similarity(vec1, vec2):
     product_of_magnitude = np.linalg.norm(vec1) * np.linalg.norm(vec2)
     if product_of_magnitude == 0.0:
         return 0.0
-    return np.dot(vec1, vec2) / (product_of_magnitude)
+    return np.dot(vec1, vec2) / product_of_magnitude
 
 
 def get_embedding(nlp, input_text):

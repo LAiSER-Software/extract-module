@@ -73,14 +73,14 @@ import pandas as pd
 import spacy
 import openai
 from openai import OpenAI
-from spacy.matcher import PhraseMatcher
-from skillNer.general_params import SKILL_DB
-from skillNer.skill_extractor_class import SkillExtractor
+# from spacy.matcher import PhraseMatcher
+# from skillNer.general_params import SKILL_DB
+# from skillNer.skill_extractor_class import SkillExtractor
 
 
 # internal packages
-from utils import get_embedding, cosine_similarity
-from params import AI_MODEL_ID, API_KEY, SIMILARITY_THRESHOLD, SKILL_DB_PATH
+from laiser.utils import get_embedding, cosine_similarity
+from laiser.params import AI_MODEL_ID, API_KEY, SIMILARITY_THRESHOLD, SKILL_DB_PATH
 
 
 class Skill_Extractor:
@@ -110,10 +110,10 @@ class Skill_Extractor:
     """
 
     def __init__(self):
-        # openai.api_key = API_KEY
-        # self.client = OpenAI(api_key=openai.api_key)
+        openai.api_key = API_KEY
+        self.client = OpenAI(api_key=openai.api_key)
         self.nlp = spacy.load("en_core_web_lg")
-        self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
+        # self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
         return
 
     # Declaring a private method for extracting raw skills from input text
@@ -135,45 +135,45 @@ class Skill_Extractor:
         The Function is designed only to return list of skills based on prompt passed to OpenAI's Fine-tuned model.
 
         """
-        # ai_client = self.client
-        # response = ai_client.completions.create(
-        #     model=AI_MODEL_ID,
-        #     prompt=f"""Name all the skills present in the following job description in a single list.
-        #                 Response should have only the skills, no other information or words.
-        #                 Skills should be keywords, each being no more than 3 words.:
-        #                 This is the Job Description:
-        #                 {input_text}
+        ai_client = self.client
+        response = ai_client.completions.create(
+            model=AI_MODEL_ID,
+            prompt=f"""Name all the skills present in the following job description in a single list.
+                        Response should have only the skills, no other information or words.
+                        Skills should be keywords, each being no more than 3 words.:
+                        This is the Job Description:
+                        {input_text}
+
+                        Skills:
+                        """,
+            max_tokens=75,
+            temperature=0.0,
+        )
+        extracted_skills = response.choices[0].text.strip()
+        extracted_skills = list(set(
+            [word.lstrip("-").strip() for word in extracted_skills.split("\n")]
+        ))
+
+        return extracted_skills
+
+        # ner_extractor = self.ner_extractor
+        # extracted_skills_set = set()
+        # annotations = None
+        # try:
+        #     annotations = ner_extractor.annotate(input_text)
+        # except ValueError as e:
+        #     print(f"Skipping example, ValueError encountered: {e}")
+        # except Exception as e:
+        #     print(f"Skipping example, An unexpected error occurred: {e}")
         #
-        #                 Skills:
-        #                 """,
-        #     max_tokens=75,
-        #     temperature=0.0,
-        # )
-        # extracted_skills = response.choices[0].text.strip()
-        # extracted_skills = list(set(
-        #     [word.lstrip("-").strip() for word in extracted_skills.split("\n")]
-        # ))
+        # for item in annotations['results']['full_matches']:
+        #     extracted_skills_set.add(item['doc_node_value'])
         #
-        # return extracted_skills
-
-        ner_extractor = self.ner_extractor
-        extracted_skills_set = set()
-        annotations = None
-        try:
-            annotations = ner_extractor.annotate(input_text)
-        except ValueError as e:
-            print(f"Skipping example, ValueError encountered: {e}")
-        except Exception as e:
-            print(f"Skipping example, An unexpected error occurred: {e}")
-
-        for item in annotations['results']['full_matches']:
-            extracted_skills_set.add(item['doc_node_value'])
-
-        # get ngram_scored
-        for item in annotations['results']['ngram_scored']:
-            extracted_skills_set.add(item['doc_node_value'])
-
-        return list(extracted_skills_set)
+        # # get ngram_scored
+        # for item in annotations['results']['ngram_scored']:
+        #     extracted_skills_set.add(item['doc_node_value'])
+        #
+        # return list(extracted_skills_set)
 
     def align_skills(self, raw_skills, document_id='0'):
         """
