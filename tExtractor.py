@@ -37,45 +37,45 @@ TODO:
 - 3: Change the output to a JSON format
 """
 
-# import pandas as pd
+import pandas as pd
 
-# # Load the CSV file into a Pandas DataFrame
-# osn_comp_df = pd.read_csv('data/osn_comp.csv')
-# osn_ind_df = pd.read_csv('data/osn_ind.csv')
-# osn_pr_df = pd.read_csv('data/osn_pr.csv')
+# Load the CSV file into a Pandas DataFrame
+osn_comp_df = pd.read_csv('data/osn_comp.csv')
+osn_ind_df = pd.read_csv('data/osn_ind.csv')
+osn_pr_df = pd.read_csv('data/osn_pr.csv')
 
-# # Create a new column 'ID' to store the modified WGUSID values
-# osn_comp_df['ID'] = ''
-# osn_ind_df['ID'] = ''
-# osn_pr_df['ID'] = ''
+# Create a new column 'ID' to store the modified WGUSID values
+osn_comp_df['ID'] = ''
+osn_ind_df['ID'] = ''
+osn_pr_df['ID'] = ''
 
-# # Iterate over each row in the DataFrame
-# for df in [osn_comp_df, osn_ind_df, osn_pr_df]:
-#     # Iterate over the 'Keywords' column
-#     for index, keywords in df['Keywords'].items():
-#         # Split the keywords by ';'
-#         parts = keywords.split(';')
+# Iterate over each row in the DataFrame
+for df in [osn_comp_df, osn_ind_df, osn_pr_df]:
+    # Iterate over the 'Keywords' column
+    for index, keywords in df['Keywords'].items():
+        # Split the keywords by ';'
+        parts = keywords.split(';')
         
-#         # Iterate over the parts
-#         for part in parts:
-#             # Check if the part starts with 'WGUSID:'
-#             if part.strip().startswith('WGUSID:'):
-#                 # Split the part to get the unique number
-#                 unique_number = part.split(':')[1].strip()
+        # Iterate over the parts
+        for part in parts:
+            # Check if the part starts with 'WGUSID:'
+            if part.strip().startswith('WGUSID:'):
+                # Split the part to get the unique number
+                unique_number = part.split(':')[1].strip()
                 
-#                 # Construct the new ID in the desired format
-#                 new_id = f'OSN.{unique_number}'
+                # Construct the new ID in the desired format
+                new_id = f'OSN.{unique_number}'
                 
-#                 # Assign the new ID to the 'ID' column for the current row
-#                 df.at[index, 'ID'] = new_id
+                # Assign the new ID to the 'ID' column for the current row
+                df.at[index, 'ID'] = new_id
                 
-#                 # Break out of the inner loop since we found the WGUSID
-#                 break
-# 
-# # Save the updated DataFrame to a new CSV file
-# osn_comp_df.to_csv('data/osn_comp_prepped.csv', index=False)
-# osn_ind_df.to_csv('data/osn_ind_prepped.csv', index=False)
-# osn_pr_df.to_csv('data/osn_pr_prepped.csv', index=False)
+                # Break out of the inner loop since we found the WGUSID
+                break
+
+# Save the updated DataFrame to a new CSV file
+osn_comp_df.to_csv('data/osn_comp_prepped.csv', index=False)
+osn_ind_df.to_csv('data/osn_ind_prepped.csv', index=False)
+osn_pr_df.to_csv('data/osn_pr_prepped.csv', index=False)
 
 from Skill_Extractor import Skill_Extractor
 
