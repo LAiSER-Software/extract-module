@@ -58,8 +58,10 @@ SKILL_DB_PATH = os.path.join(INPUT_PATH, 'combined.csv')
 #     SKILL_TAXONOMY = json.load(json_file)
 
 
-SIMILARITY_THRESHOLD = 0.05
+SIMILARITY_THRESHOLD = 0.75
 
-AI_MODEL_ID = 't:davinci-002:personal::8IIFVUbf'
-API_KEY = 'sk-proj-aXyKoTNJA8Cd4E7fP9s0T3BlbkFJKVQSd6folsAavHi3mQWi'
+# AI_MODEL_ID = 't:davinci-002:personal::8IIFVUbf'
+AI_MODEL_ID = 'Phanindra-max/gemma-Code-Instruct-Finetune-test'
+# API_KEY = 'sk-proj-aXyKoTNJA8Cd4E7fP9s0T3BlbkFJKVQSd6folsAavHi3mQWi'
+API_KEY = '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'
 

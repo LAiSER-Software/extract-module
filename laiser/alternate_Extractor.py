@@ -55,7 +55,7 @@ Rev No.     Date            Author              Description
 [1.0.2]     06/08/2024      Satya Phanindra K.  Modify get_aligned_skills function to JSON output
 [1.0.3]     06/10/2024      Vedant M.           Updated functions extract_raw and align_skills for input and output
 [1.0.4]     06/13/2024      Vedant M.           Added function extractor to encapsulate both functions
-[1.0.5]     06/15/2024      Satya Phanindra K.  Replaced OpenAI API with HuggingFace API for skill extraction
+
 
 TODO:
 -----
@@ -71,14 +71,11 @@ import os
 # installed packages
 import pandas as pd
 import spacy
-import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
 # import openai
 # from openai import OpenAI
-# from spacy.matcher import PhraseMatcher
-# from skillNer.general_params import SKILL_DB
-# from skillNer.skill_extractor_class import SkillExtractor
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from spacy.matcher import PhraseMatcher
+from skillNer.general_params import SKILL_DB
+from skillNer.skill_extractor_class import SkillExtractor
 
 
 # internal packages
@@ -93,7 +90,7 @@ class Skill_Extractor:
 
     Attributes
     ----------
-    client : HuggingFace API client
+    client : OpenAI Client object
     nlp : spacy nlp model
         Short description
 
@@ -108,9 +105,6 @@ class Skill_Extractor:
 
     align_skills(raw_skills: list, document_id='0': string):
         This function aligns the skills provided to the desired taxonomy
-        
-    extractor(data: pandas dataframe, id_column='Research ID', text_column='Text'):
-        Function takes text dataset to extract and aligns skills based on available taxonomies
     ....
 
     """
@@ -119,7 +113,7 @@ class Skill_Extractor:
         # openai.api_key = API_KEY
         # self.client = OpenAI(api_key=openai.api_key)
         self.nlp = spacy.load("en_core_web_lg")
-        # self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
+        self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
         return
 
     # Declaring a private method for extracting raw skills from input text
@@ -149,7 +143,7 @@ class Skill_Extractor:
         #                 Skills should be keywords, each being no more than 3 words.:
         #                 This is the Job Description:
         #                 {input_text}
-
+        #
         #                 Skills:
         #                 """,
         #     max_tokens=75,
@@ -159,118 +153,27 @@ class Skill_Extractor:
         # extracted_skills = list(set(
         #     [word.lstrip("-").strip() for word in extracted_skills.split("\n")]
         # ))
-
+        #
         # return extracted_skills
 
-        # ner_extractor = self.ner_extractor
-        # extracted_skills_set = set()
-        # annotations = None
-        # try:
-        #     annotations = ner_extractor.annotate(input_text)
-        # except ValueError as e:
-        #     print(f"Skipping example, ValueError encountered: {e}")
-        # except Exception as e:
-        #     print(f"Skipping example, An unexpected error occurred: {e}")
-        
-        # for item in annotations['results']['full_matches']:
-        #     extracted_skills_set.add(item['doc_node_value'])
-        
-        # # get ngram_scored
-        # for item in annotations['results']['ngram_scored']:
-        #     extracted_skills_set.add(item['doc_node_value'])
+        ner_extractor = self.ner_extractor
+        extracted_skills_set = set()
+        annotations = None
+        try:
+            annotations = ner_extractor.annotate(input_text)
+        except ValueError as e:
+            print(f"Skipping example, ValueError encountered: {e}")
+        except Exception as e:
+            print(f"Skipping example, An unexpected error occurred: {e}")
 
-        tokenizer = AutoTokenizer.from_pretrained(AI_MODEL_ID)
-        model = AutoModelForCausalLM.from_pretrained(AI_MODEL_ID)
-        
-        # use the model variable to generate the list of skills form the input_text
-        model_output = model.generate(
-            tokenizer(input_text, return_tensors="pt").input_ids,
-            max_length=100,
-            num_return_sequences=1,
-            num_beams=5,
-            no_repeat_ngram_size=2,
-            top_k=50,
-            top_p=0.95,
-            temperature=0.5,
-            do_sample=True,
-            pad_token_id=tokenizer.eos_token_id
-        )
-        extracted_skills = tokenizer.batch_decode(model_output, skip_special_tokens=True)
-        extracted_skills_set = set(extracted_skills)
-            
+        for item in annotations['results']['full_matches']:
+            extracted_skills_set.add(item['doc_node_value'])
+
+        # get ngram_scored
+        for item in annotations['results']['ngram_scored']:
+            extracted_skills_set.add(item['doc_node_value'])
+
         return list(extracted_skills_set)
-
-    # def align_skills(self, raw_skills, document_id='0'):
-    #     """
-    #     This function aligns the skills provided to the available taxonomy
-
-    #     Parameters
-    #     ----------
-    #     raw_skills : list
-    #         Provide list of skill extracted from Job Descriptions / Syllabus.
-    #     document_id: string
-    #         ID of the document or text from where skills where extracted
-    #         Defaults to '0'
-
-    #     Returns
-    #     -------
-    #     list: List of taxonomy skills from text in JSON format
-    #         [
-    #             {
-    #                 "Research ID": text_id
-    #                 "Skill Name": Raw skill extracted,
-    #                 "Skill Tag": taxonomy skill tag,
-    #                 "Correlation Coefficient": similarity_score
-    #             },
-    #             ...
-    #         ]
-
-    #     """
-    #     # dataframe for skill taxonomy database
-    #     skill_db_df = pd.read_csv(SKILL_DB_PATH)
-
-    #     skill_matches = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
-
-    #     # iterate over extracted skills
-    #     for raw_skill in raw_skills:
-
-    #         # get vectorized embedding for raw skill
-    #         raw_skill_embedding = get_embedding(self.nlp, raw_skill)
-
-    #         best_match = None
-    #         best_similarity = 0.0
-    #         matched_skill_set = set()
-
-    #         # iterate over each row in skill taxonomy db
-    #         for index, row in skill_db_df.iterrows():
-    #             tag = row['SkillTag']
-    #             label = row['SkillLabel']
-
-    #             # get vectorized embedding for skill in taxonomy db
-    #             db_skill_embedding = get_embedding(self.nlp, label)
-
-    #             # get cosine similarity between raw skill and skill from taxonomy db
-    #             similarity = cosine_similarity(raw_skill_embedding, db_skill_embedding)
-    #             # print(f'{raw_skill} X {tag}({label}):\t{similarity}')
-
-    #             # if cosine similarity > threshold and not already added then update the best tag
-    #             if similarity > SIMILARITY_THRESHOLD and tag not in matched_skill_set:
-    #                 if similarity > best_similarity:
-    #                     best_match = tag
-    #                     best_similarity = similarity
-    #                     matched_skill_set.add(tag)
-
-    #         # add the best similarity and best match to the output
-    #         if best_match:
-    #             temp = {
-    #                 "Research ID": document_id,
-    #                 "Raw Skill": raw_skill,
-    #                 "Skill Tag": best_match,
-    #                 "Correlation Coefficient": best_similarity
-    #             }
-    #             skill_matches = skill_matches._append(temp, ignore_index=True)
-
-    #     return skill_matches
 
     def align_skills(self, raw_skills, document_id='0'):
         """
@@ -281,7 +184,7 @@ class Skill_Extractor:
         raw_skills : list
             Provide list of skill extracted from Job Descriptions / Syllabus.
         document_id: string
-            ID of the document or text from where skills were extracted
+            ID of the document or text from where skills where extracted
             Defaults to '0'
 
         Returns
@@ -289,7 +192,7 @@ class Skill_Extractor:
         list: List of taxonomy skills from text in JSON format
             [
                 {
-                    "Research ID": text_id,
+                    "Research ID": text_id
                     "Skill Name": Raw skill extracted,
                     "Skill Tag": taxonomy skill tag,
                     "Correlation Coefficient": similarity_score
@@ -309,6 +212,8 @@ class Skill_Extractor:
             # get vectorized embedding for raw skill
             raw_skill_embedding = get_embedding(self.nlp, raw_skill)
 
+            best_match = None
+            best_similarity = 0.0
             matched_skill_set = set()
 
             # iterate over each row in skill taxonomy db
@@ -321,20 +226,26 @@ class Skill_Extractor:
 
                 # get cosine similarity between raw skill and skill from taxonomy db
                 similarity = cosine_similarity(raw_skill_embedding, db_skill_embedding)
+                # print(f'{raw_skill} X {tag}({label}):\t{similarity}')
 
-                # if cosine similarity > threshold and not already added then add to the matched skills
+                # if cosine similarity > threshold and not already added then update the best tag
                 if similarity > SIMILARITY_THRESHOLD and tag not in matched_skill_set:
-                    temp = pd.DataFrame([{
-                        "Research ID": document_id,
-                        "Raw Skill": raw_skill,
-                        "Skill Tag": tag,
-                        "Correlation Coefficient": similarity
-                    }])
-                    skill_matches = pd.concat([skill_matches, temp], ignore_index=True)
-                    matched_skill_set.add(tag)
+                    if similarity > best_similarity:
+                        best_match = tag
+                        best_similarity = similarity
+                        matched_skill_set.add(tag)
 
-        return skill_matches.to_dict(orient='records')
+            # add the best similarity and best match to the output
+            if best_match:
+                temp = {
+                    "Research ID": document_id,
+                    "Raw Skill": raw_skill,
+                    "Skill Tag": best_match,
+                    "Correlation Coefficient": best_similarity
+                }
+                skill_matches = skill_matches._append(temp, ignore_index=True)
 
+        return skill_matches
 
     def extractor(self, data, id_column='Research ID', text_column='Text'):
         """
