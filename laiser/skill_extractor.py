@@ -117,7 +117,7 @@ class Skill_Extractor:
     # Declaring a private method for extracting raw skills from input text
     def extract_raw(self, input_text):
         """
-        The function extracts skills from text using OpenAI's API
+        The function extracts skills from text using Fine-Tuned Language Model's API
 
         Parameters
         ----------
@@ -130,12 +130,14 @@ class Skill_Extractor:
 
         Notes
         -----
+        More details on which (pre-trained) language model is fine-tuned can be found in llm_methods.py
         The Function is designed only to return list of skills based on prompt passed to OpenAI's Fine-tuned model.
 
         """
         tokenizer = AutoTokenizer.from_pretrained(AI_MODEL_ID)
         model = AutoModelForCausalLM.from_pretrained(AI_MODEL_ID)
         
+        # TODO: optimize the model usage by loading it once and using it multiple times from the  llm_methods.py file
         # use the model variable to generate the list of skills form the input_text
         model_output = model.generate(
             tokenizer(input_text, return_tensors="pt").input_ids,
