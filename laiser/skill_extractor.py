@@ -73,11 +73,6 @@ import pandas as pd
 import spacy
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-# import openai
-# from openai import OpenAI
-# from spacy.matcher import PhraseMatcher
-# from skillNer.general_params import SKILL_DB
-# from skillNer.skill_extractor_class import SkillExtractor
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
@@ -116,10 +111,7 @@ class Skill_Extractor:
     """
 
     def __init__(self):
-        # openai.api_key = API_KEY
-        # self.client = OpenAI(api_key=openai.api_key)
         self.nlp = spacy.load("en_core_web_lg")
-        # self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
         return
 
     # Declaring a private method for extracting raw skills from input text
@@ -141,44 +133,6 @@ class Skill_Extractor:
         The Function is designed only to return list of skills based on prompt passed to OpenAI's Fine-tuned model.
 
         """
-        # ai_client = self.client
-        # response = ai_client.completions.create(
-        #     model=AI_MODEL_ID,
-        #     prompt=f"""Name all the skills present in the following job description in a single list.
-        #                 Response should have only the skills, no other information or words.
-        #                 Skills should be keywords, each being no more than 3 words.:
-        #                 This is the Job Description:
-        #                 {input_text}
-
-        #                 Skills:
-        #                 """,
-        #     max_tokens=75,
-        #     temperature=0.0,
-        # )
-        # extracted_skills = response.choices[0].text.strip()
-        # extracted_skills = list(set(
-        #     [word.lstrip("-").strip() for word in extracted_skills.split("\n")]
-        # ))
-
-        # return extracted_skills
-
-        # ner_extractor = self.ner_extractor
-        # extracted_skills_set = set()
-        # annotations = None
-        # try:
-        #     annotations = ner_extractor.annotate(input_text)
-        # except ValueError as e:
-        #     print(f"Skipping example, ValueError encountered: {e}")
-        # except Exception as e:
-        #     print(f"Skipping example, An unexpected error occurred: {e}")
-        
-        # for item in annotations['results']['full_matches']:
-        #     extracted_skills_set.add(item['doc_node_value'])
-        
-        # # get ngram_scored
-        # for item in annotations['results']['ngram_scored']:
-        #     extracted_skills_set.add(item['doc_node_value'])
-
         tokenizer = AutoTokenizer.from_pretrained(AI_MODEL_ID)
         model = AutoModelForCausalLM.from_pretrained(AI_MODEL_ID)
         
@@ -199,78 +153,6 @@ class Skill_Extractor:
         extracted_skills_set = set(extracted_skills)
             
         return list(extracted_skills_set)
-
-    # def align_skills(self, raw_skills, document_id='0'):
-    #     """
-    #     This function aligns the skills provided to the available taxonomy
-
-    #     Parameters
-    #     ----------
-    #     raw_skills : list
-    #         Provide list of skill extracted from Job Descriptions / Syllabus.
-    #     document_id: string
-    #         ID of the document or text from where skills where extracted
-    #         Defaults to '0'
-
-    #     Returns
-    #     -------
-    #     list: List of taxonomy skills from text in JSON format
-    #         [
-    #             {
-    #                 "Research ID": text_id
-    #                 "Skill Name": Raw skill extracted,
-    #                 "Skill Tag": taxonomy skill tag,
-    #                 "Correlation Coefficient": similarity_score
-    #             },
-    #             ...
-    #         ]
-
-    #     """
-    #     # dataframe for skill taxonomy database
-    #     skill_db_df = pd.read_csv(SKILL_DB_PATH)
-
-    #     skill_matches = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
-
-    #     # iterate over extracted skills
-    #     for raw_skill in raw_skills:
-
-    #         # get vectorized embedding for raw skill
-    #         raw_skill_embedding = get_embedding(self.nlp, raw_skill)
-
-    #         best_match = None
-    #         best_similarity = 0.0
-    #         matched_skill_set = set()
-
-    #         # iterate over each row in skill taxonomy db
-    #         for index, row in skill_db_df.iterrows():
-    #             tag = row['SkillTag']
-    #             label = row['SkillLabel']
-
-    #             # get vectorized embedding for skill in taxonomy db
-    #             db_skill_embedding = get_embedding(self.nlp, label)
-
-    #             # get cosine similarity between raw skill and skill from taxonomy db
-    #             similarity = cosine_similarity(raw_skill_embedding, db_skill_embedding)
-    #             # print(f'{raw_skill} X {tag}({label}):\t{similarity}')
-
-    #             # if cosine similarity > threshold and not already added then update the best tag
-    #             if similarity > SIMILARITY_THRESHOLD and tag not in matched_skill_set:
-    #                 if similarity > best_similarity:
-    #                     best_match = tag
-    #                     best_similarity = similarity
-    #                     matched_skill_set.add(tag)
-
-    #         # add the best similarity and best match to the output
-    #         if best_match:
-    #             temp = {
-    #                 "Research ID": document_id,
-    #                 "Raw Skill": raw_skill,
-    #                 "Skill Tag": best_match,
-    #                 "Correlation Coefficient": best_similarity
-    #             }
-    #             skill_matches = skill_matches._append(temp, ignore_index=True)
-
-    #     return skill_matches
 
     def align_skills(self, raw_skills, document_id='0'):
         """
