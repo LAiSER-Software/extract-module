@@ -56,12 +56,14 @@ Rev No.     Date            Author              Description
 [1.0.3]     06/10/2024      Vedant M.           Updated functions extract_raw and align_skills for input and output
 [1.0.4]     06/13/2024      Vedant M.           Added function extractor to encapsulate both functions
 [1.0.5]     06/15/2024      Satya Phanindra K.  Replaced OpenAI API with HuggingFace API for skill extraction
+[1.0.6]     06/20/2024      Satya Phanindra K.  Added function to extract skills from text using Fine-Tuned Language Model's API
 
 TODO:
 -----
 - 1: Add references to utils and global parameter file
 - 2: sort taxonomy inputs
 - 3: include rsd_name instead of keywords from osn
+- 4: Optimize the `align_skills` function.
 """
 
 # native packages

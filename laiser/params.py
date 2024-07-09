@@ -36,10 +36,10 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 """
 Revision History
 -----------------
-Rev No.     Date            Author                      Description
-[1.0.0]     06/01/2024      Vedant M.                   Initial Version
-[1.0.1]     06/10/2024      Vedant M.                   added paths for input and output
-[1.0.2]     07/01/2024      Satya Phanindra Kumar K.    updated threshold for similarity and AI model ID
+Rev No.     Date            Author                Description
+[1.0.0]     06/01/2024      Vedant M.             Initial Version
+[1.0.1]     06/10/2024      Vedant M.             added paths for input and output
+[1.0.2]     07/01/2024      Satya Phanindra K.    updated threshold for similarity and AI model ID
 
 
 TODO:
