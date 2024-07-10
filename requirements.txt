@@ -1,4 +1,4 @@
-numpy==2.0.0
+numpy==1.26.4
 pandas==2.2.2
 psutil==5.9.8
 scikit_learn==1.5.1
@@ -12,3 +12,4 @@ huggingface_hub==0.23.4
 peft==0.11.1
 torch==2.3.1
 trl==0.9.4
+skillNer==1.0.3

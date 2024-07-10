@@ -73,14 +73,19 @@ import os
 # installed packages
 import pandas as pd
 import spacy
+import torch
 import pandas as pd
+from spacy.matcher import PhraseMatcher
+from skillNer.general_params import SKILL_DB
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from skillNer.skill_extractor_class import SkillExtractor
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 
 # internal packages
 from laiser.utils import get_embedding, cosine_similarity
-from laiser.params import AI_MODEL_ID, API_KEY, SIMILARITY_THRESHOLD, SKILL_DB_PATH
+from laiser.params import AI_MODEL_ID, SIMILARITY_THRESHOLD, SKILL_DB_PATH
+from laiser.llm_methods import get_completion
 
 
 class Skill_Extractor:
@@ -114,6 +119,26 @@ class Skill_Extractor:
 
     def __init__(self):
         self.nlp = spacy.load("en_core_web_lg")
+        self.model_id = AI_MODEL_ID  
+        if torch.cuda.is_available():
+            print("GPU is available. Using GPU for Fine-tuned Language model initialization.")
+            self.bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16
+            )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id, 
+                quantization_config=self.bnb_config, 
+                device_map={"": 0}
+            )
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left')
+        else:
+            print("GPU is not available. Using CPU for SkillNer model initialization.")
+            self.nlp = spacy.load("en_core_web_lg")
+            self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
+    
         return
 
     # Declaring a private method for extracting raw skills from input text
@@ -135,26 +160,33 @@ class Skill_Extractor:
         More details on which (pre-trained) language model is fine-tuned can be found in llm_methods.py
         The Function is designed only to return list of skills based on prompt passed to OpenAI's Fine-tuned model.
 
-        """
-        tokenizer = AutoTokenizer.from_pretrained(AI_MODEL_ID)
-        model = AutoModelForCausalLM.from_pretrained(AI_MODEL_ID)
+        """    
         
-        # TODO: optimize the model usage by loading it once and using it multiple times from the  llm_methods.py file
-        # use the model variable to generate the list of skills form the input_text
-        model_output = model.generate(
-            tokenizer(input_text, return_tensors="pt").input_ids,
-            max_length=100,
-            num_return_sequences=1,
-            num_beams=5,
-            no_repeat_ngram_size=2,
-            top_k=50,
-            top_p=0.95,
-            temperature=0.5,
-            do_sample=True,
-            pad_token_id=tokenizer.eos_token_id
-        )
-        extracted_skills = tokenizer.batch_decode(model_output, skip_special_tokens=True)
-        extracted_skills_set = set(extracted_skills)
+        if torch.cuda.is_available():
+            # GPU is available. Using Language model for extraction.
+            extracted_skills = get_completion(input_text, self.model, self.tokenizer)
+            extracted_skills_set = set(extracted_skills)
+            torch.cuda.empty_cache()   
+        else: 
+            # GPU is not available. Using SkillNer model for extraction.
+            ner_extractor = self.ner_extractor
+            extracted_skills_set = set()
+            annotations = None
+            try:
+                annotations = ner_extractor.annotate(input_text)
+            except ValueError as e:
+                print(f"Skipping example, ValueError encountered: {e}")
+            except Exception as e:
+                print(f"Skipping example, An unexpected error occurred: {e}")
+
+            for item in annotations['results']['full_matches']:
+                extracted_skills_set.add(item['doc_node_value'])
+
+            # get ngram_scored
+            for item in annotations['results']['ngram_scored']:
+                extracted_skills_set.add(item['doc_node_value'])
+
+            return list(extracted_skills_set)
             
         return list(extracted_skills_set)
 

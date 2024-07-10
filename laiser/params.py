@@ -62,4 +62,3 @@ SIMILARITY_THRESHOLD = 0.75
 # AI_MODEL_ID = 'Phanindra-max/gemma-Code-Instruct-Finetune-test'
 AI_MODEL_ID = 'SaikatM/Code-Gemma-v1'
 API_KEY = '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'
-
