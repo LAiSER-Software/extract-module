@@ -57,6 +57,11 @@ Rev No.     Date            Author              Description
 [1.0.4]     06/13/2024      Vedant M.           Added function extractor to encapsulate both functions
 [1.0.5]     06/15/2024      Satya Phanindra K.  Replaced OpenAI API with HuggingFace API for skill extraction
 [1.0.6]     06/20/2024      Satya Phanindra K.  Added function to extract skills from text using Fine-Tuned Language Model's API
+[1.0.7]     07/03/2024      Satya Phanindra K.  Added CONDITIONAL GPU support for Fine-Tuned Language Model and error handling
+[1.0.9]     07/08/2024      Satya Phanindra K.  Added support for SkillNer model for skill extraction, if GPU not available
+[1.0.8]     07/11/2024      Satya Phanindra K.  Calculate cosine similarities in bulk for optimal performance.
+[1.0.9]     07/15/2024      Satya Phanindra K.  Error handling for empty list outputs from extract_raw function
+
 
 TODO:
 -----
