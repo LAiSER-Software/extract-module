@@ -203,9 +203,6 @@ class Skill_Extractor:
         ----------
         raw_skills : list
             Provide list of skill extracted from Job Descriptions / Syllabus.
-        document_id: string
-            ID of the document or text from where skills were extracted
-            Defaults to '0'
 
         Returns
         -------
@@ -221,43 +218,23 @@ class Skill_Extractor:
             ]
 
         """
-        # dataframe for skill taxonomy database
-        skill_db_df = pd.read_csv(SKILL_DB_PATH)
+        raw_skill_embeddings = np.array([get_embedding(self.nlp, skill) for skill in raw_skills])
 
-        skill_matches = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
+        # Calculate cosine similarities in bulk
+        similarities = 1 - cdist(raw_skill_embeddings, self.skill_db_embeddings, metric='cosine')
 
-        # iterate over extracted skills
-        for raw_skill in raw_skills:
+        matches = []
+        for i, raw_skill in enumerate(raw_skills):
+            skill_matches = np.where(similarities[i] > SIMILARITY_THRESHOLD)[0]
+            for match in skill_matches:
+                matches.append({
+                    "Research ID": document_id,
+                    "Raw Skill": raw_skill,
+                    "Skill Tag": self.skill_db_df.iloc[match]['SkillTag'],
+                    "Correlation Coefficient": similarities[i, match]
+                })
 
-            # get vectorized embedding for raw skill
-            raw_skill_embedding = get_embedding(self.nlp, raw_skill)
-
-            matched_skill_set = set()
-
-            # iterate over each row in skill taxonomy db
-            for index, row in skill_db_df.iterrows():
-                tag = row['SkillTag']
-                label = row['SkillLabel']
-
-                # get vectorized embedding for skill in taxonomy db
-                db_skill_embedding = get_embedding(self.nlp, label)
-
-                # get cosine similarity between raw skill and skill from taxonomy db
-                similarity = cosine_similarity(raw_skill_embedding, db_skill_embedding)
-
-                # if cosine similarity > threshold and not already added then add to the matched skills
-                if similarity > SIMILARITY_THRESHOLD and tag not in matched_skill_set:
-                    temp = pd.DataFrame([{
-                        "Research ID": document_id,
-                        "Raw Skill": raw_skill,
-                        "Skill Tag": tag,
-                        "Correlation Coefficient": similarity
-                    }])
-                    skill_matches = pd.concat([skill_matches, temp], ignore_index=True)
-                    matched_skill_set.add(tag)
-
-        return skill_matches.to_dict(orient='records')
-
+        return matches
 
     def extractor(self, data, id_column='Research ID', text_column='Text'):
         """
