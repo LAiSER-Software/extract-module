@@ -1,6 +1,5 @@
 # LAiSER
-
-## Introduction
+LAiSER stands for  Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research​. LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
 ## Installation 
 
@@ -38,16 +37,7 @@ To use LAiSER as a command line tool, follow the steps below:
   ```shell
   python main.py
   ```
-
-## Contact
-
 ## Funding
-
-## Disclaimer
-
-## Contributing
-
-## Code of Conduct
 
 ## Authors
 

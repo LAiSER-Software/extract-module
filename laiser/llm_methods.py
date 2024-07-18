@@ -46,11 +46,11 @@ Revision History:
 -----------------
 Rev No.     Date            Author              Description
 [1.0.0]     07/10/2024      Satya Phanindra K.  Define all the LLM methods being used in the projectxtraction
+[1.0.1]     07/19/2024      Satya Phanindra K.  Add descriptions to each method
 
 TODO:
 -----
-- 1: Add all the methods used in the project
-- 2: Add descriptions to each method
+- 1: Add descriptions to each method
 """
 
 import re
@@ -61,6 +61,20 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 torch.cuda.empty_cache()
 
 def fetch_model_output(response):
+    """
+    Format the model's output to extract the skill keywords from the get_completion() response
+    
+    Parameters
+    ----------
+    input_text : text
+        The model's response after processing the prompt. 
+        Contains special tags to identify the start and end of the model's response.
+        
+    Returns
+    -------
+    list: List of extracted skills from text
+    
+    """
     # Find the content between the model start tag and the last <eos> tag
     pattern = r'<start_of_turn>model\s*<eos>(.*?)<eos>\s*$'
     match = re.search(pattern, response, re.DOTALL)
@@ -77,6 +91,26 @@ def fetch_model_output(response):
         return skills
 
 def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
+    """
+    Get completions for a list of queries using the model
+    
+    Parameters
+    ----------
+    queries : list
+        List of queries to get completions for using the model
+    model : model
+        The model to use for generating completions
+    tokenizer : tokenizer
+        The tokenizer to use for encoding the queries
+    batch_size : int, optional
+        Preferred batch size to use for generating completions
+        
+    Returns
+    -------
+    list: List of extracted skills from the text(s)
+    
+    """
+    
     device = "cuda:0"
     results = []
 
@@ -115,6 +149,24 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
     return results
 
 def get_completion(query: str, model, tokenizer) -> str:
+    """
+    Get completion for a single query using the model
+    
+    Parameters
+    ----------
+    query : str
+        The query to get completions for using the model
+    model : model
+        The model to use for generating completions
+    tokenizer : tokenizer
+        The tokenizer to use for encoding the queries
+        
+    Returns
+    -------
+    list: List of extracted skills from the text
+        
+    """
+    
     device = "cuda:0"
 
     prompt_template = """
