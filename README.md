@@ -39,8 +39,6 @@ To use LAiSER as a command line tool, follow the steps below:
   python main.py
   ```
 
-## License
-
 ## Contact
 
 ## Funding
