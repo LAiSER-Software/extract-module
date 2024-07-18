@@ -20,5 +20,5 @@ print('The skills have been extracted successfully...\n')
 
 # save the extracted skills to a csv file
 print(output)
-output.to_csv('./output/extracted_skills_for_50Jobs.csv', index=False)
+output.to_csv('./output/test_extracted_skills_for_2Jobs.csv', index=False)
 print('The extracted skills have been saved to the file named: extracted_skills_for_50Jobs.csv')
