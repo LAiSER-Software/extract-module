@@ -76,15 +76,16 @@ import sys
 import os
 
 # installed packages
-import pandas as pd
 import spacy
 import torch
+import numpy as np
 import pandas as pd
 from spacy.matcher import PhraseMatcher
 from skillNer.general_params import SKILL_DB
 from sklearn.metrics.pairwise import cosine_similarity
 from skillNer.skill_extractor_class import SkillExtractor
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from scipy.spatial.distance import cdist
 
 
 # internal packages
@@ -102,12 +103,7 @@ class Skill_Extractor:
     ----------
     client : HuggingFace API client
     nlp : spacy nlp model
-        Short description
-
-    Parameters
-    ----------
-
-
+    
     Methods
     -------
     extract_raw(input_text: text)

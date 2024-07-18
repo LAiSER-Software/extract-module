@@ -119,3 +119,4 @@ def log_performance(function_name, start_time, end_time):
         "-------------------------------"
     )
     logging.info(log_message)
+    print(log_message)
