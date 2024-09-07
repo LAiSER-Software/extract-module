@@ -5,11 +5,11 @@
 # Contents
 LAiSER stands for  Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research​. LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
-1. About
-2. Requirements
-3. Setup & Installation
-4. Usage
-5. Examples
+1. ![About](#about)
+2. ![Requirements](#requirements)
+3. ![Setup & Installation](#setup-and-installation)
+4. ![Usage](#usage)
+5. ![Examples](#examples)
 
 ## 1. About
 ## 2. Requirements
