@@ -1,3 +1,8 @@
+<div align="center">
+<img src="![image](https://github.com/user-attachments/assets/2b7a9900-68db-49ef-9fe2-0da8f4ffa6b0)
+" width="70%"/>
+
+</div>
 # LAiSER
 LAiSER stands for  Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research​. LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
@@ -42,3 +47,4 @@ To use LAiSER as a command line tool, follow the steps below:
 ## Authors
 
 ## Sponsors
+<p align='center'> <b> Made with Passion💖, Data Science📊, and a little magic!🪄 </b></p>
