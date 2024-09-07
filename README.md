@@ -1,20 +1,26 @@
 <div align="center">
-<img src="![image](https://github.com/user-attachments/assets/2b7a9900-68db-49ef-9fe2-0da8f4ffa6b0)
-" width="70%"/>
-
+<img src="https://github.com/user-attachments/assets/2b7a9900-68db-49ef-9fe2-0da8f4ffa6b0" width="70%"/>
 </div>
-# LAiSER
+
+# Contents
 LAiSER stands for  Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research​. LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
-## Installation 
+- About
+- Requirements
+- Installation
+- Setup and Usage
+- Examples
 
-### Download the repository
-Before proceeding to  LAiSER, you'd want to follow the steps below to install the required dependencies:
-- Clone the repository using 
-  ```shell
-  git clone https://github.com/Micah-Sanders/LAiSER.git
-  ```
-  or download the [zip(link)](https://github.com/Micah-Sanders/LAiSER/archive/refs/heads/main.zip) file and extract it.
+## About
+## Requirements
+- Python version >= Python 3.12. 
+- A GPU with atelast 15GB video memory is essential for running this tool on large datasets.
+- If you encounter any `*.dll` file missing errors, make sure you downgrade the pytorch version to `2.2.2`.
+```shell
+pip install pytorch=2.2.2
+```
+
+## Installation
 
 ### Install the dependencies
 > [!NOTE]
@@ -25,6 +31,20 @@ Install the required dependencies using the command below:
     pip install -r requirements.txt
 ```
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
+
+
+## Setup and Usage
+## Examples
+
+## Installation 
+
+### Download the repository
+Before proceeding to  LAiSER, you'd want to follow the steps below to install the required dependencies:
+- Clone the repository using 
+  ```shell
+  git clone https://github.com/Micah-Sanders/LAiSER.git
+  ```
+  or download the [zip(link)](https://github.com/Micah-Sanders/LAiSER/archive/refs/heads/main.zip) file and extract it.
 
 
 ## Setup and Usage
