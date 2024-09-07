@@ -7,7 +7,7 @@ LAiSER stands for  Leveraging ​Artificial ​Intelligence for ​Skill ​Extr
 
 1. ![About](#about)
 2. ![Requirements](#requirements)
-3. ![Setup & Installation](#setup-and-installation)
+3. ![Setup and Installation](#setup-and-installation)
 4. ![Usage](#usage)
 5. ![Examples](#examples)
 
@@ -20,7 +20,7 @@ LAiSER stands for  Leveraging ​Artificial ​Intelligence for ​Skill ​Extr
 pip install pytorch=2.2.2
 ```
 
-## 3. Installation
+## 3. Setup and Installation
 
 ### i. Download the repository
 Before proceeding to  LAiSER, you'd want to follow the steps below to install the required dependencies:
@@ -41,7 +41,7 @@ Install the required dependencies using the command below:
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
 
 
-## 4. Setup and Usage
+## 4. Usage
 
 As of now LAiSER can be used a command line tool or from the Jupyter notebook(Google Colab). The steps to setup the tool are as follows:
 
@@ -60,9 +60,6 @@ To use LAiSER as a command line tool, follow the steps below:
 
 ## 5. Examples
 
-
-
-## Setup and Usage
 
 ## Funding
 
