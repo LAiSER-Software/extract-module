@@ -45,7 +45,7 @@ Output/Return Format:
 Revision History:
 -----------------
 Rev No.     Date            Author              Description
-[1.0.0]     07/10/2024      Satya Phanindra K.  Define all the LLM methods being used in the projectxtraction
+[1.0.0]     07/10/2024      Satya Phanindra K.  Define all the LLM methods being used in the project
 [1.0.1]     07/19/2024      Satya Phanindra K.  Add descriptions to each method
 
 TODO:
