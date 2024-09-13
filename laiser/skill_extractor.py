@@ -90,7 +90,7 @@ from scipy.spatial.distance import cdist
 
 # internal packages
 from laiser.utils import get_embedding, cosine_similarity
-from laiser.params import AI_MODEL_ID, SIMILARITY_THRESHOLD, SKILL_DB_PATH
+from laiser.params import SIMILARITY_THRESHOLD, SKILL_DB_PATH, HF_API_KEY, AI_MODEL_ID
 from laiser.llm_methods import get_completion
 
 
@@ -136,7 +136,7 @@ class Skill_Extractor:
                 self.model_id,
                 quantization_config=self.bnb_config,
                 device_map={"": 0},
-                token="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"
+                token=HF_API_KEY
             )
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left', token="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")
         else:

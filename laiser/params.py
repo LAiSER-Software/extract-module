@@ -48,6 +48,7 @@ TODO:
 """
 
 import os
+from dotenv import load_dotenv
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(ROOT_DIR, 'input')
@@ -58,6 +59,7 @@ SKILL_DB_PATH = os.path.join(INPUT_PATH, 'combined.csv')
 
 SIMILARITY_THRESHOLD = 0.85
 
-# TODO: When done finalizing the model, Update the AI_MODEL_ID.
-# AI_MODEL_ID = 'Phanindra-max/gemma-Code-Instruct-Finetune-test'
+# HuggingFace API Key and Model ID
+load_dotenv('.env')
+HF_API_KEY = os.getenv('HF_API_KEY')
 AI_MODEL_ID = 'google/gemma-2b-it'
