@@ -14,7 +14,10 @@ LAiSER is a tool that helps learners, educators and employers share trusted and 
 - [Usage](#usage)
   - [Google Colab Setup(preferred)](#google-colab-setuppreferred)
   - [Command Line Setup](#command-line-setup)
-- [Examples](#examples)
+- [Funding](#funding)
+- [Authors](#authors)
+- [Partners](#partners)
+<!-- - [Examples](#examples) -->
 - [Funding](#funding)
 - [Authors](#authors)
 - [Partners](#partners)
@@ -70,7 +73,7 @@ pip install pytorch=2.2.2
 ```
 
 
-## Examples
+<!-- ## Examples -->
 
 
 ## Funding
