@@ -50,7 +50,7 @@ Rev No.     Date            Author              Description
 
 TODO:
 -----
-- 1: Add descriptions to each method
+
 """
 
 import re

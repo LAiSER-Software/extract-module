@@ -90,7 +90,7 @@ from scipy.spatial.distance import cdist
 
 # internal packages
 from laiser.utils import get_embedding, cosine_similarity
-from laiser.params import AI_MODEL_ID, SIMILARITY_THRESHOLD, SKILL_DB_PATH
+from laiser.params import SIMILARITY_THRESHOLD, SKILL_DB_PATH, HF_API_KEY, AI_MODEL_ID
 from laiser.llm_methods import get_completion
 
 
@@ -119,10 +119,13 @@ class Skill_Extractor:
     """
 
     def __init__(self):
+        self.model_id = AI_MODEL_ID
         self.nlp = spacy.load("en_core_web_lg")
-        self.model_id = AI_MODEL_ID  
+        self.skill_db_df = pd.read_csv(SKILL_DB_PATH)
+        self.skill_db_embeddings = np.array([get_embedding(self.nlp, label) for label in self.skill_db_df['SkillLabel']])
         if torch.cuda.is_available():
             print("GPU is available. Using GPU for Fine-tuned Language model initialization.")
+            torch.cuda.empty_cache()
             self.bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_use_double_quant=True,
@@ -130,16 +133,15 @@ class Skill_Extractor:
                 bnb_4bit_compute_dtype=torch.bfloat16
             )
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id, 
-                quantization_config=self.bnb_config, 
-                device_map={"": 0}
+                self.model_id,
+                quantization_config=self.bnb_config,
+                device_map={"": 0},
+                token=HF_API_KEY
             )
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left')
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left', token="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")
         else:
             print("GPU is not available. Using CPU for SkillNer model initialization.")
-            self.nlp = spacy.load("en_core_web_lg")
             self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
-    
         return
 
     # Declaring a private method for extracting raw skills from input text
