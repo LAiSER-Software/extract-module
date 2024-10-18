@@ -138,7 +138,7 @@ class Skill_Extractor:
                 device_map={"": 0},
                 token=HF_API_KEY
             )
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left', token="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")
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left', token="<ADD YOUR TOKEN HERE/IN GOOGLE COLAB SECRETS>")
         else:
             print("GPU is not available. Using CPU for SkillNer model initialization.")
             self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
