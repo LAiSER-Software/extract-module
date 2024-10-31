@@ -14,4 +14,5 @@ torch==2.3.1
 trl==0.9.4
 skillNer==1.0.3
 ipython==8.27.0
+python-dotenv
 https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.7.1/en_core_web_lg-3.7.1.tar.gz
