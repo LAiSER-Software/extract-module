@@ -2,7 +2,7 @@ import pandas as pd
 from laiser.skill_extractor import Skill_Extractor
 
 print('\n\nLoading a sample dataset of 50 jobs...')
-nlx_sample = pd.read_csv('https://raw.githubusercontent.com/phanindra-max/LAiSER-datasets/master/nlx_tx_sample_data_gwu.csv')
+nlx_sample = pd.read_csv('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/nlx_job_data_50rows.csv')
 print('The sample dataset has been loaded successfully!\n')
 
 
