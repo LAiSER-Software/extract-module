@@ -47,6 +47,7 @@ Revision History:
 Rev No.     Date            Author              Description
 [1.0.0]     07/10/2024      Satya Phanindra K.  Define all the LLM methods being used in the project
 [1.0.1]     07/19/2024      Satya Phanindra K.  Add descriptions to each method
+[1.0.2]     11/24/2024      Prudhvi Chekuri     Add support for skills extraction from syllabi data
 
 TODO:
 -----
@@ -148,14 +149,18 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
 
     return results
 
-def get_completion(query: str, model, tokenizer) -> str:
+def get_completion(input_text, text_columns, input_type, model, tokenizer) -> str:
     """
     Get completion for a single query using the model
     
     Parameters
     ----------
-    query : str
+    input_text : pandas Series with text data related to Job Description / Syllabus Description / Course Outcomes etc.
         The query to get completions for using the model
+    text_columns : list
+        List of columns in the input_text dataframe that contain the text data. (Default: ['description'])
+    input_type : str
+        Type of input data - 'job_desc' / 'syllabus' etc. (Default: 'job_desc')
     model : model
         The model to use for generating completions
     tokenizer : tokenizer
@@ -169,15 +174,32 @@ def get_completion(query: str, model, tokenizer) -> str:
     
     device = "cuda:0"
 
-    prompt_template = """
-    <start_of_turn>user
-    Name all the skills present in the following description in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
-    Below text is the Description:
+    if input_type == "job_desc":
+        prompt_template = """
+        <start_of_turn>user
+        Name all the skills present in the following description in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
+        Below text is the Description:
 
-    {query}
-    <end_of_turn>\n<start_of_turn>model
-    """
-    prompt = prompt_template.format(query=query)
+        {query}
+        <end_of_turn>\n<start_of_turn>model
+        """
+        prompt = prompt_template.format(query=input_text[text_columns[0]])
+    elif input_type == "syllabus":
+        prompt_template = """
+        <start_of_turn>user
+        Name all the skills present in the following course details in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
+
+        Course Description:
+        {description}
+
+
+        Learning Outcomes:
+        {learning_outcomes}
+
+        <end_of_turn>
+        <start_of_turn>model
+        """
+        prompt = prompt_template.format(description=input_text[text_columns[0]], learning_outcomes=input_text[text_columns[1]])
 
     encodeds = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
 

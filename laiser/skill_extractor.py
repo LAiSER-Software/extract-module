@@ -61,6 +61,7 @@ Rev No.     Date            Author              Description
 [1.0.9]     07/08/2024      Satya Phanindra K.  Added support for SkillNer model for skill extraction, if GPU not available
 [1.0.8]     07/11/2024      Satya Phanindra K.  Calculate cosine similarities in bulk for optimal performance.
 [1.0.9]     07/15/2024      Satya Phanindra K.  Error handling for empty list outputs from extract_raw function
+[1.0.10]    11/24/2024      Prudhvi Chekuri     Added support for skills extraction from syllabi data
 
 
 TODO:
@@ -138,21 +139,25 @@ class Skill_Extractor:
                 device_map={"": 0},
                 token=HF_API_KEY
             )
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left', token="<ADD YOUR TOKEN HERE/IN GOOGLE COLAB SECRETS>")
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, add_eos_token=True, padding_side='left', token=HF_API_KEY)
         else:
             print("GPU is not available. Using CPU for SkillNer model initialization.")
             self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
         return
 
     # Declaring a private method for extracting raw skills from input text
-    def extract_raw(self, input_text):
+    def extract_raw(self, input_text, text_columns, input_type):
         """
         The function extracts skills from text using Fine-Tuned Language Model's API
 
         Parameters
         ----------
-        input_text : text
+        input_text : pandas Series with text data
             Job advertisement / Job Description / Syllabus Description / Course Outcomes etc.
+        text_columns: list
+            Name of the text columns in the dataset. Defaults to 'description'
+        input_type: string
+            Type of input data. Defaults to 'job_desc'
 
         Returns
         -------
@@ -167,7 +172,7 @@ class Skill_Extractor:
         
         if torch.cuda.is_available():
             # GPU is available. Using Language model for extraction.
-            extracted_skills = get_completion(input_text, self.model, self.tokenizer)
+            extracted_skills = get_completion(input_text, text_columns, input_type, self.model, self.tokenizer)
             extracted_skills_set = set(extracted_skills)
             torch.cuda.empty_cache()   
         else: 
@@ -176,6 +181,12 @@ class Skill_Extractor:
             extracted_skills_set = set()
             annotations = None
             try:
+                
+                if input_type == "job_desc":
+                  input_text = input_text[text_columns][0]
+                elif input_type == "syllabus":
+                  input_text = f"Course Description: {input_text[text_columns[0]]}\n\nLearning Outcomes: {input_text[text_columns[1]]}"
+                
                 annotations = ner_extractor.annotate(input_text)
             except ValueError as e:
                 print(f"Skipping example, ValueError encountered: {e}")
@@ -234,7 +245,7 @@ class Skill_Extractor:
 
         return matches
 
-    def extractor(self, data, id_column='Research ID', text_column='Text'):
+    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc"):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
 
@@ -244,8 +255,10 @@ class Skill_Extractor:
             Dataset containing text id and actual text to extract skills.
         id_column: string
             Name of id column in the dataset. Defaults to 'Research ID'
-        text_column: string
-            Name of the text column in the dataset. Defaults to 'Text'
+        text_columns: list
+            Name of the text columns in the dataset. Defaults to 'description'
+        input_type: string
+            Type of input data. Defaults to 'job_desc'
 
         Returns
         -------
@@ -261,11 +274,15 @@ class Skill_Extractor:
             ]
 
         """
+        
         extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
-        for index, row in data.iterrows():
+        for _, row in data.iterrows():
             research_id = row[id_column]
-            input_text = row[text_column]
-            raw_skills = self.extract_raw(input_text)
-            aligned_skills = self.align_skills(raw_skills, research_id)
-            extracted = extracted._append(aligned_skills, ignore_index=True)
+            raw_skills = self.extract_raw(row, text_columns, input_type)
+            if(len(raw_skills) == 0):
+                continue
+            else:
+              aligned_skills = self.align_skills(raw_skills, research_id)
+              extracted = extracted._append(aligned_skills, ignore_index=True)
+
         return extracted
