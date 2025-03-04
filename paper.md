@@ -86,7 +86,7 @@ pip install -r requirements.txt
 
 Sample datasets for job descriptions and course descriptions can be downloaded from LAiSER datasets repo: <https://github.com/LAiSER-Software/datasets>. For this example, we’ll use the sample dataset with 50 Job descriptions from NLx. For this example we’ll use a sample dataset with 50 Job Descriptions from NLx\[[Link to Dataset](https://raw.githubusercontent.com/phanindra-max/LAiSER-datasets/refs/heads/master/jobs-data/nlx_job_data_50rows.csv)\]
 
-![Sample Input](assets/sample_input.png)
+<!-- ![Sample Input](assets/sample_input.png) -->
 
 **Load the data into a Pandas DataFrame:**
 
@@ -112,7 +112,7 @@ print(results)
 
 **Sample Output:**
 
-![Sample Output](assets/sample_output.png)
+<!-- ![Sample Output](assets/sample_output.png) -->
 
 **Detailed Explanation**
 

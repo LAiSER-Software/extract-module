@@ -23,7 +23,7 @@ print('The skills have been extracted from jobs data successfully...\n')
 # save the extracted skills to a csv file
 print(output)
 file_name = f'extracted_skills_for_{len(nlx_sample)}Jobs.csv'
-output.to_csv(f'./output/{file_name}', index=False)
+output.to_csv(f'{file_name}', index=False)
 print('The extracted skills have been saved to the file named:', file_name)
 
 
@@ -43,5 +43,5 @@ print('The skills have been extracted from syllabi data successfully...\n')
 # save the extracted skills to a csv file
 print(output)
 file_name = f'extracted_skills_for_{len(syllabi_sample)}Syllabi.csv'
-output.to_csv(f'./output/{file_name}', index=False)
+output.to_csv(f'{file_name}', index=False)
 print('The extracted skills have been saved to the file named:', file_name)
