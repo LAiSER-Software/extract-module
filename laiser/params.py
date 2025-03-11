@@ -58,8 +58,3 @@ SKILL_DB_PATH = os.path.join(INPUT_PATH, 'combined.csv')
 
 
 SIMILARITY_THRESHOLD = 0.85
-
-# HuggingFace API Key and Model ID
-load_dotenv('.env')
-HF_API_KEY = os.getenv('HF_API_KEY')
-AI_MODEL_ID = 'google/gemma-2b-it'
