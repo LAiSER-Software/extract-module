@@ -219,15 +219,15 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
 
 
 def parse_output_vllm(response):
-
     out = []
-    items = [i.replace('\n', '') for i in response.strip('->').strip().split('->')]
+    # Split into items, handling optional '->' prefix and multi-line input
+    items = [item.strip() for item in response.split('->') if item.strip()]
 
     for item in items:
         skill_data = {}
 
         # Extract skill
-        skill_match = re.search(r"Skill:\s*([^,]+)", item)
+        skill_match = re.search(r"Skill:\s*([^,\n]+)", item)
         if skill_match:
             skill_data['Skill'] = skill_match.group(1).strip()
 
@@ -236,17 +236,17 @@ def parse_output_vllm(response):
         if level_match:
             skill_data['Level'] = int(level_match.group(1).strip())
 
-        # Extract knowledge required
-        knowledge_match = re.search(r"Knowledge Required:\s*([^,]+(?:, [^:]+)*?)\s*(?:Task Abilities|$)", item)
+        # Extract knowledge required (multi-line support with re.DOTALL)
+        knowledge_match = re.search(r"Knowledge Required:\s*(.*?)(?=\s*Task Abilities:|\s*$)", item, re.DOTALL)
         if knowledge_match:
-            knowledge_raw = knowledge_match.group(1)
-            skill_data['Knowledge Required'] = [k.strip() for k in knowledge_raw.strip().strip(',').split(',')]
+            knowledge_raw = knowledge_match.group(1).strip()
+            skill_data['Knowledge Required'] = [k.strip() for k in knowledge_raw.split(',') if k.strip()]
 
-        # Extract task abilities
-        task_match = re.search(r"Task Abilities:\s*([^,]+(?:, [^:]+)*)", item)
+        # Extract task abilities (multi-line support with re.DOTALL)
+        task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
         if task_match:
-            task_raw = task_match.group(1)
-            skill_data['Task Abilities'] = [t.strip() for t in task_raw.split(',')]
+            task_raw = task_match.group(1).strip()
+            skill_data['Task Abilities'] = [t.strip() for t in task_raw.split(',') if t.strip()]
 
         out.append(skill_data)
 
