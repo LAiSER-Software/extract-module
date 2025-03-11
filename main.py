@@ -1,3 +1,4 @@
+import torch
 import pandas as pd
 import argparse
 from laiser.skill_extractor import Skill_Extractor
@@ -6,10 +7,14 @@ from laiser.skill_extractor import Skill_Extractor
 parser = argparse.ArgumentParser(description='Run Skill Extractor on jobs and syllabi data.')
 parser.add_argument('--HF_TOKEN', type=str, default=None, help='Hugging Face token for authentication')
 parser.add_argument('--AI_MODEL_ID', type=str, default=None, help='Model name for Skill Extractor')
+parser.add_argument('--use_gpu', type=str, default=str(torch.cuda.is_available()), help='Enable or disable GPU use.')
 args = parser.parse_args()
 
+
+use_gpu = True if args.use_gpu == "True" else False
+
 print('\n\nInitializing the Skill Extractor...')
-se = Skill_Extractor(AI_MODEL_ID=args.AI_MODEL_ID, HF_TOKEN=args.HF_TOKEN)
+se = Skill_Extractor(AI_MODEL_ID=args.AI_MODEL_ID, HF_TOKEN=args.HF_TOKEN, use_gpu=use_gpu)
 print('The Skill Extractor has been initialized successfully!\n')
 
 # Skill extraction from jobs data

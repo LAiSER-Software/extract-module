@@ -121,19 +121,20 @@ class Skill_Extractor:
 
     """
 
-    def __init__(self, AI_MODEL_ID, HF_TOKEN):
+    def __init__(self, AI_MODEL_ID, HF_TOKEN, use_gpu):
         self.model_id = AI_MODEL_ID
-        self.HF_TOKEN=HF_TOKEN,
+        self.HF_TOKEN=HF_TOKEN
+        self.use_gpu=use_gpu
         self.nlp = spacy.load("en_core_web_lg")
         self.skill_db_df = pd.read_csv(SKILL_DB_PATH)
         self.skill_db_embeddings = np.array([get_embedding(self.nlp, label) for label in self.skill_db_df['SkillLabel']])
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.use_gpu:
             print("GPU is available. Using GPU for Large Language model initialization...")
             torch.cuda.empty_cache()
             
             # Use quantization to reduce the model size and memory usage
             if self.model_id:
-                self.llm = LLM(model=self.model_id, dtype="float16", quantization='awq')
+                self.llm = LLM(model=self.model_id, dtype="float16", quantization='gptq')
             else:
                 self.llm = LLM(model="marcsun13/gemma-2-9b-it-GPTQ", dtype="float16", quantization='gptq')              
         else:
@@ -143,7 +144,7 @@ class Skill_Extractor:
 
 
     # Declaring a private method for extracting raw skills from input text
-    def extract_raw(self, input_text, text_columns, input_type):
+    def extract_raw(self, input_text, text_columns, id_column, input_type):
         """
         The function extracts skills from text using Fine-Tuned Language Model's API
 
@@ -167,9 +168,9 @@ class Skill_Extractor:
 
         """    
         
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.use_gpu:
             # GPU is available. Using Language model for extraction.
-            extracted_skills_set = get_completion_vllm(input_text, text_columns, input_type, self.llm)
+            extracted_skills_set = get_completion_vllm(input_text, text_columns, id_column, input_type, self.llm)
             torch.cuda.empty_cache()
         else: 
             # GPU is not available. Using SkillNer model for extraction.
@@ -241,7 +242,7 @@ class Skill_Extractor:
         return matches
 
 
-    def align_KSAs(self, extracted_df):
+    def align_KSAs(self, extracted_df, id_column):
         matches = []
 
         raw_skill_embeddings = np.array([get_embedding(self.nlp, skill) for skill in extracted_df['Skill']])
@@ -253,7 +254,7 @@ class Skill_Extractor:
             skill_matches = np.where(similarities[i] > SIMILARITY_THRESHOLD)[0]
             for match in skill_matches:
                 matches.append({
-                    "Research ID": extracted_df.iloc[i]['id'],
+                    "Research ID": extracted_df.iloc[i][id_column],
                     "Description": extracted_df.iloc[i]['description'],
                     "Learning Outcomes": extracted_df.iloc[i]['learning_outcomes'],
                     "Raw Skill": raw_skill,
@@ -297,15 +298,15 @@ class Skill_Extractor:
 
         """
         
-        if torch.cuda.is_available():
-            KSAs = self.extract_raw(data, text_columns, input_type)
+        if torch.cuda.is_available() and self.use_gpu:
+            KSAs = self.extract_raw(data, text_columns, id_column, input_type)
         
             extracted_df = pd.DataFrame(KSAs)
             if input_type != 'syllabus':
                 extracted_df["learning_outcomes"] = ''
 
-            extracted_df = extracted_df[["id", "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]]
-            matches = self.align_KSAs(extracted_df)
+            extracted_df = extracted_df[[id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]]
+            matches = self.align_KSAs(extracted_df, id_column)
             
             extracted = pd.DataFrame(columns=['Research ID', 'Description', 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
             extracted = extracted._append(matches, ignore_index=True)
@@ -317,7 +318,7 @@ class Skill_Extractor:
             extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
             for _, row in data.iterrows():
                 research_id = row[id_column]
-                raw_skills = self.extract_raw(row, text_columns, input_type)
+                raw_skills = self.extract_raw(row, text_columns, id_column, input_type)
                 if(len(raw_skills) == 0):
                     continue
                 else:

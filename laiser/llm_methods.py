@@ -329,17 +329,15 @@ def vllm_batch_generate(llm, queries, input_type, batch_size=32, num_key_skills=
     return result
 
 
-def get_completion_vllm(input_text, text_columns, input_type, llm, batch_size=4) -> list:
+def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, batch_size=4) -> list:
 
     result = vllm_batch_generate(llm, input_text, input_type=input_type, batch_size=batch_size)
     
-    ids = input_text['id'].to_numpy() if 'id' in input_text.columns else np.array([i for i in range(len(input_text))])
-
     parsed_output = []
     for i in range(len(result)):
         parsed = parse_output_vllm(result[i].outputs[0].text)
         for item in parsed:
-            item['id'] = ids[i]
+            item[id_column] = input_text.iloc[i][id_column]
             item['description'] = input_text.iloc[i]['description']
             if 'learning_outcomes' in input_text.columns:
                 item['learning_outcomes'] = input_text.iloc[i]['learning_outcomes']
