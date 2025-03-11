@@ -1,3 +1,4 @@
+vllm
 numpy
 pandas
 psutil
