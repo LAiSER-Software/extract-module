@@ -48,7 +48,7 @@ Rev No.     Date            Author              Description
 [1.0.0]     07/10/2024      Satya Phanindra K.  Define all the LLM methods being used in the project
 [1.0.1]     07/19/2024      Satya Phanindra K.  Add descriptions to each method
 [1.0.2]     11/24/2024      Prudhvi Chekuri     Add support for skills extraction from syllabi data
-[1.0.3]     11/25/2024      Satya Phanindra K.  Add support for skills extraction from course outcomes data
+[1.0.3]     03/12/2025     Satya Phanindra K.  Add support for skills extraction from course outcomes data
 
 TODO:
 -----
