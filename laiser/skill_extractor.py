@@ -62,6 +62,7 @@ Rev No.     Date            Author              Description
 [1.0.8]     07/11/2024      Satya Phanindra K.  Calculate cosine similarities in bulk for optimal performance.
 [1.0.9]     07/15/2024      Satya Phanindra K.  Error handling for empty list outputs from extract_raw function
 [1.0.10]    11/24/2024      Prudhvi Chekuri     Added support for skills extraction from syllabi data
+[1.1.0]     03/12/2025      Prudhvi Chekuri     Added support for extracting KSAs from text and aligning them to the taxonomy
 
 
 TODO:
@@ -104,8 +105,22 @@ class Skill_Extractor:
 
     Attributes
     ----------
-    client : HuggingFace API client
-    nlp : spacy nlp model
+    model_id: string
+        Model ID for Large Language Model
+    HF_TOKEN: string
+        HuggingFace Token for restricted models under gated HF repos.
+    use_gpu: boolean
+        Flag to use GPU for Large Language Model
+    nlp: spacy model
+        Spacy model for NER
+    skill_db_df: pandas dataframe
+        Dataframe containing taxonomy skills
+    skill_db_embeddings: numpy array
+        Array containing embeddings of taxonomy skills
+    llm: LLM model
+        Large Language Model for skill extraction
+    ner_extractor: SkillExtractor
+        SkillNer model for CPU skill extraction
     
     Methods
     -------
@@ -117,6 +132,9 @@ class Skill_Extractor:
         
     extractor(data: pandas dataframe, id_column='Research ID', text_column='Text'):
         Function takes text dataset to extract and aligns skills based on available taxonomies
+        
+    align_KSAs(extracted_df: pandas dataframe, id_column='Research ID'):
+        This function aligns the KSAs provided to the available taxonomy    
     ....
 
     """
@@ -152,6 +170,8 @@ class Skill_Extractor:
         ----------
         input_text : pandas Series with text data
             Job advertisement / Job Description / Syllabus Description / Course Outcomes etc.
+        id_column: string
+            Name of id column in the dataset. Defaults to 'Research ID'
         text_columns: list
             Name of the text columns in the dataset. Defaults to 'description'
         input_type: string
@@ -160,11 +180,6 @@ class Skill_Extractor:
         Returns
         -------
         list: List of extracted skills from text
-
-        Notes
-        -----
-        More details on which (pre-trained) language model is fine-tuned can be found in llm_methods.py
-        The Function is designed only to return list of skills based on prompt passed to OpenAI's Fine-tuned model.
 
         """    
         
@@ -243,6 +258,22 @@ class Skill_Extractor:
 
 
     def align_KSAs(self, extracted_df, id_column):
+        
+        """
+        This function aligns the KSAs provided to the available taxonomy
+        
+        Parameters
+        ----------
+        extracted_df : pandas dataframe
+            Dataset containing extracted KSAs from text and their details.
+        id_column: string
+            Name of id column in the dataset. Defaults to 'Research ID'
+            
+        Returns
+        -------
+        List of dictionary containing aligned KSAs with taxonomy skills        
+        """
+        
         matches = []
 
         raw_skill_embeddings = np.array([get_embedding(self.nlp, skill) for skill in extracted_df['Skill']])
@@ -285,6 +316,7 @@ class Skill_Extractor:
 
         Returns
         -------
+        For CPU:
         list: List of skill tags and similarity_score for all texts in  from text in JSON format
             [
                 {
@@ -295,6 +327,18 @@ class Skill_Extractor:
                 },
                 ...
             ]
+            
+        For GPU:
+        pandas dataframe with below columns:
+            - "Research ID": text_id
+            - "Description": text description
+            - "Learning Outcomes": learning outcomes
+            - "Raw Skill": Raw skill extracted
+            - "Level": Level of the skill
+            - "Knowledge Required": Knowledge required for the skill
+            - "Task Abilities": Task abilities
+            - "Skill Tag": taxonomy skill tag
+            - "Correlation Coefficient": similarity_score
 
         """
         
