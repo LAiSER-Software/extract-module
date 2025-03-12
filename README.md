@@ -63,13 +63,13 @@ To use LAiSER as a command line tool, follow the steps below:
 
 - Navigate to the root directory of the repository and run the command below:
   ```shell
-  pip install laiser-dev
+  pip install dev-laiser
   ```
 
 - Once the installation is complete, you can run the tool using the command below:
   <!-- TODO: add an example of importing and initiating the skillExtractor class -->
   ```shell
-  
+  TODO: add an example of importing and initiating the skillExtractor class
   ```
 
 <!-- > [!CAUTION]
