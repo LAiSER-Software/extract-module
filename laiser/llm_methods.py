@@ -290,27 +290,6 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
     ------- 
     str
         The formatted prompt for the KSA extraction task.       
-    """
-
-    """
-    Create a prompt for the VLLM model to extract key skills, knowledge required, and task abilities from the input text.
-    
-    Parameters
-    ----------
-    query : dict
-        The query to get completions for using the model
-    input_type : str
-        Type of input data - 'job_desc' / 'syllabus' etc. (Default: 'job_desc')
-    num_key_skills : int, optional
-        Number of key skills to extract from the input text
-    num_key_kr : str, optional
-        Number of key knowledge required items to extract from the input text
-    num_key_tas : str, optional
-        Number of key task abilities items to extract from the input text
-        
-    Returns
-    -------
-    str: Prompt to be used for the VLLM model to extract key skills, knowledge required, and task abilities from the input text.
     
     """
 

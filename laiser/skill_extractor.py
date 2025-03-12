@@ -126,12 +126,6 @@ class Skill_Extractor:
     -------
     extract_raw(input_text: text)
         The function extracts skills from text using NER model
-
-    align_skills(raw_skills: list, document_id='0': string):
-        This function aligns the skills provided to the desired taxonomy
-        
-    align_KSAs(extracted_df: pandas dataframe, id_column='Research ID'):
-        This function aligns the skills provided to the desired taxonomy
         
     extractor(data: pandas dataframe, id_column='Research ID', text_column='Text'):
         Function takes text dataset to extract and aligns skills based on available taxonomies
