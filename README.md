@@ -34,7 +34,7 @@ LAiSER is a tool that helps learners, educators and employers share trusted and 
 Before proceeding to  LAiSER, you'd want to follow the steps below to install the required dependencies:
 - Clone the repository using 
   ```shell
-  git clone https://github.com/Micah-Sanders/LAiSER.git
+  git clone https://github.com/LAiSER-Software/extract-module.git
   ```
   or download the [zip(link)](https://github.com/Micah-Sanders/LAiSER/archive/refs/heads/main.zip) file and extract it.
 

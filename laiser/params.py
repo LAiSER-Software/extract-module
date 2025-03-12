@@ -40,7 +40,7 @@ Rev No.     Date            Author                Description
 [1.0.0]     06/01/2024      Vedant M.             Initial Version
 [1.0.1]     06/10/2024      Vedant M.             added paths for input and output
 [1.0.2]     07/01/2024      Satya Phanindra K.    updated threshold for similarity and AI model ID
-
+[1.0.3]     03/12/2025      Prudhvi Chekuri       Remove unnecessary params
 
 TODO:
 -----
