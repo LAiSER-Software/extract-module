@@ -1,0 +1,28 @@
+name: Cleanup Before Release
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [created]
+
+jobs:
+  delete-folder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Delete folder
+        run: |
+          # Replace 'folder-to-delete' with your target folder
+          rm -rf dev_space
+
+      - name: Commit changes
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --global user.name "Satya Phanindra Kumar Kalaga"
+          git config --global user.email "phanindra.1756.kkr@gmail.com"
+          git add .
+          git commit -m "Remove folder before release [skip ci]" || echo "No changes to commit"
+          git push

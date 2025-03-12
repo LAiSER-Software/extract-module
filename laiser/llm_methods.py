@@ -56,7 +56,9 @@ TODO:
 
 import re
 import torch
+import numpy as np
 from trl import SFTTrainer
+from vllm import SamplingParams
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 torch.cuda.empty_cache()
@@ -214,3 +216,131 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
     response = decoded.split("<start_of_turn>model<eos>")[-1].strip()
     processed_response = fetch_model_output(response)
     return (processed_response)
+
+
+def parse_output_vllm(response):
+    out = []
+    # Split into items, handling optional '->' prefix and multi-line input
+    items = [item.strip() for item in response.split('->') if item.strip()]
+
+    for item in items:
+        skill_data = {}
+
+        # Extract skill
+        skill_match = re.search(r"Skill:\s*([^,\n]+)", item)
+        if skill_match:
+            skill_data['Skill'] = skill_match.group(1).strip()
+
+        # Extract level
+        level_match = re.search(r"Level:\s*(\d+)", item)
+        if level_match:
+            skill_data['Level'] = int(level_match.group(1).strip())
+
+        # Extract knowledge required (multi-line support with re.DOTALL)
+        knowledge_match = re.search(r"Knowledge Required:\s*(.*?)(?=\s*Task Abilities:|\s*$)", item, re.DOTALL)
+        if knowledge_match:
+            knowledge_raw = knowledge_match.group(1).strip()
+            skill_data['Knowledge Required'] = [k.strip() for k in knowledge_raw.split(',') if k.strip()]
+
+        # Extract task abilities (multi-line support with re.DOTALL)
+        task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
+        if task_match:
+            task_raw = task_match.group(1).strip()
+            skill_data['Task Abilities'] = [t.strip() for t in task_raw.split(',') if t.strip()]
+
+        out.append(skill_data)
+
+    return out
+
+
+def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas):
+
+    prompt_template = """user
+**Objective:** Given a {input_desc}, complete the following tasks with structured outputs.
+
+### Tasks:
+1. **Skills Extraction:** Identify {num_key_skills} key skills mentioned in the {input_desc}.
+  - Extract skill keywords or phrases of no more than three words.
+
+2. **Skill Level Assignment:** Assign a proficiency level to each extracted skill based on the SCQF Level Descriptors (see below).
+
+3. **Knowledge Required:** For each skill, list {num_key_kr} broad areas of understanding or expertise necessary to develop the skill.
+
+4. **Task Abilities:** For each skill, list {num_key_tas} general tasks or capabilities enabled by the skill.
+
+### Guidelines:
+- **Skill Extraction:** Identify skills explicitly stated or implied through {input_desc}.
+- **Skill Level Assignment:** Use the SCQF Level Descriptors to classify proficiency:
+  - 1: Basic awareness of simple concepts.
+  - 2: Limited operational understanding, guided application.
+  - 3: Moderate knowledge, supervised application of techniques.
+  - 4: Clear understanding, independent work in familiar contexts.
+  - 5: Advanced knowledge, autonomous problem-solving.
+  - 6: Specialized knowledge, critical analysis within defined areas.
+  - 7: Advanced specialization, leadership in problem-solving.
+  - 8: Expert knowledge, innovation in complex contexts.
+  - 9: Highly specialized expertise, contributing original thought.
+  - 10: Sustained mastery, influential in areas of specialization.
+  - 11: Groundbreaking innovation, professional or academic mastery.
+  - 12: Global expertise, leading advancements at the highest level.
+
+- **Knowledge and Task Abilities:**
+  - **Knowledge Required:** Broad areas, e.g., "data visualization techniques."
+  - **Task Abilities:** General tasks or capabilities, e.g., "data analysis."
+  - Each item in these two lists should be no more than three words.
+  - Avoid overly specific or vague terms.
+
+### Answer Format:
+- Use this format strictly in the response:
+  -> Skill: [Skill Name], Level: [1–12], Knowledge Required: [list], Task Abilities: [list].
+
+{input_text}
+
+**Response:** Provide only the requested structured information without additional explanations.
+
+
+model
+"""
+
+
+    input_desc = "job description" if input_type == "syllabi" else "course syllabus description and its learning outcomes"
+    
+    if input_type == "syllabi":
+        input_text = f"""### Input:\n**Course Description:** {query["description"]}\n**Learning Outcomes:** {query["learning_outcomes"]}"""
+    else:
+        input_text = f"""### Input:\n{query["description"]}"""
+        
+    prompt = prompt_template.format(input_desc=input_desc, num_key_skills=num_key_skills, num_key_kr=num_key_kr, num_key_tas=num_key_tas, input_text=input_text)
+    return prompt
+
+
+def vllm_batch_generate(llm, queries, input_type, batch_size=32, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
+
+    result = []
+
+    sampling_params = SamplingParams(max_tokens=1000)
+
+    for i in range(0, len(queries), batch_size):
+        prompts = [create_ksa_prompt(queries.iloc[i], input_type, num_key_skills, num_key_kr, num_key_tas) for i in range(i, min(i+batch_size, len(queries)))]
+        output = llm.generate(prompts, sampling_params=sampling_params)
+
+        result.extend(output)
+
+    return result
+
+
+def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, batch_size=4) -> list:
+
+    result = vllm_batch_generate(llm, input_text, input_type=input_type, batch_size=batch_size)
+    
+    parsed_output = []
+    for i in range(len(result)):
+        parsed = parse_output_vllm(result[i].outputs[0].text)
+        for item in parsed:
+            item[id_column] = input_text.iloc[i][id_column]
+            item['description'] = input_text.iloc[i]['description']
+            if 'learning_outcomes' in input_text.columns:
+                item['learning_outcomes'] = input_text.iloc[i]['learning_outcomes']
+        parsed_output.extend(parsed)
+
+    return parsed_output
