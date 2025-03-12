@@ -48,6 +48,7 @@ Rev No.     Date            Author              Description
 [1.0.0]     07/10/2024      Satya Phanindra K.  Define all the LLM methods being used in the project
 [1.0.1]     07/19/2024      Satya Phanindra K.  Add descriptions to each method
 [1.0.2]     11/24/2024      Prudhvi Chekuri     Add support for skills extraction from syllabi data
+[1.0.3]     11/25/2024      Satya Phanindra K.  Add support for skills extraction from course outcomes data
 
 TODO:
 -----
@@ -219,6 +220,20 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
 
 
 def parse_output_vllm(response):
+    # TODO: Verify the docstring and update missing/incorrect information
+    """
+    Parse the output from the VLLM model to extract skills, levels, knowledge required, and task abilities.
+    
+    Parameters
+    ----------
+    response : str
+        The model's response containing the structured information about skills.
+        
+    Returns
+    -------
+    list: List of dictionaries containing the extracted skills, levels, knowledge required, and task abilities.
+    """
+        
     out = []
     # Split into items, handling optional '->' prefix and multi-line input
     items = [item.strip() for item in response.split('->') if item.strip()]
@@ -254,6 +269,27 @@ def parse_output_vllm(response):
 
 
 def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas):
+    # TODO: Verify the docstring and update missing/incorrect information
+    """
+    Create a structured prompt for the KSA (Knowledge, Skills, Abilities) extraction task.
+    
+    Parameters
+    ----------
+    query : dict
+        A dictionary containing the input data, including 'description' and optionally 'learning_outcomes'.
+    input_type : str
+        The type of input data - 'job_desc' or 'syllabi'.
+    num_key_skills : int
+        The number of key skills to extract.
+    num_key_kr : str
+        The number of key knowledge areas to extract (e.g., '3-5').
+    num_key_tas : str
+        The number of key task abilities to extract (e.g., '3-5').
+    Returns
+    ------- 
+    str
+        The formatted prompt for the KSA extraction task.       
+    """
 
     prompt_template = """user
 **Objective:** Given a {input_desc}, complete the following tasks with structured outputs.

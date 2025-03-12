@@ -62,6 +62,7 @@ Rev No.     Date            Author              Description
 [1.0.8]     07/11/2024      Satya Phanindra K.  Calculate cosine similarities in bulk for optimal performance.
 [1.0.9]     07/15/2024      Satya Phanindra K.  Error handling for empty list outputs from extract_raw function
 [1.0.10]    11/24/2024      Prudhvi Chekuri     Added support for skills extraction from syllabi data
+[1.0.11]    03/12/2025      Satya Phanindra K.  Update extractor function to handle syllabus data
 
 
 TODO:
@@ -113,6 +114,9 @@ class Skill_Extractor:
         The function extracts skills from text using NER model
 
     align_skills(raw_skills: list, document_id='0': string):
+        This function aligns the skills provided to the desired taxonomy
+        
+    align_KSAs(extracted_df: pandas dataframe, id_column='Research ID'):
         This function aligns the skills provided to the desired taxonomy
         
     extractor(data: pandas dataframe, id_column='Research ID', text_column='Text'):
@@ -243,6 +247,36 @@ class Skill_Extractor:
 
 
     def align_KSAs(self, extracted_df, id_column):
+        """
+        This function aligns the skills provided to the available taxonomy
+        
+        Parameters
+        ----------
+        extracted_df : pandas dataframe
+            Provide dataframe of skills extracted from Job Descriptions / Syllabus.
+        id_column: string
+            Name of id column in the dataset. Defaults to 'Research ID'
+            
+        Returns
+        -------
+        list: List of taxonomy skills from text in JSON format
+
+            [
+                {
+                    "Research ID": text_id,
+                    "Description": String, (optional)
+                    "Learning Outcomes": List of Strings, (optional)
+                    "Raw Skill": String,
+                    "Level": int, (optional)
+                    "Knowledge Required": String, (optional)
+                    "Task Abilities": String, (optional)
+                    "Skill Tag": String,
+                    "Correlation Coefficient": float
+                },
+                ...
+            ]
+        """
+        
         matches = []
 
         raw_skill_embeddings = np.array([get_embedding(self.nlp, skill) for skill in extracted_df['Skill']])
@@ -288,10 +322,15 @@ class Skill_Extractor:
         list: List of skill tags and similarity_score for all texts in  from text in JSON format
             [
                 {
-                    "Research ID": text_id
-                    "Skill Name": Raw skill extracted,
-                    "Skill Tag": taxonomy skill tag,
-                    "Correlation Coefficient": similarity_score
+                    "Research ID": text_id,
+                    "Skill Tag": String, 
+                    "Description": String, (optional)
+                    "Learning Outcomes": List of Strings, (optional)
+                    "Raw Skill": String,
+                    "Level": int, (optional)
+                    "Knowledge Required": String, (optional)
+                    "Task Abilities": String, (optional)
+                    "Correlation Coefficient": float
                 },
                 ...
             ]
