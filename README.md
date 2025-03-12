@@ -63,14 +63,20 @@ To use LAiSER as a command line tool, follow the steps below:
 
 - Navigate to the root directory of the repository and run the command below:
   ```shell
-  python main.py
+  pip install laiser-dev
   ```
 
-> [!CAUTION]
+- Once the installation is complete, you can run the tool using the command below:
+  <!-- TODO: add an example of importing and initiating the skillExtractor class -->
+  ```shell
+  
+  ```
+
+<!-- > [!CAUTION]
 > - If you encounter any `*.dll` file missing errors, make sure you downgrade the pytorch version to `2.2.2`.
 ```shell
 pip install pytorch=2.2.2
-```
+``` -->
 
 
 <!-- ## Examples -->
@@ -97,4 +103,4 @@ pip install pytorch=2.2.2
 
 
 </br>
-<p align='center'> <b> Made with Passion💖, Data Science📊, and a little magic!🪄 </b></p>
+<!-- <p align='center'> <b> Made with Passion💖, Data Science📊, and a little magic!🪄 </b></p> -->
