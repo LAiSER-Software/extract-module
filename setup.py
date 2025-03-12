@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='laiser',
+    name='laiser-dev',
     version='0.2.0', 
     author='Satya Phanindra Kumar Kalaga, Bharat Khandelwal, Prudhvi Chekuri', 
     author_email='phanindra.connect@gmail.com',  
@@ -15,25 +15,25 @@ setup(
         'License :: OSI Approved :: BSD-3-Clause License', 
         'Operating System :: OS Independent',
     ],
-    python_requires='>=3.6',  
+    python_requires='>=3.6',
     install_requires=[
-        # List your package dependencies here
-        # numpy,
-        # pandas,
-        # psutil,
-        # scikit_learn,
-        # skillNer,
-        # spacy,
-        # transformers,
-        # accelerate,
-        # bitsandbytes,
-        # datasets,
-        # huggingface_hub,
-        # peft,
-        # torch,
-        # trl,
-        # skillNer,
-        # ipython,
-        # python-dotenv
+        'numpy',
+        'pandas',
+        'psutil',
+        'scikit_learn',
+        'skillNer',
+        'spacy',
+        'transformers',
+        'accelerate',
+        'bitsandbytes',
+        'datasets',
+        'huggingface_hub',
+        'peft',
+        'torch',
+        'trl',
+        'ipython',
+        'python-dotenv',
+        'vllm',
+        'tqdm'
     ],
 )
