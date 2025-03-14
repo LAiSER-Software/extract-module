@@ -352,7 +352,7 @@ model
     return prompt
 
 
-def vllm_batch_generate(llm, queries, input_type, batch_size=32, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
+def vllm_batch_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
 
     """
     Generate completions for a batch of queries using the model.
@@ -393,7 +393,7 @@ def vllm_batch_generate(llm, queries, input_type, batch_size=32, num_key_skills=
     return result
 
 
-def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, batch_size=4) -> list:
+def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, batch_size=32) -> list:
 
     """
     Get completions for whole input data and parse the required KSAs from the model responses. The input data can be a job description or syllabi data.
