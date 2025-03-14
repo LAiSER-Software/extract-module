@@ -136,10 +136,10 @@ class Skill_Extractor:
 
     """
 
-    def __init__(self, AI_MODEL_ID, HF_TOKEN, use_gpu):
+    def __init__(self, AI_MODEL_ID=None, HF_TOKEN=None, use_gpu=None):
         self.model_id = AI_MODEL_ID
         self.HF_TOKEN=HF_TOKEN
-        self.use_gpu=use_gpu
+        self.use_gpu=use_gpu if use_gpu else torch.cuda.is_available()
         self.nlp = spacy.load("en_core_web_lg")
         self.skill_db_df = pd.read_csv(SKILL_DB_PATH)
         self.skill_db_embeddings = np.array([get_embedding(self.nlp, label) for label in self.skill_db_df['SkillLabel']])
