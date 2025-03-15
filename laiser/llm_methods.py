@@ -49,6 +49,8 @@ Rev No.     Date            Author              Description
 [1.0.1]     07/19/2024      Satya Phanindra K.  Add descriptions to each method
 [1.0.2]     11/24/2024      Prudhvi Chekuri     Add support for skills extraction from syllabi data
 [1.0.3]     03/12/2025      Prudhvi Chekuri     Implement functions to extract levels, KSAs from job descriptions and syllabi data using vLLM
+[1.0.4]     03/15/2025      Prudhvi Chekuri     Add exception handling
+
 
 TODO:
 -----
@@ -241,30 +243,32 @@ def parse_output_vllm(response):
 
     for item in items:
         skill_data = {}
+        try:
+            # Extract skill
+            skill_match = re.search(r"Skill:\s*([^,\n]+)", item)
+            if skill_match:
+                skill_data['Skill'] = skill_match.group(1).strip()
 
-        # Extract skill
-        skill_match = re.search(r"Skill:\s*([^,\n]+)", item)
-        if skill_match:
-            skill_data['Skill'] = skill_match.group(1).strip()
+            # Extract level
+            level_match = re.search(r"Level:\s*(\d+)", item)
+            if level_match:
+                skill_data['Level'] = int(level_match.group(1).strip())
 
-        # Extract level
-        level_match = re.search(r"Level:\s*(\d+)", item)
-        if level_match:
-            skill_data['Level'] = int(level_match.group(1).strip())
+            # Extract knowledge required (multi-line support with re.DOTALL)
+            knowledge_match = re.search(r"Knowledge Required:\s*(.*?)(?=\s*Task Abilities:|\s*$)", item, re.DOTALL)
+            if knowledge_match:
+                knowledge_raw = knowledge_match.group(1).strip()
+                skill_data['Knowledge Required'] = [k.strip() for k in knowledge_raw.split(',') if k.strip()]
 
-        # Extract knowledge required (multi-line support with re.DOTALL)
-        knowledge_match = re.search(r"Knowledge Required:\s*(.*?)(?=\s*Task Abilities:|\s*$)", item, re.DOTALL)
-        if knowledge_match:
-            knowledge_raw = knowledge_match.group(1).strip()
-            skill_data['Knowledge Required'] = [k.strip() for k in knowledge_raw.split(',') if k.strip()]
+            # Extract task abilities (multi-line support with re.DOTALL)
+            task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
+            if task_match:
+                task_raw = task_match.group(1).strip()
+                skill_data['Task Abilities'] = [t.strip() for t in task_raw.split(',') if t.strip()]
 
-        # Extract task abilities (multi-line support with re.DOTALL)
-        task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
-        if task_match:
-            task_raw = task_match.group(1).strip()
-            skill_data['Task Abilities'] = [t.strip() for t in task_raw.split(',') if t.strip()]
-
-        out.append(skill_data)
+            out.append(skill_data)
+        except:
+            continue
 
     return out
 
@@ -352,10 +356,10 @@ model
     return prompt
 
 
-def vllm_batch_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
+def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
 
     """
-    Generate completions for a batch of queries using the model.
+    Generate completions for the whole data using the LLM model with vLLM.
     
     Parameters
     ----------
@@ -386,9 +390,14 @@ def vllm_batch_generate(llm, queries, input_type, batch_size, num_key_skills=5, 
 
     for i in range(0, len(queries), batch_size):
         prompts = [create_ksa_prompt(queries.iloc[i], input_type, num_key_skills, num_key_kr, num_key_tas) for i in range(i, min(i+batch_size, len(queries)))]
-        output = llm.generate(prompts, sampling_params=sampling_params)
 
-        result.extend(output)
+        try:
+            output = llm.generate(prompts, sampling_params=sampling_params)
+            result.extend(output)
+        except Exception as e:
+            result.extend([None]*batch_size)
+            print(f"Error generating batch at index {i}: {e}")
+            continue
 
     return result
 
@@ -418,16 +427,25 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
     list: List of dictionaries that has levels, KSAs for all the data points in the input text. 
     """
 
-    result = vllm_batch_generate(llm, input_text, input_type=input_type, batch_size=batch_size)
+    try:
+        result = vllm_generate(llm, input_text, input_type=input_type, batch_size=batch_size)
+    except Exception as e:
+        print(f"Error in vLLM generation: {e}")
+        return []
     
     parsed_output = []
     for i in range(len(result)):
-        parsed = parse_output_vllm(result[i].outputs[0].text)
-        for item in parsed:
-            item[id_column] = input_text.iloc[i][id_column]
-            item['description'] = input_text.iloc[i]['description']
-            if 'learning_outcomes' in input_text.columns:
-                item['learning_outcomes'] = input_text.iloc[i]['learning_outcomes']
-        parsed_output.extend(parsed)
+        if result[i] is not None:
+            try:
+                parsed = parse_output_vllm(result[i].outputs[0].text)
+                for item in parsed:
+                    item[id_column] = input_text.iloc[i][id_column]
+                    item['description'] = input_text.iloc[i]['description']
+                    if 'learning_outcomes' in input_text.columns:
+                        item['learning_outcomes'] = input_text.iloc[i]['learning_outcomes']
+                parsed_output.extend(parsed)
+            except Exception as e:
+                print(f"Error parsing output for index {i}: {e}")
+                continue
 
     return parsed_output
