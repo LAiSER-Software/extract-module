@@ -63,6 +63,7 @@ Rev No.     Date            Author              Description
 [1.0.9]     07/15/2024      Satya Phanindra K.  Error handling for empty list outputs from extract_raw function
 [1.0.10]    11/24/2024      Prudhvi Chekuri     Added support for skills extraction from syllabi data
 [1.1.0]     03/12/2025      Prudhvi Chekuri     Added support for extracting KSAs from text and aligning them to the taxonomy
+[1.1.1]     03/15/2025      Prudhvi Chekuri     Add exception handling
 
 
 TODO:
@@ -145,13 +146,18 @@ class Skill_Extractor:
         self.skill_db_embeddings = np.array([get_embedding(self.nlp, label) for label in self.skill_db_df['SkillLabel']])
         if torch.cuda.is_available() and self.use_gpu:
             print("GPU is available. Using GPU for Large Language model initialization...")
-            torch.cuda.empty_cache()
             
-            # Use quantization to reduce the model size and memory usage
-            if self.model_id:
-                self.llm = LLM(model=self.model_id, dtype="float16", quantization='gptq')
-            else:
-                self.llm = LLM(model="marcsun13/gemma-2-9b-it-GPTQ", dtype="float16", quantization='gptq')              
+            try:
+                torch.cuda.empty_cache()
+            
+                # Use quantization to reduce the model size and memory usage
+                if self.model_id:
+                    self.llm = LLM(model=self.model_id, dtype="float16", quantization='gptq')
+                else:
+                    self.llm = LLM(model="marcsun13/gemma-2-9b-it-GPTQ", dtype="float16", quantization='gptq')   
+            except Exception as e:
+                print(f"Failed to initialize LLM: {e}")
+                raise
         else:
             print("GPU is not available. Using CPU for SkillNer model initialization...")
             self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
@@ -290,25 +296,36 @@ class Skill_Extractor:
         
         matches = []
 
-        raw_skill_embeddings = np.array([get_embedding(self.nlp, skill) for skill in extracted_df['Skill']])
+        extracted_df = extracted_df[
+                extracted_df['Skill'].apply(lambda x: isinstance(x, str) and x.strip() != '')
+            ]
 
-        # Calculate cosine similarities in bulk
-        similarities = 1 - cdist(raw_skill_embeddings, self.skill_db_embeddings, metric='cosine')
+
+        try:
+            raw_skill_embeddings = np.array([get_embedding(self.nlp, skill) for skill in extracted_df['Skill']])
+            # Calculate cosine similarities in bulk
+            similarities = 1 - cdist(raw_skill_embeddings, self.skill_db_embeddings, metric='cosine')
+        except Exception as e:
+            print(f"Error computing embeddings or similarities in align_KSAs: {e}")
+            return []
 
         for i, raw_skill in tqdm(enumerate(extracted_df['Skill'])):
-            skill_matches = np.where(similarities[i] > SIMILARITY_THRESHOLD)[0]
-            for match in skill_matches:
-                matches.append({
-                    "Research ID": extracted_df.iloc[i][id_column],
-                    "Description": extracted_df.iloc[i]['description'],
-                    "Learning Outcomes": extracted_df.iloc[i]['learning_outcomes'],
-                    "Raw Skill": raw_skill,
-                    "Level": extracted_df.iloc[i]['Level'],
-                    "Knowledge Required": extracted_df.iloc[i]['Knowledge Required'],
-                    "Task Abilities": extracted_df.iloc[i]['Task Abilities'],
-                    "Skill Tag": f"ESCO.{match}",
-                    "Correlation Coefficient": similarities[i, match]
-                })
+            try:
+                skill_matches = np.where(similarities[i] > SIMILARITY_THRESHOLD)[0]
+                for match in skill_matches:
+                    matches.append({
+                        "Research ID": extracted_df.iloc[i][id_column],
+                        "Description": extracted_df.iloc[i]['description'],
+                        "Learning Outcomes": extracted_df.iloc[i]['learning_outcomes'],
+                        "Raw Skill": raw_skill,
+                        "Level": extracted_df.iloc[i]['Level'],
+                        "Knowledge Required": extracted_df.iloc[i]['Knowledge Required'],
+                        "Task Abilities": extracted_df.iloc[i]['Task Abilities'],
+                        "Skill Tag": f"ESCO.{match}",
+                        "Correlation Coefficient": similarities[i, match]
+                    })
+            except:
+                continue
 
         return matches
 
@@ -364,21 +381,28 @@ class Skill_Extractor:
         """
         
         if torch.cuda.is_available() and self.use_gpu:
-            KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
-        
-            extracted_df = pd.DataFrame(KSAs)
-            if input_type != 'syllabus':
-                extracted_df["learning_outcomes"] = ''
-
-            extracted_df = extracted_df[[id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]]
-            matches = self.align_KSAs(extracted_df, id_column)
             
-            extracted = pd.DataFrame(columns=['Research ID', 'Description', 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
-            extracted = extracted._append(matches, ignore_index=True)
+            assert not data.empty, "Input data is empty, pass a valid input..."
 
-            if input_type != "syllabus":
-                extracted.drop("Learning Outcomes", axis=1, inplace=True)
+            try:
+                KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
+            
+                extracted_df = pd.DataFrame(KSAs)
+                
+                if input_type != 'syllabus':
+                    extracted_df["learning_outcomes"] = ''
 
+                extracted_df = extracted_df[[id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]]
+                matches = self.align_KSAs(extracted_df, id_column)
+                
+                extracted = pd.DataFrame(columns=['Research ID', 'Description', 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
+                extracted = extracted._append(matches, ignore_index=True)
+
+                if input_type != "syllabus":
+                    extracted.drop("Learning Outcomes", axis=1, inplace=True)
+            except Exception as e:
+                print(f"Error in extraction pipeline: {e}")
+                extracted = pd.DataFrame()
         else:
             extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
             for _, row in data.iterrows():
