@@ -51,10 +51,8 @@ import os
 from dotenv import load_dotenv
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_PATH = os.path.join(ROOT_DIR, 'input')
-OUTPUT_PATH = os.path.join(ROOT_DIR, 'output')
 
-SKILL_DB_PATH = os.path.join(INPUT_PATH, 'combined.csv')
+SKILL_DB_PATH = os.path.join('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv')
 
 
 SIMILARITY_THRESHOLD = 0.85
