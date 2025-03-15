@@ -159,7 +159,7 @@ class Skill_Extractor:
 
 
     # Declaring a private method for extracting raw skills from input text
-    def extract_raw(self, input_text, text_columns, id_column, input_type):
+    def extract_raw(self, input_text, text_columns, id_column, input_type, batch_size):
         """
         The function extracts skills from text using Fine-Tuned Language Model's API
 
@@ -173,6 +173,8 @@ class Skill_Extractor:
             Name of the text columns in the dataset. Defaults to 'description'
         input_type: string
             Type of input data. Defaults to 'job_desc'
+        batch_size: int
+            Number of examples to process in each batch. Defaults to 32
 
         Returns
         -------
@@ -182,7 +184,7 @@ class Skill_Extractor:
         
         if torch.cuda.is_available() and self.use_gpu:
             # GPU is available. Using Language model for extraction.
-            extracted_skills_set = get_completion_vllm(input_text, text_columns, id_column, input_type, self.llm)
+            extracted_skills_set = get_completion_vllm(input_text, text_columns, id_column, input_type, self.llm, batch_size)
             torch.cuda.empty_cache()
         else: 
             # GPU is not available. Using SkillNer model for extraction.
@@ -311,7 +313,7 @@ class Skill_Extractor:
         return matches
 
 
-    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc"):
+    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", batch_size=32):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
 
@@ -325,6 +327,8 @@ class Skill_Extractor:
             Name of the text columns in the dataset. Defaults to 'description'
         input_type: string
             Type of input data. Defaults to 'job_desc'
+        batch_size: int
+            Number of examples to process in each batch. Defaults to 32
 
         Returns
         -------
@@ -360,7 +364,7 @@ class Skill_Extractor:
         """
         
         if torch.cuda.is_available() and self.use_gpu:
-            KSAs = self.extract_raw(data, text_columns, id_column, input_type)
+            KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
         
             extracted_df = pd.DataFrame(KSAs)
             if input_type != 'syllabus':
