@@ -15,6 +15,5 @@ torch
 trl
 skillNer
 ipython
-vllm
 tqdm
 python-dotenv

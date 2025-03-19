@@ -338,7 +338,7 @@ class Skill_Extractor:
         return matches
 
 
-    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", levels=False, batch_size=32):
+    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", batch_size=32):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
 
@@ -352,8 +352,6 @@ class Skill_Extractor:
             Name of the text columns in the dataset. Defaults to 'description'
         input_type: string
             Type of input data. Defaults to 'job_desc'
-        levels: boolean
-            Whether to include skill levels in the output. Defaults to False.
         batch_size: int
             Number of examples to process in each batch. Defaults to 32
 
@@ -389,36 +387,27 @@ class Skill_Extractor:
             - "Correlation Coefficient": similarity_score
 
         """
-
+        
         if torch.cuda.is_available() and self.use_gpu:
             
             assert not data.empty, "Input data is empty, pass a valid input..."
-            
+
             try:
-                KSAs = self.extract_raw(data, text_columns, id_column, input_type)
+                KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
             
                 extracted_df = pd.DataFrame(KSAs)
                 
                 if input_type != 'syllabus':
                     extracted_df["learning_outcomes"] = ''
 
-                selected_columns = [id_column, "learning_outcomes", "Skill", "Knowledge Required", "Task Abilities"]
-                if levels:
-                    selected_columns.insert(3, "Level")  # Insert "Level" at the correct position
-                
-                extracted_df = extracted_df[selected_columns]
+                extracted_df = extracted_df[[id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]]
                 matches = self.align_KSAs(extracted_df, id_column)
                 
-                extracted_columns = ['Research ID', 'Learning Outcomes', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient']
-                if levels:
-                    extracted_columns.insert(3, 'Level')  # Include "Level" column in the final dataframe
-
-                extracted = pd.DataFrame(columns=extracted_columns)
+                extracted = pd.DataFrame(columns=['Research ID', 'Description', 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
                 extracted = extracted._append(matches, ignore_index=True)
 
                 if input_type != "syllabus":
                     extracted.drop("Learning Outcomes", axis=1, inplace=True)
-                
             except Exception as e:
                 print(f"Error in extraction pipeline: {e}")
                 extracted = pd.DataFrame()
@@ -426,12 +415,11 @@ class Skill_Extractor:
             extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
             for _, row in data.iterrows():
                 research_id = row[id_column]
-                raw_skills = self.extract_raw(row, text_columns, id_column, input_type)
-                if len(raw_skills) == 0:
+                raw_skills = self.extract_raw(row, text_columns, id_column, input_type, batch_size)
+                if(len(raw_skills) == 0):
                     continue
                 else:
                     aligned_skills = self.align_skills(raw_skills, research_id)
                     extracted = extracted._append(aligned_skills, ignore_index=True)
 
         return extracted
-

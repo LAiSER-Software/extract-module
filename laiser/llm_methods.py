@@ -386,7 +386,7 @@ def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_ke
 
     result = []
 
-    sampling_params = SamplingParams(max_tokens=1000)
+    sampling_params = SamplingParams(max_tokens=1000, seed=42)
 
     for i in range(0, len(queries), batch_size):
         prompts = [create_ksa_prompt(queries.iloc[i], input_type, num_key_skills, num_key_kr, num_key_tas) for i in range(i, min(i+batch_size, len(queries)))]
