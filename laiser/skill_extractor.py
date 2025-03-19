@@ -338,88 +338,77 @@ class Skill_Extractor:
         return matches
 
 
-    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", batch_size=32):
-        """
-        Function takes text dataset to extract and aligns skills based on available taxonomies
+    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", levels=False):
+    """
+    Function takes text dataset to extract and align skills based on available taxonomies.
 
-        Parameters
-        ----------
-        data : pandas dataframe
-            Dataset containing text id and actual text to extract skills.
-        id_column: string
-            Name of id column in the dataset. Defaults to 'Research ID'
-        text_columns: list
-            Name of the text columns in the dataset. Defaults to 'description'
-        input_type: string
-            Type of input data. Defaults to 'job_desc'
-        batch_size: int
-            Number of examples to process in each batch. Defaults to 32
+    Parameters
+    ----------
+    data : pandas dataframe
+        Dataset containing text id and actual text to extract skills.
+    id_column: string
+        Name of id column in the dataset. Defaults to 'Research ID'
+    text_columns: list
+        Name of the text columns in the dataset. Defaults to 'description'
+    input_type: string
+        Type of input data. Defaults to 'job_desc'
+    levels: boolean
+        Whether to include skill levels in the output. Defaults to False.
 
-        Returns
-        -------
-        For CPU:
-        list: List of skill tags and similarity_score for all texts in  from text in JSON format
-            [
-                {
-                    "Research ID": text_id,
-                    "Skill Tag": String, 
-                    "Description": String, (optional)
-                    "Learning Outcomes": List of Strings, (optional)
-                    "Raw Skill": String,
-                    "Level": int, (optional)
-                    "Knowledge Required": String, (optional)
-                    "Task Abilities": String, (optional)
-                    "Correlation Coefficient": float
-                },
-                ...
-            ]
-            
-        For GPU:
-        pandas dataframe with below columns:
-            - "Research ID": text_id
-            - "Description": text description
-            - "Learning Outcomes": learning outcomes
-            - "Raw Skill": Raw skill extracted
-            - "Level": Level of the skill
-            - "Knowledge Required": Knowledge required for the skill
-            - "Task Abilities": Task abilities
-            - "Skill Tag": taxonomy skill tag
-            - "Correlation Coefficient": similarity_score
+    Returns
+    -------
+    list: List of skill tags and similarity_score for all texts in JSON format
+        [
+            {
+                "Research ID": text_id
+                "Skill Name": Raw skill extracted,
+                "Skill Tag": taxonomy skill tag,
+                "Correlation Coefficient": similarity_score
+            },
+            ...
+        ]
+    """
 
-        """
+    if torch.cuda.is_available() and self.use_gpu:
+        KSAs = self.extract_raw(data, text_columns, id_column, input_type)
         
-        if torch.cuda.is_available() and self.use_gpu:
-            
-            assert not data.empty, "Input data is empty, pass a valid input..."
+        extracted_df = pd.DataFrame(KSAs)
+        if input_type != 'syllabus':
+            extracted_df["learning_outcomes"] = ''
 
-            try:
-                KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
-            
-                extracted_df = pd.DataFrame(KSAs)
-                
-                if input_type != 'syllabus':
-                    extracted_df["learning_outcomes"] = ''
+        # Select columns conditionally based on levels parameter (excluding "description")
+        selected_columns = [id_column, "learning_outcomes", "Skill", "Knowledge Required", "Task Abilities"]
+        if levels:
+            selected_columns.insert(3, "Level")  # Insert "Level" at the correct position
+        
+        extracted_df = extracted_df[selected_columns]
+        matches = self.align_KSAs(extracted_df, id_column)
+        
+        extracted_columns = ['Research ID', 'Learning Outcomes', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient']
+        if levels:
+            extracted_columns.insert(3, 'Level')  # Include "Level" column in the final dataframe
 
-                extracted_df = extracted_df[[id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]]
-                matches = self.align_KSAs(extracted_df, id_column)
-                
-                extracted = pd.DataFrame(columns=['Research ID', 'Description', 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
-                extracted = extracted._append(matches, ignore_index=True)
+        extracted = pd.DataFrame(columns=extracted_columns)
+        extracted = extracted._append(matches, ignore_index=True)
 
-                if input_type != "syllabus":
-                    extracted.drop("Learning Outcomes", axis=1, inplace=True)
-            except Exception as e:
-                print(f"Error in extraction pipeline: {e}")
-                extracted = pd.DataFrame()
-        else:
-            extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
-            for _, row in data.iterrows():
-                research_id = row[id_column]
-                raw_skills = self.extract_raw(row, text_columns, id_column, input_type, batch_size)
-                if(len(raw_skills) == 0):
-                    continue
-                else:
-                    aligned_skills = self.align_skills(raw_skills, research_id)
-                    extracted = extracted._append(aligned_skills, ignore_index=True)
+        if input_type != "syllabus":
+            extracted.drop("Learning Outcomes", axis=1, inplace=True)
 
-        return extracted
+    else:
+        extracted_columns = ['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient']
+        # if levels:
+        #     extracted_columns.insert(2, 'Level')   Include "Level" if levels=True
+
+        extracted = pd.DataFrame(columns=extracted_columns)
+        
+        for _, row in data.iterrows():
+            research_id = row[id_column]
+            raw_skills = self.extract_raw(row, text_columns, id_column, input_type)
+            if len(raw_skills) == 0:
+                continue
+            else:
+                aligned_skills = self.align_skills(raw_skills, research_id)
+                extracted = extracted._append(aligned_skills, ignore_index=True)
+
+    return extracted
+
