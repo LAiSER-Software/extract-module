@@ -1,5 +1,6 @@
 vllm
 numpy
+triton
 pandas
 psutil
 scikit_learn

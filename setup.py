@@ -33,6 +33,8 @@ setup(
         'ipython==9.0.2',
         'python-dotenv==1.0.1',
         'vllm==0.8.1',
-        'tqdm==4.67.1'
+        'tqdm==4.67.1',
+        'triton'
+        
     ],
 )
