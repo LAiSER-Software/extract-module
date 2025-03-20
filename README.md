@@ -9,71 +9,56 @@ LAiSER is a tool that helps learners, educators and employers share trusted and 
 - [About](#about)
 - [Requirements](#requirements)
 - [Setup and Installation](#setup-and-installation)
-  - [i. Download the repository](#i-download-the-repository)
-  - [ii. Install the dependencies](#ii-install-the-dependencies)
+  - [Install LAiSER](#install-LAiSER)
 - [Usage](#usage)
   - [Google Colab Setup(preferred)](#google-colab-setuppreferred)
-  - [Command Line Setup](#command-line-setup)
-- [Funding](#funding)
-- [Authors](#authors)
-- [Partners](#partners)
-<!-- - [Examples](#examples) -->
 - [Funding](#funding)
 - [Authors](#authors)
 - [Partners](#partners)
 
 ## About
-## Requirements
-- Python version >= Python 3.12. 
-- A GPU with atelast 15GB video memory is essential for running this tool on large datasets.
 
+LAiSER is an innovative tool that harnesses the power of artificial intelligence to simplify the extraction and analysis of skills. It is designed for learners, educators, and employers who want to gain reliable insights into skill sets, ensuring that the information shared is both trusted and mutually intelligible across various sectors.
+
+By leveraging state-of-the-art AI models, LAiSER automates the process of identifying and classifying skills from diverse data sources. This not only saves time but also enhances accuracy, making it easier for users to discover emerging trends and in-demand skills.
+
+The tool emphasizes standardization and transparency, offering a common framework that bridges the communication gap between different stakeholders. With LAiSER, educators can better align their teaching methods with industry requirements, and employers can more effectively identify the competencies required for their teams. The result is a more efficient and strategic approach to skill development, benefiting the entire ecosystem.
+
+## Requirements
+- Python version >= Python 3.9. 
+- A GPU with atleast 15GB video memory is essential for running this tool on large datasets.
 
 ## Setup and Installation
 
-### i. Download the repository
-Before proceeding to  LAiSER, you'd want to follow the steps below to install the required dependencies:
-- Clone the repository using 
+- Install LAiSER using pip:
+
   ```shell
-  git clone https://github.com/LAiSER-Software/extract-module.git
+  pip install uv
+  uv pip install laiser
   ```
-  or download the [zip(link)](https://github.com/Micah-Sanders/LAiSER/archive/refs/heads/main.zip) file and extract it.
-
-### ii. Install the dependencies
-> [!NOTE]
-> If you intend to use the Jupyter Notebook interface, you can skip this step as the dependencies will be installed seperately in the Google Colab environment.
-
-Install the required dependencies using the command below:
-  ```shell
-    pip install -r requirements.txt
-```
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
-
 
 ## Usage
 
-As of now LAiSER can be used a command line tool or from the Jupyter notebook(Google Colab). The steps to setup the tool are as follows:
+As of now LAiSER can be used a python package in Google Colab or a local machine with GPU access. The steps to setup the tool are as follows:
 
-### Google Colab Setup(preferred)
+### Google Colab Setup (preferred)
 LAiSER's Jupyter notebook is, currently, the fastest way to get started with the tool. You can access the notebook [here](https://github.com/LAiSER-Software/extract-module/blob/main/dev_space/Extract%20Function%20Colab%20Execution.ipynb).
 
 - Once the notebook is imported in google colaboratory, connect to a GPU-accelerated runtime(T4 GPU) and run the cells in the notebook.
 
-### Command Line Setup
-To use LAiSER as a command line tool, follow the steps below:
-
-- Navigate to the root directory of the repository and run the command below:
+- Sample code to import and verify laiser module
   ```shell
-  python main.py
+  from laiser.skill_extractor import Skill_Extractor
+  print('\n\nInitializing the Skill Extractor...')
+  # Replace 'your_model_id' and 'your_hf_token' with your actual credentials.
+  AI_MODEL_ID = "your_model_id"  # e.g., "bert-base-uncased"
+  HF_TOKEN = "your_hf_token"
+  use_gpu = True  # Change to False if you are not using a GPU
+  se = Skill_Extractor(AI_MODEL_ID=AI_MODEL_ID, HF_TOKEN=HF_TOKEN, use_gpu=use_gpu)
+  print('The Skill Extractor has been initialized successfully!\n')
+  print("LAiSER package loaded successfully!")
   ```
-
-> [!CAUTION]
-> - If you encounter any `*.dll` file missing errors, make sure you downgrade the pytorch version to `2.2.2`.
-```shell
-pip install pytorch=2.2.2
-```
-
-
-<!-- ## Examples -->
 
 
 ## Funding
@@ -97,4 +82,4 @@ pip install pytorch=2.2.2
 
 
 </br>
-<p align='center'> <b> Made with Passion💖, Data Science📊, and a little magic!🪄 </b></p>
+<!-- <p align='center'> <b> Made with Passion💖, Data Science📊, and a little magic!🪄 </b></p> -->
