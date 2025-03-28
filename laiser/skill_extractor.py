@@ -395,7 +395,7 @@ class Skill_Extractor:
             assert not data.empty, "Input data is empty, pass a valid input..."
             
             try:
-                KSAs = self.extract_raw(data, text_columns, id_column, input_type)
+                KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
             
                 extracted_df = pd.DataFrame(KSAs)
                 
@@ -426,7 +426,7 @@ class Skill_Extractor:
             extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
             for _, row in data.iterrows():
                 research_id = row[id_column]
-                raw_skills = self.extract_raw(row, text_columns, id_column, input_type)
+                raw_skills = self.extract_raw(row, text_columns, id_column, input_type, batch_size)
                 if len(raw_skills) == 0:
                     continue
                 else:
