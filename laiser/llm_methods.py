@@ -60,7 +60,6 @@ TODO:
 import re
 import torch
 import numpy as np
-from trl import SFTTrainer
 from vllm import SamplingParams
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
