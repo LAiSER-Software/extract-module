@@ -23,7 +23,7 @@ print('The Skill Extractor has been initialized successfully!\n')
 
 # Skill extraction from jobs data
 print('\n\nLoading a sample dataset of 50 jobs...')
-job_sample = pd.read_csv('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/job_job_data_50rows.csv')
+job_sample = pd.read_csv('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/linkedin_jobs_sample_36rows.csv')
 print('The sample jobs dataset has been loaded successfully!\n')
 
 job_sample = job_sample[['description', 'job_id']]
