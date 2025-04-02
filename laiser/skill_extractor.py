@@ -64,6 +64,7 @@ Rev No.     Date            Author              Description
 [1.0.10]    11/24/2024      Prudhvi Chekuri     Added support for skills extraction from syllabi data
 [1.1.0]     03/12/2025      Prudhvi Chekuri     Added support for extracting KSAs from text and aligning them to the taxonomy
 [1.1.1]     03/15/2025      Prudhvi Chekuri     Add exception handling
+[1.1.2]     03/20/2025      Prudhvi Chekuri     Fix Levels Toggle
 
 
 TODO:
@@ -402,22 +403,22 @@ class Skill_Extractor:
                 if input_type != 'syllabus':
                     extracted_df["learning_outcomes"] = ''
 
-                selected_columns = [id_column, "learning_outcomes", "Skill", "Knowledge Required", "Task Abilities"]
-                if levels:
-                    selected_columns.insert(3, "Level")  # Insert "Level" at the correct position
+                selected_columns = [id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]
                 
                 extracted_df = extracted_df[selected_columns]
                 matches = self.align_KSAs(extracted_df, id_column)
                 
-                extracted_columns = ['Research ID', 'Learning Outcomes', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient']
-                if levels:
-                    extracted_columns.insert(3, 'Level')  # Include "Level" column in the final dataframe
+                extracted_columns = ['Research ID', "Description", 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient']
 
                 extracted = pd.DataFrame(columns=extracted_columns)
                 extracted = extracted._append(matches, ignore_index=True)
 
                 if input_type != "syllabus":
                     extracted.drop("Learning Outcomes", axis=1, inplace=True)
+
+                if not levels:
+                    extracted.drop("Level", axis=1, inplace=True)
+
                 
             except Exception as e:
                 print(f"Error in extraction pipeline: {e}")
