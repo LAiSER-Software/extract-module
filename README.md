@@ -1,6 +1,10 @@
+> [!CAUTION]
+> <h3>LAiSER is currently in development mode, features could be experimental. Use with caution!</h3>
+
+
 <div align="center">
 <img src="https://i.imgur.com/XznvjNi.png" width="70%"/>
-<h2>Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research (LAiSER)</h2>
+<h1>Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research (LAiSER)</h1>
 </div>
 
 ### Contents
@@ -9,9 +13,8 @@ LAiSER is a tool that helps learners, educators and employers share trusted and 
 - [About](#about)
 - [Requirements](#requirements)
 - [Setup and Installation](#setup-and-installation)
-  - [Install LAiSER](#install-LAiSER)
 - [Usage](#usage)
-  - [Google Colab Setup(preferred)](#google-colab-setuppreferred)
+  - [Google Colab Setup](#google-colab-setup)
 - [Funding](#funding)
 - [Authors](#authors)
 - [Partners](#partners)
@@ -42,7 +45,7 @@ The tool emphasizes standardization and transparency, offering a common framewor
 
 As of now LAiSER can be used a python package in Google Colab or a local machine with GPU access. The steps to setup the tool are as follows:
 
-### Google Colab Setup (preferred)
+### Google Colab Setup
 LAiSER's Jupyter notebook is, currently, the fastest way to get started with the tool. You can access the notebook [here](https://github.com/LAiSER-Software/extract-module/blob/main/dev_space/Extract%20Function%20Colab%20Execution.ipynb).
 
 - Once the notebook is imported in google colaboratory, connect to a GPU-accelerated runtime(T4 GPU) and run the cells in the notebook.
