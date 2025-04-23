@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser(description='Run Skill Extractor on jobs and sy
 parser.add_argument('--HF_TOKEN', type=str, default=None, help='Hugging Face token for authentication')
 parser.add_argument('--AI_MODEL_ID', type=str, default=None, help='Model name for Skill Extractor')
 parser.add_argument('--use_gpu', type=str, default=str(torch.cuda.is_available()), help='Enable or disable GPU use.')
+parser.add_argument('--batch_size', type=int, default=32, help='Batch size for skills extraction')
 args = parser.parse_args()
 
 
@@ -22,20 +23,20 @@ print('The Skill Extractor has been initialized successfully!\n')
 
 # Skill extraction from jobs data
 print('\n\nLoading a sample dataset of 50 jobs...')
-nlx_sample = pd.read_csv('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/nlx_job_data_50rows.csv')
+job_sample = pd.read_csv('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/linkedin_jobs_sample_36rows.csv')
 print('The sample jobs dataset has been loaded successfully!\n')
 
-nlx_sample = nlx_sample[['description', 'job_id']]
-nlx_sample = nlx_sample[1:3]
+job_sample = job_sample[['description', 'job_id']]
+job_sample = job_sample[1:3]
 print('The sample dataset has been filtered successfully!\n')
-print('Head of the sample:\n', nlx_sample.head())
+print('Head of the sample:\n', job_sample.head())
 
-output = se.extractor(nlx_sample, 'job_id', text_columns=['description'])
+output = se.extractor(job_sample, 'job_id', text_columns=['description'], batch_size=args.batch_size)
 print('The skills have been extracted from jobs data successfully...\n')
 
 # Save the extracted skills to a CSV file
 print(output)
-file_name = f'extracted_skills_for_{len(nlx_sample)}Jobs.csv'
+file_name = f'extracted_skills_for_{len(job_sample)}Jobs.csv'
 output.to_csv(file_name, index=False)
 print('The extracted skills have been saved to the file named:', file_name)
 
@@ -49,7 +50,7 @@ syllabi_sample = syllabi_sample[1:3]
 print('The sample dataset has been filtered successfully!\n')
 print('Head of the sample:\n', syllabi_sample.head())
 
-output = se.extractor(syllabi_sample, 'id', text_columns=['description', 'learning_outcomes'], input_type='syllabus')
+output = se.extractor(syllabi_sample, 'id', text_columns=['description', 'learning_outcomes'], input_type='syllabus', batch_size=args.batch_size)
 print('The skills have been extracted from syllabi data successfully...\n')
 
 # Save the extracted skills to a CSV file

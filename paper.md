@@ -84,7 +84,7 @@ pip install -r requirements.txt
 
 **Step 2: Prepare Input Data**
 
-Sample datasets for job descriptions and course descriptions can be downloaded from LAiSER datasets repo: <https://github.com/LAiSER-Software/datasets>. For this example, we’ll use the sample dataset with 50 Job descriptions from NLx. For this example we’ll use a sample dataset with 50 Job Descriptions from NLx\[[Link to Dataset](https://raw.githubusercontent.com/phanindra-max/LAiSER-datasets/refs/heads/master/jobs-data/nlx_job_data_50rows.csv)\]
+Sample datasets for job descriptions and course descriptions can be downloaded from LAiSER datasets repo: <https://github.com/LAiSER-Software/datasets>. For this example we’ll use a sample dataset from LinkedIn with 36 Job Descriptions \[[Link to Dataset](https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/linkedin_jobs_sample_36rows.csv)\]
 
 <!-- ![Sample Input](assets/sample_input.png) -->
 
