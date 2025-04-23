@@ -302,7 +302,7 @@ class Skill_Extractor:
         return matches
 
 
-    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc"):
+    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", levels=False, batch_size=32, warnings=True):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
 
@@ -316,6 +316,12 @@ class Skill_Extractor:
             Name of the text columns in the dataset. Defaults to 'description'
         input_type: string
             Type of input data. Defaults to 'job_desc'
+        levels: boolean
+            Whether to include skill levels in the output. Defaults to False.
+        batch_size: int
+            Number of examples to process in each batch. Defaults to 32
+        warnings: boolean
+            Whether to display development mode warnings. Defaults to True.
 
         Returns
         -------
@@ -336,7 +342,12 @@ class Skill_Extractor:
             ]
 
         """
-        
+        # Display development mode warning if warnings are enabled
+        if warnings:
+            print("\033[93m" + "=" * 80 + "\033[0m")
+            print("\033[93m\033[1m⚠️  WARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution! ⚠️\033[0m")
+            print("\033[93m" + "=" * 80 + "\033[0m")
+
         if torch.cuda.is_available() and self.use_gpu:
             KSAs = self.extract_raw(data, text_columns, id_column, input_type)
         
