@@ -2,9 +2,9 @@ name: Test Package Installation
 
 on:
   push:
-    branches: [ main ]
+    branches: [ development ]
   pull_request:
-    branches: [ main ]
+    branches: [ development ]
 
 jobs:
   test-installation:
@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: [3.9, 3.10, 3.11]
+        python-version: ['3.9', '3.10', '3.11']
         install-type: [cpu, gpu]
         exclude:
           # Exclude GPU tests on macOS as it's not commonly supported
@@ -20,7 +20,7 @@ jobs:
             install-type: gpu
           # Exclude GPU tests on Windows with Python 3.11 due to potential compatibility issues
           - os: windows-latest
-            python-version: 3.11
+            python-version: '3.11'
             install-type: gpu
 
     steps:
@@ -30,6 +30,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+        check-latest: true
 
     - name: Install system dependencies (Linux)
       if: runner.os == 'Linux'
