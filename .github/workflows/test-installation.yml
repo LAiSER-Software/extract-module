@@ -31,7 +31,15 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        check-latest: true
+        cache: 'pip'
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
 
     - name: Install system dependencies (Linux)
       if: runner.os == 'Linux'
@@ -66,7 +74,7 @@ jobs:
     - name: Install package with ${{ matrix.install-type }} support
       shell: bash
       run: |
-        pip install -e .[${{ matrix.install-type }}]
+        pip install --no-cache-dir -e .[${{ matrix.install-type }}]
 
     - name: Run basic import test
       shell: bash
