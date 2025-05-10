@@ -2,9 +2,9 @@ name: Test Package Installation
 
 on:
   push:
-    branches: [ main, development ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, development ]
+    branches: [ main ]
 
 jobs:
   test-installation:
@@ -42,40 +42,40 @@ jobs:
       run: |
         brew install python3-dev
 
-    - name: Create and activate virtual environment
+    - name: Create virtual environment
+      shell: bash
       run: |
         python -m venv venv
+
+    - name: Activate virtual environment
+      shell: bash
+      run: |
         if [ "$RUNNER_OS" == "Windows" ]; then
-          .\venv\Scripts\activate
+          source venv/Scripts/activate
         else
           source venv/bin/activate
         fi
 
     - name: Upgrade pip
+      shell: bash
       run: |
         python -m pip install --upgrade pip
 
     - name: Install package with ${{ matrix.install-type }} support
+      shell: bash
       run: |
         pip install -e .[${{ matrix.install-type }}]
 
     - name: Run basic import test
+      shell: bash
       run: |
         python -c "from laiser.skill_extractor import Skill_Extractor; print('Import successful!')"
 
     - name: Test GPU availability (GPU jobs only)
       if: matrix.install-type == 'gpu'
+      shell: bash
       run: |
         python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
         if [ "$RUNNER_OS" == "Linux" ]; then
           nvidia-smi
-        fi
-
-    - name: Clean up
-      if: always()
-      run: |
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          deactivate
-        else
-          deactivate
         fi 
