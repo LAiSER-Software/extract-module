@@ -399,7 +399,7 @@ class Skill_Extractor:
             print("\033[93m" + "=" * 80 + "\033[0m")
 
         if torch.cuda.is_available() and self.use_gpu:
-            KSAs = self.extract_raw(data, text_columns, id_column, input_type)
+            KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
         
             extracted_df = pd.DataFrame(KSAs)
             if input_type != 'syllabus':
