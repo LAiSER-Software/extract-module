@@ -1,12 +1,12 @@
 numpy>=1.21.0,<2.0.0
-pandas==2.2.3
+pandas==2.2.2
 psutil>=5.8.0,<6.0.0
 skillNer==1.0.3
 scikit-learn>=1.0.0,<2.0.0
 spacy>=3.0.0,<4.0.0
 transformers>=4.0.0,<5.0.0
 tokenizers>=0.10.0,<1.0.0
-torch==2.2.2
+torch==2.6.0
 ipython>=7.0.0,<8.0.0
 python-dotenv>=0.19.0,<1.0.0
 vllm>=0.1.0,<1.0.0
