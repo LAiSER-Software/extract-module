@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dev-laiser"
-version = "0.1.23"
+name = "laiser"
+version = "0.1.2"
 description = "LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research)..."
 readme = "README.md"
 authors = [
