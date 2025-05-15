@@ -7,6 +7,8 @@
 <h1>Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research (LAiSER)</h1>
 </div>
 
+[![Package Status](https://github.com/LAiSER-Software/extract-module/actions/workflows/test-installation.yml/badge.svg?branch=development&event=pull_request)](https://github.com/LAiSER-Software/extract-module/actions/workflows/test-installation.yml)
+
 ### Contents
 LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
@@ -35,11 +37,22 @@ The tool emphasizes standardization and transparency, offering a common framewor
 
 - Install LAiSER using pip:
 
+  # For GPU support (recommended if you have a CUDA-capable GPU):
   ```shell
-  pip install uv
-  uv pip install laiser
+  pip install dev-laiser[gpu]
   ```
+  # For CPU-only environments:
+  ```shell
+  pip install dev-laiser[cpu]
+  ```
+  # By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
+
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
+
+You can check if your machine has a GPU available with:
+```shell
+python -c "import torch; print(torch.cuda.is_available())"
+```
 
 ## Usage
 

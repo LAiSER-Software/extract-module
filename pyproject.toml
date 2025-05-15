@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laiser"
+version = "0.1.2"
+description = "LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research)..."
+readme = "README.md"
+authors = [
+    { name = "Satya Phanindra Kumar Kalaga" },
+    { name = "Prudhvi Chekuri" },
+    { name = "Bharat Khandelwal" }
+]
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.21.0,<2.0.0",
+    "pandas==2.2.2",
+    "psutil>=5.8.0,<6.0.0",
+    "skillNer==1.0.3",
+    "scikit-learn>=1.0.0,<2.0.0",
+    "spacy>=3.0.0,<4.0.0",
+    "transformers>=4.0.0,<5.0.0",
+    "tokenizers>=0.10.0,<1.0.0",
+    "torch==2.6.0",
+    "ipython>=7.0.0,<8.0.0",
+    "python-dotenv>=0.19.0,<1.0.0",
+    "vllm>=0.1.0,<1.0.0",
+    "tqdm>=4.62.0,<5.0.0"
+]
+
+[project.optional-dependencies]
+gpu = [
+    "torch==2.6.0",
+    "vllm>=0.1.0,<1.0.0"
+]
+cpu = [
+    "skillNer==1.0.3",
+    "spacy>=3.0.0,<4.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/LAiSER-Software/extract-module"
