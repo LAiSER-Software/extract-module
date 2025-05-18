@@ -7,8 +7,6 @@
 <h1>Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research (LAiSER)</h1>
 </div>
 
-[![Package Status](https://github.com/LAiSER-Software/extract-module/actions/workflows/test-installation.yml/badge.svg?branch=development&event=pull_request)](https://github.com/LAiSER-Software/extract-module/actions/workflows/test-installation.yml)
-
 ### Contents
 LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
