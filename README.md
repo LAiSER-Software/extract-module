@@ -37,11 +37,11 @@ The tool emphasizes standardization and transparency, offering a common framewor
 
   # For GPU support (recommended if you have a CUDA-capable GPU):
   ```shell
-  pip install dev-laiser[gpu]
+  pip install laiser[gpu]
   ```
   # For CPU-only environments:
   ```shell
-  pip install dev-laiser[cpu]
+  pip install laiser[cpu]
   ```
   # By default, torch and vllm are NOT installed unless you use the [gpu] extra.
 

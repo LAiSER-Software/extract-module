@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='dev-laiser',
+    name='laiser',
     version='0.1.21', 
     author='Satya Phanindra Kumar Kalaga, Prudhvi Chekuri, Bharat Khandelwal', 
     author_email='phanindra.connect@gmail.com',  
