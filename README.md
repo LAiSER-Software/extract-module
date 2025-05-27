@@ -43,7 +43,7 @@ The tool emphasizes standardization and transparency, offering a common framewor
   ```shell
   pip install laiser[cpu]
   ```
-  # By default, torch and vllm are NOT installed unless you use the [gpu] extra.
+  # By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
 
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
 

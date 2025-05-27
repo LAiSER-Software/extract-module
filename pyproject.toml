@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laiser"
-version = "0.1.23"
+version = "0.1.2"
 description = "LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research)..."
 readme = "README.md"
 authors = [
