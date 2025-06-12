@@ -19,14 +19,14 @@ License:
 Copyright 2024 George Washington University Institute of Public Policy
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation
 the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
 and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
 Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
 WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -62,6 +62,9 @@ import torch
 import numpy as np
 from vllm import SamplingParams
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+import json
+
+from laiser.utils import get_top_esco_skills
 
 torch.cuda.empty_cache()
 
@@ -299,9 +302,12 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
     prompt_template = """user
 **Objective:** Given a {input_desc}, complete the following tasks with structured outputs.
 
+### Semantic matches from Taxonomy Skills:
+{esco_context_block}
+
 ### Tasks:
 1. **Skills Extraction:** Identify {num_key_skills} key skills mentioned in the {input_desc}.
-  - Extract skill keywords or phrases of no more than three words.
+  - Extract/Filter contextually relevant skill keywords or phrases from taxonomy semantic matches.
 
 2. **Skill Level Assignment:** Assign a proficiency level to each extracted skill based on the SCQF Level Descriptors (see below).
 
@@ -310,7 +316,10 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
 4. **Task Abilities:** For each skill, list {num_key_tas} general tasks or capabilities enabled by the skill.
 
 ### Guidelines:
-- **Skill Extraction:** Identify skills explicitly stated or implied through {input_desc}.
+- **Skill Extraction:** 
+    - If the Semantic matches from the taxonomy skills are provided, use them to identify relevant skills.
+    - If none of the semantic matches are contextually relevant to the {input_desc}, infer skills from the {input_desc} directly.
+
 - **Skill Level Assignment:** Use the SCQF Level Descriptors to classify proficiency:
   - 1: Basic awareness of simple concepts.
   - 2: Limited operational understanding, guided application.
@@ -343,20 +352,21 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
 model
 """
 
-
     input_desc = "job description" if input_type == "syllabi" else "course syllabus description and its learning outcomes"
-    
     if input_type == "syllabi":
         input_text = f"""### Input:\n**Course Description:** {query["description"]}\n**Learning Outcomes:** {query["learning_outcomes"]}"""
     else:
         input_text = f"""### Input:\n{query["description"]}"""
-        
-    prompt = prompt_template.format(input_desc=input_desc, num_key_skills=num_key_skills, num_key_kr=num_key_kr, num_key_tas=num_key_tas, input_text=input_text)
+
+    # Prepare ESCO context for each input
+    esco_context = []
+    top_esco = get_top_esco_skills(input_text, top_k=10)
+    esco_context.append(", ".join([s['Skill'] for s in top_esco]))
+    prompt = prompt_template.format(input_desc=input_desc, num_key_skills=num_key_skills, num_key_kr=num_key_kr, num_key_tas=num_key_tas, input_text=input_text, esco_context_block=esco_context)
     return prompt
 
 
 def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
-
     """
     Generate completions for the whole data using the LLM model with vLLM.
     
@@ -410,7 +420,7 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
     ----------
     input_text : pandas DataFrame
         The input data to get completions for using the model
-    text_columns : list
+    text_columns : list (optional)
         List of columns in the input_text dataframe that contain the text data. (Default: ['description'])
     id_column : str
         Column name in the input_text dataframe that contains the unique identifier for each row
@@ -448,3 +458,78 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
                 continue
 
     return parsed_output
+
+# ----------------------------------------------------------------------------------
+# NEW HELPER: get_ksa_details
+# ----------------------------------------------------------------------------------
+
+def get_ksa_details(skill: str, description: str, llm, num_key_kr: int = 3, num_key_tas: int = 3):
+    """
+    Generate Knowledge Required and Task Abilities for a given skill in the context of the supplied description.
+
+    Parameters
+    ----------
+    skill : str
+        The skill name for which to generate KSAs.
+    description : str
+        The textual description (job description, syllabus, etc.) providing context.
+    llm : vllm.LLM
+        The LLM instance already initialised by the caller.
+    num_key_kr : int, optional
+        Maximum length of the Knowledge Required list (default 3).
+    num_key_tas : int, optional
+        Maximum length of the Task Abilities list (default 3).
+
+    Returns
+    -------
+    Tuple[list, list]
+        knowledge_required, task_abilities – both are lists of strings.  Empty lists are
+        returned if generation/parsing fails.
+    """
+
+    from vllm import SamplingParams
+    import json
+    import re
+
+    # Guard clause – if llm is None we simply return empty lists.
+    if llm is None:
+        return [], []
+
+    prompt = (
+        "user\n"
+        f"Given the following context, provide concise lists for the specified skill.\n\n"
+        f"Skill: {skill}\n\n"
+        "Context:\n"
+        f"{description}\n\n"
+        f"For the skill above produce:\n"
+        f"- Knowledge Required: {num_key_kr} bullet items, each ≤ 3 words.\n"
+        f"- Task Abilities: {num_key_tas} bullet items, each ≤ 3 words.\n\n"
+        "Respond strictly in valid JSON with the exact keys 'Knowledge Required' and 'Task Abilities'.\n"
+        "model"
+    )
+
+    sampling_params = SamplingParams(max_tokens=200, seed=42)
+
+    try:
+        result = llm.generate([prompt], sampling_params=sampling_params)
+        raw_text = result[0].outputs[0].text.strip()
+
+        # Attempt to locate JSON object within the text
+        json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        if not json_match:
+            return [], []
+
+        parsed = json.loads(json_match.group())
+        knowledge = parsed.get("Knowledge Required", [])
+        task_abilities = parsed.get("Task Abilities", [])
+
+        # Ensure they are lists
+        if not isinstance(knowledge, list):
+            knowledge = [str(knowledge)]
+        if not isinstance(task_abilities, list):
+            task_abilities = [str(task_abilities)]
+
+        return knowledge, task_abilities
+    except Exception as e:
+        print(f"[get_ksa_details] Generation/parsing error for skill '{skill}': {e}")
+        return [], []

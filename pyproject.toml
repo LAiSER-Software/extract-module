@@ -4,15 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laiser"
-version = "0.1.2"
-description = "LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research)..."
+version = "0.2.2"
+description = "LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research) is a Python package designed to extract skills from job/course descriptions and resumes using advanced NLP techniques."
 readme = "README.md"
 authors = [
     { name = "Satya Phanindra Kumar Kalaga" },
-    { name = "Prudhvi Chekuri" },
-    { name = "Bharat Khandelwal" }
+    { name = "Prudhvi Chekuri" }
 ]
-license = { text = "BSD-3-Clause" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+license = "BSD-3-Clause"
 requires-python = ">=3.9"
 dependencies = [
     "numpy>=1.21.0,<2.0.0",
@@ -27,7 +30,9 @@ dependencies = [
     "ipython>=7.0.0,<8.0.0",
     "python-dotenv>=0.19.0,<1.0.0",
     "vllm>=0.1.0,<1.0.0",
-    "tqdm>=4.62.0,<5.0.0"
+    "tqdm>=4.62.0,<5.0.0",
+    "sentence-transformers==4.1.0",
+    "faiss-cpu==1.11.0"
 ]
 
 [project.optional-dependencies]
