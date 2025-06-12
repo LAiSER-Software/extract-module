@@ -49,7 +49,9 @@ TODO:
 import numpy as np
 import psutil
 import logging
-
+from sentence_transformers import SentenceTransformer, util
+import faiss
+import pandas as pd
 
 def cosine_similarity(vec1, vec2):
     """
@@ -68,6 +70,74 @@ def cosine_similarity(vec1, vec2):
         return 0.0
     return np.dot(vec1, vec2) / product_of_magnitude
 
+# TODO: Clean/Refactor the following functions to use FAISS for ESCO skills
+def build_faiss_index_esco():
+    """
+    Builds a FAISS index for ESCO skills
+
+    Returns
+    -------
+    faiss index object
+    """
+    
+    # Load ESCO skill data
+    esco_df = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")  # replace with your file if needed
+    skill_names = esco_df["preferredLabel"].tolist()
+
+    # Embed ESCO skills using SentenceTransformer
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    print("Embedding ESCO skills...")
+    esco_embeddings = model.encode(skill_names, convert_to_numpy=True, show_progress_bar=True)
+
+    # ⚡ Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
+    dimension = esco_embeddings.shape[1]
+    index = faiss.IndexFlatIP(dimension)
+    faiss.normalize_L2(esco_embeddings)
+    index.add(esco_embeddings)
+    
+    # save the index to disk
+    # TODO: store this in a persistent storage like S3 or a database and remove this step from initialization
+    print("Saving FAISS index to disk...")
+    faiss.write_index(index, "esco_faiss_index.index")
+    print("FAISS index for ESCO skills built and saved for reusability.")
+    return index
+    
+def load_faiss_index_esco():
+    """
+    Loads a FAISS index for ESCO skills
+
+    Returns
+    -------
+    faiss index object
+    """
+    try:
+        # set the path to your FAISS index file in the input directory
+        print("Loading FAISS index for ESCO skills...")
+        
+        import os
+        index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
+        if not os.path.exists(index_path):
+            raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
+        index = faiss.read_index(index_path)
+        print("FAISS index for ESCO skills loaded successfully.")
+        return index
+    except Exception as e:
+        print(f"Error loading FAISS index: {e}")
+        return None
+
+def get_top_esco_skills(input_text, top_k=10):
+    """
+    Retrieves top ESCO skills based on cosine similarity with input text
+    """
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    index = load_faiss_index_esco()
+    if index is None:
+        raise ValueError("FAISS index for ESCO skills didn't load properly. Please check the index file.")
+    skill_names = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")["preferredLabel"].tolist()
+    emb = model.encode(input_text, convert_to_numpy=True)
+    faiss.normalize_L2(emb.reshape(1, -1))
+    scores, indices = index.search(emb.reshape(1, -1), top_k)
+    return [{"Skill": skill_names[i], "score": float(scores[0][j])} for j, i in enumerate(indices[0])]
 
 def get_embedding(nlp, input_text):
     """

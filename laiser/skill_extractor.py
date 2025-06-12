@@ -91,11 +91,13 @@ from skillNer.general_params import SKILL_DB
 from sklearn.metrics.pairwise import cosine_similarity
 from skillNer.skill_extractor_class import SkillExtractor
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from sentence_transformers import SentenceTransformer, util
+import faiss
 from scipy.spatial.distance import cdist
 
 
 # internal packages
-from laiser.utils import get_embedding, cosine_similarity
+from laiser.utils import get_embedding
 from laiser.params import SIMILARITY_THRESHOLD, SKILL_DB_PATH
 from laiser.llm_methods import get_completion, get_completion_vllm
 
@@ -137,15 +139,75 @@ class Skill_Extractor:
     ....
 
     """
+    def build_faiss_index_esco():
+        """
+        Builds a FAISS index for ESCO skills
+
+        Returns
+        -------
+        faiss index object
+        """
+        
+        # Load ESCO skill data
+        esco_df = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")  # replace with your file if needed
+        skill_names = esco_df["preferredLabel"].tolist()
+
+        # Embed ESCO skills using SentenceTransformer
+        model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        print("Embedding ESCO skills...")
+        esco_embeddings = model.encode(skill_names, convert_to_numpy=True, show_progress_bar=True)
+
+        # ⚡ Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
+        dimension = esco_embeddings.shape[1]
+        index = faiss.IndexFlatIP(dimension)
+        faiss.normalize_L2(esco_embeddings)
+        index.add(esco_embeddings)
+        
+        # save the index to disk
+        # TODO: store this in a persistent storage like S3 or a database and remove this step from initialization
+        print("Saving FAISS index to disk...")
+        faiss.write_index(index, "esco_faiss_index.index")
+        print("FAISS index for ESCO skills built and saved for reusability.")
+        return index
+    
+    def load_faiss_index_esco():
+        """
+        Loads a FAISS index for ESCO skills
+
+        Returns
+        -------
+        faiss index object
+        """
+        try:
+            # set the path to your FAISS index file in the input directory
+            print("Loading FAISS index for ESCO skills...")
+            
+            import os
+            index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
+            if not os.path.exists(index_path):
+                raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
+            index = faiss.read_index(index_path)
+            print("FAISS index for ESCO skills loaded successfully.")
+            return index
+        except Exception as e:
+            print(f"Error loading FAISS index: {e}")
+            return None
 
     def __init__(self, AI_MODEL_ID=None, HF_TOKEN=None, use_gpu=None):
         self.model_id = AI_MODEL_ID
+        self.embedding_model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
         self.HF_TOKEN=HF_TOKEN
         self.use_gpu=use_gpu if use_gpu else torch.cuda.is_available()
+        self.index = self.load_faiss_index_esco()
+        if self.index is None:
+            print("ESCO FAISS index not found. Building a new index...")
+            self.build_faiss_index_esco()
+            self.index = self.load_faiss_index_esco()
         
         try:
             print("Found 'en_core_web_lg' model. Loading...")
             self.nlp = spacy.load("en_core_web_lg")
+            
         except OSError:
             print("Downloading 'en_core_web_lg' model...")
             spacy.cli.download("en_core_web_lg")
@@ -173,6 +235,7 @@ class Skill_Extractor:
         return
 
 
+    # TODO: Deprecate flow, handle this abandoned flow in future releases
     # Declaring a private method for extracting raw skills from input text
     def extract_raw(self, input_text, text_columns, id_column, input_type, batch_size):
         """
@@ -228,7 +291,7 @@ class Skill_Extractor:
 
         return list(extracted_skills_set)
             
-
+    # TODO: Deprecate flow, handle this abandoned flow in future releases
     def align_skills(self, raw_skills, document_id='0'):
         """
         This function aligns the skills provided to the available taxonomy
@@ -270,12 +333,12 @@ class Skill_Extractor:
 
         return matches
 
-
+    # TODO: Deprecate flow, handle this abandoned flow in future releases
     def align_KSAs(self, extracted_df, id_column):
-        
+
         """
         This function aligns the KSAs provided to the available taxonomy
-        
+
         Parameters
         ----------
         extracted_df : pandas dataframe
@@ -338,7 +401,16 @@ class Skill_Extractor:
 
         return matches
 
+   
+    def get_top_esco_skills(input_text, model, index, top_k=25):
+        esco_df = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")  # replace with your file if needed
+        skill_names = esco_df["preferredLabel"].tolist()
+        emb = model.encode(input_text, convert_to_numpy=True)
+        faiss.normalize_L2(emb.reshape(1, -1))
+        scores, indices = index.search(emb.reshape(1, -1), top_k)
+        return [{"Skill": skill_names[i], "score": float(scores[0][j])} for j, i in enumerate(indices[0])]
 
+        
     def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", levels=False, batch_size=32, warnings=True):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
@@ -449,4 +521,3 @@ class Skill_Extractor:
                     extracted = extracted._append(aligned_skills, ignore_index=True)
 
         return extracted
-
