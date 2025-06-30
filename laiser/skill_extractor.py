@@ -66,6 +66,7 @@ Rev No.     Date            Author              Description
 [1.1.1]     03/15/2025      Prudhvi Chekuri     Add exception handling
 [1.1.2]     03/20/2025      Prudhvi Chekuri     Fix Levels Toggle
 [1.2.0]     06/12/2025      Satya Phanindra K.  Added support for ESCO skills using FAISS index and SentenceTransformers
+[1.2.1]     06/29/2025      Anket Patil         Added support for API-based LLM models 
 
 
 
@@ -86,7 +87,6 @@ import spacy
 import torch
 import numpy as np
 import pandas as pd
-from vllm import LLM
 from tqdm.auto import tqdm
 from spacy.matcher import PhraseMatcher
 from skillNer.general_params import SKILL_DB
@@ -96,13 +96,13 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from sentence_transformers import SentenceTransformer, util
 import faiss
 from scipy.spatial.distance import cdist
-
+import requests
 
 # internal packages
 from laiser.utils import get_embedding
 from laiser.params import SIMILARITY_THRESHOLD, SKILL_DB_PATH
-from laiser.llm_methods import get_completion, get_completion_vllm, get_ksa_details
-
+from laiser.llm_methods import get_completion, get_completion_vllm,get_ksa_details
+from laiser.llm_models.model_loader import load_model_from_vllm
 
 class Skill_Extractor:
     """
@@ -202,11 +202,12 @@ class Skill_Extractor:
             self.index = None
             return None
 
-    def __init__(self, AI_MODEL_ID=None, HF_TOKEN=None, use_gpu=None):
+    def __init__(self, AI_MODEL_ID=None, HF_TOKEN=None,api_key=None, use_gpu=None):
         self.model_id = AI_MODEL_ID
         self.embedding_model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
         self.HF_TOKEN=HF_TOKEN
-        self.use_gpu=use_gpu if use_gpu else torch.cuda.is_available()
+        self.api_key = api_key
+        self.use_gpu = use_gpu if use_gpu is not None else False
         # Ensure the FAISS index attribute is always defined
         self.index = None  # Will be populated after loading or building the index
         # Load ESCO data and FAISS index
@@ -236,18 +237,14 @@ class Skill_Extractor:
             
             try:
                 torch.cuda.empty_cache()
-            
-                # Use quantization to reduce the model size and memory usage
-                if self.model_id:
-                    self.llm = LLM(model=self.model_id, dtype="float16", quantization='gptq')
-                else:
-                    self.llm = LLM(model="marcsun13/gemma-2-9b-it-GPTQ", dtype="float16", quantization='gptq')   
+                self.llm = load_model_from_vllm( self.model_id,self.HF_TOKEN)
             except Exception as e:
                 print(f"Failed to initialize LLM: {e}")
                 raise
         else:
-            print("GPU is not available. Using CPU for SkillNer model initialization...")
-            self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
+            if self.model_id != 'gemini':
+                print("GPU is not available. Using CPU for SkillNer model initialization...")
+                self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
         return
 
 
@@ -546,7 +543,7 @@ class Skill_Extractor:
                 # Fetch Knowledge Required & Task Abilities using the LLM if GPU/LLM available
                 knowledge_required, task_abilities = [], []
                 if torch.cuda.is_available() and self.use_gpu:
-                    knowledge_required, task_abilities = get_ksa_details(raw_skill, description_text, self.llm)
+                    knowledge_required, task_abilities = get_ksa_details(raw_skill, description_text, self.model_id,self.use_gpu,llm = self.llm, tokenizer=None,model=None,api_key=self.api_key)
 
                 output_records.append({
                     "Research ID": research_id,
@@ -567,59 +564,63 @@ class Skill_Extractor:
         # Legacy pipeline retained below for backwards compatibility
         # ------------------------------------------------------------------
         # Display development mode warning if warnings are enabled
-        if warnings:
-            print("\033[93m" + "=" * 80 + "\033[0m")
-            print("\033[93m\033[1m⚠️  WARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution! ⚠️\033[0m")
-            print("\033[93m" + "=" * 80 + "\033[0m")
+        try:    
+            if warnings:
+                print("\033[93m" + "=" * 80 + "\033[0m")
+                print("\033[93m\033[1m⚠️  WARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution! ⚠️\033[0m")
+                print("\033[93m" + "=" * 80 + "\033[0m")
 
-        if torch.cuda.is_available() and self.use_gpu:
-            KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
-        
-            extracted_df = pd.DataFrame(KSAs)
-            if input_type != 'syllabus':
-                extracted_df["learning_outcomes"] = ''
-
-        if torch.cuda.is_available() and self.use_gpu:
-            
-            assert not data.empty, "Input data is empty, pass a valid input..."
-            
-            try:
+            if torch.cuda.is_available() and self.use_gpu:
                 KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
             
                 extracted_df = pd.DataFrame(KSAs)
-                
                 if input_type != 'syllabus':
                     extracted_df["learning_outcomes"] = ''
 
-                selected_columns = [id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]
+            if torch.cuda.is_available() and self.use_gpu:
                 
-                extracted_df = extracted_df[selected_columns]
-                matches = self.align_KSAs(extracted_df, id_column)
+                assert not data.empty, "Input data is empty, pass a valid input..."
                 
-                extracted_columns = ['Research ID', "Description", 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient']
-
-                extracted = pd.DataFrame(columns=extracted_columns)
-                extracted = extracted._append(matches, ignore_index=True)
-
-                if input_type != "syllabus":
-                    extracted.drop("Learning Outcomes", axis=1, inplace=True)
-
-                if not levels:
-                    extracted.drop("Level", axis=1, inplace=True)
-
+                try:
+                    KSAs = self.extract_raw(data, text_columns, id_column, input_type, batch_size)
                 
-            except Exception as e:
-                print(f"Error in extraction pipeline: {e}")
-                extracted = pd.DataFrame()
-        else:
-            extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
-            for _, row in data.iterrows():
-                research_id = row[id_column]
-                raw_skills = self.extract_raw(row, text_columns, id_column, input_type, batch_size)
-                if len(raw_skills) == 0:
-                    continue
-                else:
-                    aligned_skills = self.align_skills(raw_skills, research_id)
-                    extracted = extracted._append(aligned_skills, ignore_index=True)
+                    extracted_df = pd.DataFrame(KSAs)
+                    
+                    if input_type != 'syllabus':
+                        extracted_df["learning_outcomes"] = ''
+
+                    selected_columns = [id_column, "description", "learning_outcomes", "Skill", "Level", "Knowledge Required", "Task Abilities"]
+                    
+                    extracted_df = extracted_df[selected_columns]
+                    matches = self.align_KSAs(extracted_df, id_column)
+                    
+                    extracted_columns = ['Research ID', "Description", 'Learning Outcomes', 'Raw Skill', 'Level', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient']
+
+                    extracted = pd.DataFrame(columns=extracted_columns)
+                    extracted = extracted._append(matches, ignore_index=True)
+
+                    if input_type != "syllabus":
+                        extracted.drop("Learning Outcomes", axis=1, inplace=True)
+
+                    if not levels:
+                        extracted.drop("Level", axis=1, inplace=True)
+
+                    
+                except Exception as e:
+                    print(f"Error in extraction pipeline: {e}")
+                    extracted = pd.DataFrame()
+            else:
+                extracted = pd.DataFrame(columns=['Research ID', 'Raw Skill', 'Skill Tag', 'Correlation Coefficient'])
+                for _, row in data.iterrows():
+                    research_id = row[id_column]
+                    raw_skills = self.extract_raw(row, text_columns, id_column, input_type, batch_size)
+                    if len(raw_skills) == 0:
+                        continue
+                    else:
+                        aligned_skills = self.align_skills(raw_skills, research_id)
+                        extracted = extracted._append(aligned_skills, ignore_index=True)
+        except Exception as e:
+            print(f"\033[91m❌ Legacy pipeline could not be executed: {e}\033[0m")
+            extracted = pd.DataFrame()
 
         return extracted
