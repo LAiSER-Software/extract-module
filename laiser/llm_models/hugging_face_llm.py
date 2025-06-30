@@ -45,8 +45,7 @@ Output/Return Format:
 Revision History:
 -----------------
 Rev No.     Date            Author              Description
-[1.0.0]     6/12/2025      Anket Patil          Modularize LLM generation logic for transformers and vLLM
-
+[1.0.0]     6/30/2025      Anket Patil          Modularize LLM generation logic for transformers and vLLM
 """
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
