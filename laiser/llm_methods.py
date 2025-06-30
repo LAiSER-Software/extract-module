@@ -50,6 +50,7 @@ Rev No.     Date            Author              Description
 [1.0.2]     11/24/2024      Prudhvi Chekuri     Add support for skills extraction from syllabi data
 [1.0.3]     03/12/2025      Prudhvi Chekuri     Implement functions to extract levels, KSAs from job descriptions and syllabi data using vLLM
 [1.0.4]     03/15/2025      Prudhvi Chekuri     Add exception handling
+[1.0.5]     06/29/2025      Anket Patil         Integrate LLM Router for multi-LLM support
 
 
 TODO:
@@ -60,11 +61,10 @@ TODO:
 import re
 import torch
 import numpy as np
-from vllm import SamplingParams
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import json
 
 from laiser.utils import get_top_esco_skills
+from laiser.llm_models.llm_router import llm_router
 
 torch.cuda.empty_cache()
 
@@ -463,7 +463,7 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
 # NEW HELPER: get_ksa_details
 # ----------------------------------------------------------------------------------
 
-def get_ksa_details(skill: str, description: str, llm, num_key_kr: int = 3, num_key_tas: int = 3):
+def get_ksa_details(skill: str, description: str, model_id, use_gpu, llm, tokenizer=None, model=None, api_key=None,num_key_kr: int = 3, num_key_tas: int = 3):    
     """
     Generate Knowledge Required and Task Abilities for a given skill in the context of the supplied description.
 
@@ -487,14 +487,6 @@ def get_ksa_details(skill: str, description: str, llm, num_key_kr: int = 3, num_
         returned if generation/parsing fails.
     """
 
-    from vllm import SamplingParams
-    import json
-    import re
-
-    # Guard clause – if llm is None we simply return empty lists.
-    if llm is None:
-        return [], []
-
     prompt = (
         "user\n"
         f"Given the following context, provide concise lists for the specified skill.\n\n"
@@ -508,13 +500,8 @@ def get_ksa_details(skill: str, description: str, llm, num_key_kr: int = 3, num_
         "model"
     )
 
-    sampling_params = SamplingParams(max_tokens=200, seed=42)
-
     try:
-        result = llm.generate([prompt], sampling_params=sampling_params)
-        raw_text = result[0].outputs[0].text.strip()
-
-        # Attempt to locate JSON object within the text
+        raw_text = llm_router(prompt, model_id, use_gpu,llm, tokenizer, model,api_key)       
         json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not json_match:
             return [], []
