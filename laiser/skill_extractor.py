@@ -81,6 +81,7 @@ TODO:
 # native packages
 import sys
 import os
+from pathlib import Path
 
 # installed packages
 import spacy
@@ -185,20 +186,33 @@ class Skill_Extractor:
         faiss index object
         """
         try:
-            # set the path to your FAISS index file in the input directory
             print("Loading FAISS index for ESCO skills...")
-            
-            import os
-            index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
-            if not os.path.exists(index_path):
-                raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
-            index = faiss.read_index(index_path)
+
+            # 1. Path to package-included file
+            local_index_path = Path(__file__).parent / "public" / "esco_faiss_index.index"
+
+            # 2. GitHub fallback URL
+            raw_url = "https://raw.githubusercontent.com/LAiSER-Software/extract-module/main/laiser/input/esco_faiss_index.index"
+
+            # 3. Check local package path
+            if not local_index_path.exists():
+                print(f"FAISS index not found locally at {local_index_path}. Downloading from {raw_url} ...")
+                response = requests.get(raw_url)
+                response.raise_for_status()
+                local_index_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+                with open(local_index_path, "wb") as f:
+                    f.write(response.content)
+                print("Download complete.")
+
+            # 4. Load FAISS index
+            index = faiss.read_index(str(local_index_path))
             print("FAISS index for ESCO skills loaded successfully.")
             self.index = index
             return index
+
         except Exception as e:
             print(f"Error loading FAISS index: {e}")
-            # Ensure self.index is defined even on failure
+            print("ESCO FAISS index not found. Building a new index on system memory...")
             self.index = None
             return None
 
@@ -453,7 +467,7 @@ class Skill_Extractor:
         ]
 
         
-    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", levels=False, batch_size=32, warnings=True):
+    def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", top_k= None, levels=False, batch_size=32, warnings=True):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
 
@@ -530,7 +544,9 @@ class Skill_Extractor:
 
             # Retrieve the top-k ESCO skills via FAISS semantic search
             try:
-                top_esco = self.get_top_esco_skills(description_text, top_k=batch_size if batch_size else 25)
+                top_k_val = top_k if (top_k is not None and top_k > 0) else 25
+                top_esco = self.get_top_esco_skills(description_text, top_k=top_k_val)
+
             except Exception as e:
                 print(f"[Skill_Extractor.extractor] ESCO search failed for ID {research_id}: {e}")
                 continue
