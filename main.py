@@ -17,6 +17,9 @@ args = parser.parse_args()
 
 use_gpu = True if args.use_gpu == "True" else False
 
+# based on the above arguments, to run this script:
+# python main.py --HF_TOKEN <your_hf_token> --AI_MODEL_ID <your_model_id> --use_gpu True --batch_size 32
+
 print('\n\nInitializing the Skill Extractor...')
 se = Skill_Extractor(AI_MODEL_ID=args.AI_MODEL_ID, HF_TOKEN=args.HF_TOKEN, use_gpu=use_gpu)
 print('The Skill Extractor has been initialized successfully!\n')

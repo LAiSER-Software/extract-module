@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='laiser',
-    version='0.1.1', 
+    name='dev-laiser',
+    version='0.2.26', 
     author='Satya Phanindra Kumar Kalaga, Prudhvi Chekuri, Bharat Khandelwal', 
     author_email='phanindra.connect@gmail.com',  
     description="LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research) is a tool designed to help learners, educators, and employers extract and share trusted information about skills. It uses a fine-tuned language model to extract raw skill keywords from text, then aligns them with a predefined taxonomy. You can find more technical details in the project's paper.md and an overview in the README.md.", 
@@ -29,7 +29,9 @@ setup(
         'ipython>=7.0.0,<8.0.0',
         'python-dotenv>=0.19.0,<1.0.0',
         'vllm>=0.1.0,<1.0.0',
-        'tqdm>=4.62.0,<5.0.0'
+        'tqdm>=4.62.0,<5.0.0',
+        "sentence-transformers==4.1.0",
+        "faiss-cpu==1.11.0"
     ],
     extras_require={
         'gpu': [

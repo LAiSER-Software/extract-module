@@ -19,14 +19,14 @@ License:
 Copyright 2024 George Washington University Institute of Public Policy
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation
 the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
 and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
 Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
 WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -65,6 +65,8 @@ Rev No.     Date            Author              Description
 [1.1.0]     03/12/2025      Prudhvi Chekuri     Added support for extracting KSAs from text and aligning them to the taxonomy
 [1.1.1]     03/15/2025      Prudhvi Chekuri     Add exception handling
 [1.1.2]     03/20/2025      Prudhvi Chekuri     Fix Levels Toggle
+[1.2.0]     06/12/2025      Satya Phanindra K.  Added support for ESCO skills using FAISS index and SentenceTransformers
+
 
 
 TODO:
@@ -91,13 +93,15 @@ from skillNer.general_params import SKILL_DB
 from sklearn.metrics.pairwise import cosine_similarity
 from skillNer.skill_extractor_class import SkillExtractor
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from sentence_transformers import SentenceTransformer, util
+import faiss
 from scipy.spatial.distance import cdist
 
 
 # internal packages
-from laiser.utils import get_embedding, cosine_similarity
+from laiser.utils import get_embedding
 from laiser.params import SIMILARITY_THRESHOLD, SKILL_DB_PATH
-from laiser.llm_methods import get_completion, get_completion_vllm
+from laiser.llm_methods import get_completion, get_completion_vllm, get_ksa_details
 
 
 class Skill_Extractor:
@@ -137,15 +141,89 @@ class Skill_Extractor:
     ....
 
     """
+    def build_faiss_index_esco(self):
+        """
+        Builds a FAISS index for ESCO skills
+
+        Returns
+        -------
+        faiss index object
+        """
+
+        # Embed ESCO skills using SentenceTransformer
+        model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        print("Embedding ESCO skills...")
+        esco_embeddings = model.encode(self.skill_names, convert_to_numpy=True, show_progress_bar=True)
+
+        # ⚡ Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
+        dimension = esco_embeddings.shape[1]
+        index = faiss.IndexFlatIP(dimension)
+        faiss.normalize_L2(esco_embeddings)
+        index.add(esco_embeddings)
+        
+        # save the index to disk
+        # TODO: switch from FAISS to a more persistent and cloud supported vector database.
+        print("Saving FAISS index to disk...")
+        # Get the directory where the script is located
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Create input directory if it doesn't exist
+        input_dir = os.path.join(script_dir, "input")
+        os.makedirs(input_dir, exist_ok=True)
+        # Save index to input directory
+        index_path = os.path.join(input_dir, "esco_faiss_index.index")
+        faiss.write_index(index, index_path)
+        print("FAISS index for ESCO skills built and saved for reusability.")
+        self.index = index
+        return index
+    
+    def load_faiss_index_esco(self):
+        """
+        Loads a FAISS index for ESCO skills
+
+        Returns
+        -------
+        faiss index object
+        """
+        try:
+            # set the path to your FAISS index file in the input directory
+            print("Loading FAISS index for ESCO skills...")
+            
+            import os
+            index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
+            if not os.path.exists(index_path):
+                raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
+            index = faiss.read_index(index_path)
+            print("FAISS index for ESCO skills loaded successfully.")
+            self.index = index
+            return index
+        except Exception as e:
+            print(f"Error loading FAISS index: {e}")
+            # Ensure self.index is defined even on failure
+            self.index = None
+            return None
 
     def __init__(self, AI_MODEL_ID=None, HF_TOKEN=None, use_gpu=None):
         self.model_id = AI_MODEL_ID
+        self.embedding_model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
         self.HF_TOKEN=HF_TOKEN
         self.use_gpu=use_gpu if use_gpu else torch.cuda.is_available()
+        # Ensure the FAISS index attribute is always defined
+        self.index = None  # Will be populated after loading or building the index
+        # Load ESCO data and FAISS index
+        print("Loading ESCO skill taxonomy data...")
+        self.esco_df = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")
+        self.skill_names = self.esco_df["preferredLabel"].tolist()
+        
+        # Load FAISS index        
+        self.load_faiss_index_esco()
+        if self.index is None:
+            print("ESCO FAISS index not found. Building a new index on system memory...")
+            self.build_faiss_index_esco()
         
         try:
             print("Found 'en_core_web_lg' model. Loading...")
             self.nlp = spacy.load("en_core_web_lg")
+            
         except OSError:
             print("Downloading 'en_core_web_lg' model...")
             spacy.cli.download("en_core_web_lg")
@@ -173,6 +251,7 @@ class Skill_Extractor:
         return
 
 
+    # TODO: Deprecate flow, handle this abandoned flow in future releases
     # Declaring a private method for extracting raw skills from input text
     def extract_raw(self, input_text, text_columns, id_column, input_type, batch_size):
         """
@@ -228,7 +307,7 @@ class Skill_Extractor:
 
         return list(extracted_skills_set)
             
-
+    # TODO: Deprecate flow, handle this abandoned flow in future releases
     def align_skills(self, raw_skills, document_id='0'):
         """
         This function aligns the skills provided to the available taxonomy
@@ -270,12 +349,12 @@ class Skill_Extractor:
 
         return matches
 
-
+    # TODO: Deprecate flow, handle this abandoned flow in future releases
     def align_KSAs(self, extracted_df, id_column):
-        
+
         """
         This function aligns the KSAs provided to the available taxonomy
-        
+
         Parameters
         ----------
         extracted_df : pandas dataframe
@@ -338,7 +417,45 @@ class Skill_Extractor:
 
         return matches
 
+   
+    def get_top_esco_skills(self, input_text, top_k=25):
+        """
+        Retrieve the top-k ESCO skills most semantically similar to the input text using the
+        Sentence-Transformer embeddings and the pre-built FAISS index that were both loaded
+        during __init__.
 
+        Parameters
+        ----------
+        input_text : str
+            The text (e.g., job description) for which to retrieve similar ESCO skills.
+        top_k : int, optional
+            Number of top skills to return (default 25).
+
+        Returns
+        -------
+        list[dict]
+            Each dictionary contains:
+                - "Skill": str  – ESCO preferredLabel.
+                - "index": int  – Position of the skill in the taxonomy list (used for tagging).
+                - "score": float – Cosine similarity score (0-1).
+        """
+        # Encode the input text once using the cached embedding model
+        emb = self.embedding_model.encode(input_text, convert_to_numpy=True)
+        faiss.normalize_L2(emb.reshape(1, -1))
+
+        # Search within the FAISS index
+        scores, indices = self.index.search(emb.reshape(1, -1), top_k)
+
+        return [
+            {
+                "Skill": self.skill_names[idx],
+                "index": int(idx),
+                "score": float(scores[0][rank])
+            }
+            for rank, idx in enumerate(indices[0])
+        ]
+
+        
     def extractor(self, data, id_column='Research ID', text_columns=["description"], input_type="job_desc", levels=False, batch_size=32, warnings=True):
         """
         Function takes text dataset to extract and aligns skills based on available taxonomies
@@ -392,6 +509,63 @@ class Skill_Extractor:
             - "Correlation Coefficient": similarity_score
 
         """
+        # ------------------------------------------------------------------
+        # NEW OUTPUT PIPELINE (v1.2.0 – 2025-06-12)
+        # Produces the required columns:
+        # Research ID, Description, Raw Skill, Knowledge Required, Task Abilities,
+        # Skill Tag, Correlation Coefficient
+        # ------------------------------------------------------------------
+        output_records = []
+        for _, row in data.iterrows():
+            research_id = row[id_column]
+
+            # Build the description text that we will use for semantic search & LLM context
+            if input_type == "job_desc":
+                description_text = row[text_columns[0]]
+            elif input_type == "syllabus" and len(text_columns) >= 2:
+                description_text = (
+                    f"Course Description: {row[text_columns[0]]}\n\n"
+                    f"Learning Outcomes: {row[text_columns[1]]}"
+                )
+            else:
+                # Fallback – concatenate all specified text columns separated by space
+                description_text = " ".join([str(row[col]) for col in text_columns])
+
+            # Retrieve the top-k ESCO skills via FAISS semantic search
+            try:
+                top_esco = self.get_top_esco_skills(description_text, top_k=batch_size if batch_size else 25)
+            except Exception as e:
+                print(f"[Skill_Extractor.extractor] ESCO search failed for ID {research_id}: {e}")
+                continue
+
+            for skill_obj in top_esco:
+                raw_skill = skill_obj["Skill"]
+                coeff = skill_obj["score"]
+                tag = f"ESCO.{skill_obj['index']}"
+
+                # Fetch Knowledge Required & Task Abilities using the LLM if GPU/LLM available
+                knowledge_required, task_abilities = [], []
+                if torch.cuda.is_available() and self.use_gpu:
+                    knowledge_required, task_abilities = get_ksa_details(raw_skill, description_text, self.llm)
+
+                output_records.append({
+                    "Research ID": research_id,
+                    "Description": description_text,
+                    "Raw Skill": raw_skill,
+                    "Knowledge Required": knowledge_required,
+                    "Task Abilities": task_abilities,
+                    "Skill Tag": tag,
+                    "Correlation Coefficient": coeff
+                })
+
+        # If we successfully generated any records with the new specification, we can
+        # return them immediately and skip the legacy pipeline that follows.
+        if len(output_records) > 0:
+            return pd.DataFrame(output_records)
+
+        # ------------------------------------------------------------------
+        # Legacy pipeline retained below for backwards compatibility
+        # ------------------------------------------------------------------
         # Display development mode warning if warnings are enabled
         if warnings:
             print("\033[93m" + "=" * 80 + "\033[0m")
@@ -449,4 +623,3 @@ class Skill_Extractor:
                     extracted = extracted._append(aligned_skills, ignore_index=True)
 
         return extracted
-
