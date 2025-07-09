@@ -246,6 +246,10 @@ class Skill_Extractor:
 
         self.skill_db_df = pd.read_csv(SKILL_DB_PATH)
         self.skill_db_embeddings = np.array([get_embedding(self.nlp, label) for label in self.skill_db_df['SkillLabel']])
+        
+        # Initialize llm attribute
+        self.llm = None
+        
         if torch.cuda.is_available() and self.use_gpu:
             print("GPU is available. Using GPU for Large Language model initialization...")
             
@@ -255,6 +259,9 @@ class Skill_Extractor:
             except Exception as e:
                 print(f"Failed to initialize LLM: {e}")
                 raise
+        elif self.model_id == 'gemini':
+            print("Using Gemini API for skill extraction...")
+            # For Gemini, llm remains None as it's handled by the API
         else:
             if self.model_id != 'gemini':
                 print("GPU is not available. Using CPU for SkillNer model initialization...")
@@ -558,7 +565,7 @@ class Skill_Extractor:
 
                 # Fetch Knowledge Required & Task Abilities using the LLM if GPU/LLM available
                 knowledge_required, task_abilities = [], []
-                if torch.cuda.is_available() and self.use_gpu:
+                if (torch.cuda.is_available() and self.use_gpu) or self.model_id == 'gemini':
                     knowledge_required, task_abilities = get_ksa_details(raw_skill, description_text, self.model_id,self.use_gpu,llm = self.llm, tokenizer=None,model=None,api_key=self.api_key)
 
                 output_records.append({

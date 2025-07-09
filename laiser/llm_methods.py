@@ -501,9 +501,10 @@ def get_ksa_details(skill: str, description: str, model_id, use_gpu, llm, tokeni
     )
 
     try:
-        raw_text = llm_router(prompt, model_id, use_gpu,llm, tokenizer, model,api_key)       
+        raw_text = llm_router(prompt, model_id, use_gpu,llm, tokenizer, model,api_key)     
         json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not json_match:
+            print(f"[get_ksa_details] No JSON match found in response for skill '{skill}'")
             return [], []
 
         parsed = json.loads(json_match.group())

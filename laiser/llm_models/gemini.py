@@ -54,8 +54,8 @@ TODO:
 """
 
 import torch
-import google.generativeai as genai        
-
+import google.generativeai as genai
+import re
 torch.cuda.empty_cache()
 
 def gemini_generate(prompt: str,api_key: str) -> str:
@@ -66,7 +66,10 @@ def gemini_generate(prompt: str,api_key: str) -> str:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-1.5-pro")
         response = model.generate_content(prompt)
-        return response.text.strip()
+        raw_text = response.text if response and response.text else ""
+        raw_text = raw_text.strip()
+        raw_text = re.sub(r"```(?:json)?|```", "", raw_text).strip()
+        return raw_text
     except Exception as e:
         print(f"[Gemini] Error: {e}")
         return ""
