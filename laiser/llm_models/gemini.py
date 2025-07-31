@@ -56,7 +56,6 @@ TODO:
 import torch
 import google.generativeai as genai
 import re
-torch.cuda.empty_cache()
 
 def gemini_generate(prompt: str,api_key: str) -> str:
     """
