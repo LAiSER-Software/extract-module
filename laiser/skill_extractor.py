@@ -197,8 +197,13 @@ class Skill_Extractor:
             # 3. Check local package path
             if not local_index_path.exists():
                 print(f"FAISS index not found locally at {local_index_path}. Downloading from {raw_url} ...")
-                response = requests.get(raw_url)
+                response = requests.get(raw_url, timeout=10)  # Add timeout to prevent hanging requests
                 response.raise_for_status()
+                
+                # Validate response content
+                if response.headers.get("Content-Type") != "application/octet-stream":
+                    raise ValueError(f"Unexpected content type: {response.headers.get('Content-Type')}")
+                
                 local_index_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
                 with open(local_index_path, "wb") as f:
                     f.write(response.content)
