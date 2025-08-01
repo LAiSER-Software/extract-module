@@ -262,7 +262,6 @@ class Skill_Extractor:
                 print(f"Failed to initialize LLM: {e}")
                 raise
         else:
-            if self.model_id != 'gemini':
                 print("GPU is not available. Using CPU for SkillNer model initialization...")
                 self.ner_extractor = SkillExtractor(self.nlp, SKILL_DB, PhraseMatcher)
         return
