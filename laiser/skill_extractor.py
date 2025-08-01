@@ -250,18 +250,17 @@ class Skill_Extractor:
         # Initialize llm attribute
         self.llm = None
         
-        if torch.cuda.is_available() and self.use_gpu:
+        if self.model_id == 'gemini':
+            print("Using Gemini API for skill extraction...")
+            # llm remains None, Gemini will be used via API
+        elif torch.cuda.is_available() and self.use_gpu:
             print("GPU is available. Using GPU for Large Language model initialization...")
-            
             try:
                 torch.cuda.empty_cache()
-                self.llm = load_model_from_vllm( self.model_id,self.HF_TOKEN)
+                self.llm = load_model_from_vllm(self.model_id, self.HF_TOKEN)
             except Exception as e:
                 print(f"Failed to initialize LLM: {e}")
                 raise
-        elif self.model_id == 'gemini':
-            print("Using Gemini API for skill extraction...")
-            # For Gemini, llm remains None as it's handled by the API
         else:
             if self.model_id != 'gemini':
                 print("GPU is not available. Using CPU for SkillNer model initialization...")
