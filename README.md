@@ -35,15 +35,15 @@ The tool emphasizes standardization and transparency, offering a common framewor
 
 - Install LAiSER using pip:
 
-  # For GPU support (recommended if you have a CUDA-capable GPU):
+  ### For GPU support (recommended if you have a CUDA-capable GPU):
   ```shell
   pip install laiser[gpu]
   ```
-  # For CPU-only environments:
+  ### For CPU-only environments:
   ```shell
   pip install laiser[cpu]
   ```
-  # By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
+  ### By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
 
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
 
