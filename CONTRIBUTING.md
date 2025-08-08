@@ -83,4 +83,74 @@ deprecated. All clients must be updated to use the new `/api/v2/auth/token`
 endpoint. The request and response formats have also changed.
 ```
 
+## Releases and Semantic Versioning
+
+Semantic Versioning is a versioning system that uses a three-part number to communicate the kinds of changes in a release: MAJOR.MINOR.PATCH. By using Conventional Commits, we can automate how we determine the next version number.
+How It Works
+
+Here’s how commit types relate to versioning:
+
+- PATCH version (e.g., 1.0.0 -> 1.0.1)
+
+    - Incremented for backward-compatible bug fixes.
+
+    - Corresponds to fix commits.
+
+- MINOR version (e.g., 1.0.1 -> 1.1.0)
+
+    - Incremented for new, backward-compatible functionality.
+
+    - Corresponds to feat commits.
+
+- MAJOR version (e.g., 1.1.0 -> 2.0.0)
+
+    - Incremented for any incompatible API changes (breaking changes).
+
+    - Corresponds to any commit that includes a BREAKING CHANGE: in the footer.
+
+### The Connection
+
+When we create a release, we can look at the commit history since the last release:
+
+- If there are any BREAKING CHANGE: commits, we make a MAJOR release.
+
+- If there are feat commits but no breaking changes, we make a MINOR release.
+
+- If there are only fix commits (and other types like chore, docs, etc.), we make a PATCH release.
+
+This direct link between our commit messages and versioning makes our release process predictable and clear for everyone using our software.
+
+### Examples
+
+#### Commit with a new feature (leads to a MINOR release)
+
+```shell
+feat: allow users to upload profile pictures
+
+Users can now upload a JPG or PNG file to be used as their profile picture.
+This change includes new UI elements and backend logic to handle the upload.
+```
+
+#### Commit with a bug fix (leads to a PATCH release)
+
+```shell
+fix: prevent crash when user clicks the save button twice
+
+The application was crashing due to a race condition when the save button
+was clicked multiple times in quick succession. This has been resolved by
+disabling the button after the first click.
+
+Closes #78
+```
+
+#### Commit with a breaking change (leads to a MAJOR release)
+
+```shell
+refactor: switch to new authentication API
+
+BREAKING CHANGE: The old authentication endpoint `/auth/login` is now
+deprecated. All clients must be updated to use the new `/api/v2/auth/token`
+endpoint. The request and response formats have also changed.
+```
+
 By adhering to these conventions, our project's commit history will be more organized, and we can automate our release and changelog processes effectively.
