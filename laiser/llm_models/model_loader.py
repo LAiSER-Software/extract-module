@@ -50,6 +50,10 @@ Rev No.     Date            Author              Description
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from transformers.utils import EntryNotFoundError, RepositoryNotFoundError
+from typing import Tuple, Optional
+
+from laiser.config import DEFAULT_TRANSFORMER_MODEL_ID, DEFAULT_VLLM_MODEL_ID
+from laiser.exceptions import ModelLoadError, VLLMNotAvailableError
 
 # Handle optional import for vLLM
 try:
@@ -59,9 +63,8 @@ except ImportError:
     LLM = None
     VLLM_AVAILABLE = False
 
-DEFAULT_TRANSFORMER_MODEL_ID = "google/gemma-2-9b-it"
-
-def load_model_from_transformer( model_id: str = None,token: str = ""):
+def load_model_from_transformer(model_id: str = None, token: str = ""):
+    """Load transformer model with proper error handling"""
     model_id = model_id or DEFAULT_TRANSFORMER_MODEL_ID
     quantization_config = BitsAndBytesConfig(load_in_8bit=True)
 
@@ -76,23 +79,24 @@ def load_model_from_transformer( model_id: str = None,token: str = ""):
     except (RepositoryNotFoundError, EntryNotFoundError, OSError) as e:
         print(f"[WARN] Failed to load model '{model_id}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_TRANSFORMER_MODEL_ID}")
-        tokenizer = AutoTokenizer.from_pretrained(DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token)
-        model = AutoModelForCausalLM.from_pretrained(
-            DEFAULT_TRANSFORMER_MODEL_ID,
-            use_auth_token=token,
-            quantization_config=quantization_config,
-            device_map="auto"
-        )
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token)
+            model = AutoModelForCausalLM.from_pretrained(
+                DEFAULT_TRANSFORMER_MODEL_ID,
+                use_auth_token=token,
+                quantization_config=quantization_config,
+                device_map="auto"
+            )
+        except Exception as fallback_error:
+            raise ModelLoadError(f"Failed to load both requested and default models: {fallback_error}")
 
     return tokenizer, model
 
 
-DEFAULT_VLLM_MODEL_ID = "marcsun13/gemma-2-9b-it-GPTQ"
-
 def load_model_from_vllm(model_id: str = None, token: str = None):
-
+    """Load vLLM model with proper error handling"""
     if not VLLM_AVAILABLE:
-        raise ImportError("vLLM is not installed. Cannot load model using vLLM backend.")
+        raise VLLMNotAvailableError("vLLM is not installed. Cannot load model using vLLM backend.")
 
     model_id = model_id or DEFAULT_VLLM_MODEL_ID
 
@@ -106,10 +110,13 @@ def load_model_from_vllm(model_id: str = None, token: str = None):
     except Exception as e:
         print(f"[WARN] Failed to load model '{model_id}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_VLLM_MODEL_ID}")
-        llm = LLM(
-            model=DEFAULT_VLLM_MODEL_ID,
-            dtype="float16",
-            quantization="gptq",
-        )
+        try:
+            llm = LLM(
+                model=DEFAULT_VLLM_MODEL_ID,
+                dtype="float16", 
+                quantization="gptq",
+            )
+        except Exception as fallback_error:
+            raise ModelLoadError(f"Failed to load both requested and default vLLM models: {fallback_error}")
     
     return llm

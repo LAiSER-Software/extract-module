@@ -63,6 +63,14 @@ import torch
 import numpy as np
 import json
 
+# Add missing imports
+try:
+    from vllm import SamplingParams
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+    SamplingParams = None
+
 from laiser.utils import get_top_esco_skills
 from laiser.llm_models.llm_router import llm_router
 
@@ -393,6 +401,9 @@ def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_ke
     
     """
 
+    if not VLLM_AVAILABLE:
+        raise ImportError("vLLM is not installed. Please install it to use this function.")
+    
     result = []
 
     sampling_params = SamplingParams(max_tokens=1000, seed=42)
