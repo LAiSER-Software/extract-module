@@ -72,7 +72,15 @@ except ImportError:
     SamplingParams = None
 
 from laiser.utils import get_top_esco_skills
-from laiser.llm_models.llm_router import llm_router
+
+# Import llm_router with error handling
+try:
+    from laiser.llm_models.llm_router import llm_router
+except ImportError as e:
+    print(f"Warning: Could not import llm_router: {e}")
+    # Provide a fallback function
+    def llm_router(*args, **kwargs):
+        raise ImportError("llm_router is not available. Please check your installation.")
 
 torch.cuda.empty_cache()
 
