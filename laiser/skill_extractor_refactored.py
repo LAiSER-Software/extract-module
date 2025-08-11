@@ -116,9 +116,9 @@ class SkillExtractorRefactored:
     def extract_skills(
         self,
         input_text: Union[str, Dict[str, str], pd.DataFrame],
-        id_column: str,
         input_type: str = "job_desc",
-        method: str = "basic"
+        method: str = "basic",
+        id_column: str = "job_id"
     ) -> List[str]:
         """
         Extract skills from input text.
@@ -142,8 +142,6 @@ class SkillExtractorRefactored:
                 input_data = {"description": input_text}
             elif isinstance(input_text, dict):
                 input_data = input_text
-            else:
-                raise InvalidInputError("Input must be string or dictionary")
             
             if method == "basic":
                 return self._extract_basic_skills(input_data, id_column= id_column)
