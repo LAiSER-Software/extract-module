@@ -147,11 +147,35 @@ This document outlines the comprehensive refactoring plan for the LAiSER (Levera
 
 #### Simple Usage (No changes required)
 ```python
-# This will still work exactly the same
+import torch
+import pandas as pd
+import argparse
 from laiser.skill_extractor import Skill_Extractor
 
-extractor = Skill_Extractor()
-results = extractor.extract_and_align(data)
+use_gpu = True if torch.cuda.is_available() == True else False
+
+se = Skill_Extractor(use_gpu=use_gpu)
+print('The Skill Extractor has been initialized successfully!\n')
+
+# To extract skills from a text
+# Skill extraction from jobs data
+print('\n\nLoading a sample dataset of 50 jobs...')
+job_sample = pd.read_csv('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/jobs-data/linkedin_jobs_sample_36rows.csv')
+print('The sample jobs dataset has been loaded successfully!\n')
+
+job_sample = job_sample[['description', 'job_id']]
+job_sample = job_sample[1:3]
+print('The sample dataset has been filtered successfully!\n')
+print('Head of the sample:\n', job_sample.head())
+
+output = se.extractor(job_sample, 'job_id', text_columns=['description'])
+print('The skills have been extracted from jobs data successfully...\n')
+
+# Save the extracted skills to a CSV file
+print(output)
+file_name = f'extracted_skills_for_{len(job_sample)}Jobs.csv'
+output.to_csv(file_name, index=False)
+print('The extracted skills have been saved to the file named:', file_name)
 ```
 
 #### Advanced Usage (Optional improvements)
@@ -159,12 +183,18 @@ results = extractor.extract_and_align(data)
 # New way with better configuration
 from laiser.skill_extractor_refactored import SkillExtractorRefactored
 
+import torch
+import pandas as pd
+import argparse
+
+use_gpu = True if torch.cuda.is_available() == True else False
 extractor = SkillExtractorRefactored(
     model_id="your-model",
-    use_gpu=True
+    use_gpu=use_gpu
 )
+print('The Skill Extractor has been initialized successfully!\n')
 
-# More granular control
+# To extract skills from a text
 skills = extractor.extract_skills(text, method="ksa")
 aligned = extractor.align_skills(skills)
 ```

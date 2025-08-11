@@ -116,6 +116,7 @@ class SkillExtractorRefactored:
     def extract_skills(
         self,
         input_text: Union[str, Dict[str, str], pd.DataFrame],
+        id_column: str,
         input_type: str = "job_desc",
         method: str = "basic"
     ) -> List[str]:
@@ -145,16 +146,16 @@ class SkillExtractorRefactored:
                 raise InvalidInputError("Input must be string or dictionary")
             
             if method == "basic":
-                return self._extract_basic_skills(input_data, input_type)
+                return self._extract_basic_skills(input_data, id_column= id_column)
             elif method == "ksa":
-                return self._extract_ksa_skills(input_data, input_type)
+                return self._extract_ksa_skills(input_data, input_type, id_column= id_column)
             else:
                 raise InvalidInputError(f"Unknown extraction method: {method}")
                 
         except Exception as e:
             raise LAiSERError(f"Skill extraction failed: {e}")
-    
-    def _extract_basic_skills(self, input_data: Dict[str, str], input_type: str) -> List[str]:
+
+    def _extract_basic_skills(self, input_data: Dict[str, str], input_type: str, id_column: str) -> List[str]:
         """Extract basic skills using simple prompts"""
         if self.model_id == 'gemini':
             # Use Gemini API
@@ -170,7 +171,7 @@ class SkillExtractorRefactored:
             # Use vLLM
             df = pd.DataFrame([input_data])
             text_columns = ["description"] if input_type == "job_desc" else ["description", "learning_outcomes"]
-            result = get_completion_vllm(df, text_columns, "id", input_type, self.llm, 1)
+            result = get_completion_vllm(df, text_columns, id_column, input_type, self.llm, 1)
             return [item.get('Skill', '') for item in result if 'Skill' in item]
         
         elif self.model is not None and self.tokenizer is not None:
@@ -180,13 +181,13 @@ class SkillExtractorRefactored:
         
         else:
             raise LAiSERError("No suitable model available for skill extraction")
-    
-    def _extract_ksa_skills(self, input_data: Dict[str, str], input_type: str) -> List[Dict[str, Any]]:
+
+    def _extract_ksa_skills(self, input_data: Dict[str, str], input_type: str, id_column: str) -> List[Dict[str, Any]]:
         """Extract skills with KSA details"""
         if self.llm is not None:
             df = pd.DataFrame([input_data])
             text_columns = ["description"] if input_type == "job_desc" else ["description", "learning_outcomes"]
-            return get_completion_vllm(df, text_columns, "id", input_type, self.llm, 1)
+            return get_completion_vllm(df, text_columns, id_column, input_type, self.llm, 1)
         else:
             raise LAiSERError("KSA extraction requires vLLM model")
     

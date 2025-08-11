@@ -99,12 +99,15 @@ def load_model_from_vllm(model_id: str = None, token: str = None):
         raise VLLMNotAvailableError("vLLM is not installed. Cannot load model using vLLM backend.")
 
     model_id = model_id or DEFAULT_VLLM_MODEL_ID
+    quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+    if model_id == DEFAULT_VLLM_MODEL_ID:
+        quantization_config = "gptq"
 
     try:
         llm = LLM(
             model=model_id,
             dtype="float16",
-            quantization="gptq",
+            quantization=quantization_config,
         )
         print(f"[INFO] Successfully loaded vLLM model: {model_id}")
     except Exception as e:
@@ -114,7 +117,7 @@ def load_model_from_vllm(model_id: str = None, token: str = None):
             llm = LLM(
                 model=DEFAULT_VLLM_MODEL_ID,
                 dtype="float16", 
-                quantization="gptq",
+                quantization= quantization_config,
             )
         except Exception as fallback_error:
             raise ModelLoadError(f"Failed to load both requested and default vLLM models: {fallback_error}")
