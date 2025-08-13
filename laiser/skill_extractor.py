@@ -167,11 +167,11 @@ class Skill_Extractor:
         print("Saving FAISS index to disk...")
         # Get the directory where the script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        # Create input directory if it doesn't exist
-        input_dir = os.path.join(script_dir, "input")
-        os.makedirs(input_dir, exist_ok=True)
-        # Save index to input directory
-        index_path = os.path.join(input_dir, "esco_faiss_index.index")
+        # Create public directory if it doesn't exist
+        public_dir = os.path.join(script_dir, "public")
+        os.makedirs(public_dir, exist_ok=True)
+        # Save index to public directory
+        index_path = os.path.join(public_dir, "esco_faiss_index.index")
         faiss.write_index(index, index_path)
         print("FAISS index for ESCO skills built and saved for reusability.")
         self.index = index
@@ -593,7 +593,7 @@ class Skill_Extractor:
         try:    
             if warnings:
                 print("\033[93m" + "=" * 80 + "\033[0m")
-                print("\033[93m\033[1m⚠️  WARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution! ⚠️\033[0m")
+                print("\033[93m\033[1mWARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution!\033[0m")
                 print("\033[93m" + "=" * 80 + "\033[0m")
 
             if torch.cuda.is_available() and self.use_gpu:

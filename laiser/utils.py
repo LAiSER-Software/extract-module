@@ -49,28 +49,9 @@ TODO:
 import numpy as np
 import psutil
 import logging
-
-# Handle optional dependencies with proper fallbacks
-try:
-    from sentence_transformers import SentenceTransformer, util
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    print("Warning: sentence-transformers not available. Some features may be limited.")
-
-try:
-    import faiss
-    FAISS_AVAILABLE = True
-except ImportError:
-    FAISS_AVAILABLE = False
-    print("Warning: faiss not available. Some features may be limited.")
-
-try:
-    import pandas as pd
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
-    print("Warning: pandas not available. Some features may be limited.")
+from sentence_transformers import SentenceTransformer, util
+import faiss
+import pandas as pd
 
 def cosine_similarity(vec1, vec2):
     """
@@ -129,10 +110,6 @@ def load_faiss_index_esco():
     -------
     faiss index object
     """
-    if not FAISS_AVAILABLE:
-        print("Warning: faiss not available. Cannot load FAISS index.")
-        return None
-        
     try:
         # set the path to your FAISS index file in the input directory
         print("Loading FAISS index for ESCO skills...")
@@ -140,8 +117,7 @@ def load_faiss_index_esco():
         import os
         index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
         if not os.path.exists(index_path):
-            print(f"Warning: FAISS index file not found at {index_path}. Some features may be limited.")
-            return None
+            raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
         index = faiss.read_index(index_path)
         print("FAISS index for ESCO skills loaded successfully.")
         return index
@@ -153,33 +129,15 @@ def get_top_esco_skills(input_text, top_k=10):
     """
     Retrieves top ESCO skills based on cosine similarity with input text
     """
-    if not SENTENCE_TRANSFORMERS_AVAILABLE:
-        print("Warning: sentence-transformers not available. Returning empty list.")
-        return []
-    
-    if not FAISS_AVAILABLE:
-        print("Warning: faiss not available. Returning empty list.")
-        return []
-    
-    if not PANDAS_AVAILABLE:
-        print("Warning: pandas not available. Returning empty list.")
-        return []
-    
-    try:
-        model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-        index = load_faiss_index_esco()
-        if index is None:
-            print("Warning: FAISS index for ESCO skills didn't load properly. Returning empty list.")
-            return []
-        
-        skill_names = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")["preferredLabel"].tolist()
-        emb = model.encode(input_text, convert_to_numpy=True)
-        faiss.normalize_L2(emb.reshape(1, -1))
-        scores, indices = index.search(emb.reshape(1, -1), top_k)
-        return [{"Skill": skill_names[i], "index": int(i), "score": float(scores[0][j])} for j, i in enumerate(indices[0])]
-    except Exception as e:
-        print(f"Error in get_top_esco_skills: {e}")
-        return []
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    index = load_faiss_index_esco()
+    if index is None:
+        raise ValueError("FAISS index for ESCO skills didn't load properly. Please check the index file.")
+    skill_names = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")["preferredLabel"].tolist()
+    emb = model.encode(input_text, convert_to_numpy=True)
+    faiss.normalize_L2(emb.reshape(1, -1))
+    scores, indices = index.search(emb.reshape(1, -1), top_k)
+    return [{"Skill": skill_names[i], "index": int(i), "score": float(scores[0][j])} for j, i in enumerate(indices[0])]
 
 def get_embedding(nlp, input_text):
     """

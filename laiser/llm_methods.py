@@ -368,11 +368,18 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
 model
 """
 
-    input_desc = "job description" if input_type == "syllabi" else "course syllabus description and its learning outcomes"
-    if input_type == "syllabi":
-        input_text = f"""### Input:\n**Course Description:** {query["description"]}\n**Learning Outcomes:** {query["learning_outcomes"]}"""
+    input_desc = "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
+    
+    # Convert pandas Series to dict if needed
+    if hasattr(query, 'to_dict'):
+        query_dict = query.to_dict()
     else:
-        input_text = f"""### Input:\n{query["description"]}"""
+        query_dict = query
+    
+    if input_type == "syllabi":
+        input_text = f"""### Input:\n**Course Description:** {query_dict["description"]}\n**Learning Outcomes:** {query_dict["learning_outcomes"]}"""
+    else:
+        input_text = f"""### Input:\n{query_dict["description"]}"""
 
     # Prepare ESCO context for each input
     esco_context = []
@@ -417,7 +424,7 @@ def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_ke
     sampling_params = SamplingParams(max_tokens=1000, seed=42)
 
     for i in range(0, len(queries), batch_size):
-        prompts = [create_ksa_prompt(queries.iloc[i], input_type, num_key_skills, num_key_kr, num_key_tas) for i in range(i, min(i+batch_size, len(queries)))]
+        prompts = [create_ksa_prompt(queries.iloc[j], input_type, num_key_skills, num_key_kr, num_key_tas) for j in range(i, min(i+batch_size, len(queries)))]
 
         try:
             output = llm.generate(prompts, sampling_params=sampling_params)
@@ -467,13 +474,17 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
             try:
                 parsed = parse_output_vllm(result[i].outputs[0].text)
                 for item in parsed:
-                    item[id_column] = input_text.iloc[i][id_column]
-                    item['description'] = input_text.iloc[i]['description']
+                    # Use iloc to access by position, which matches the result index
+                    row_data = input_text.iloc[i]
+                    item[id_column] = row_data[id_column]
+                    item['description'] = row_data['description']
                     if 'learning_outcomes' in input_text.columns:
-                        item['learning_outcomes'] = input_text.iloc[i]['learning_outcomes']
+                        item['learning_outcomes'] = row_data['learning_outcomes']
                 parsed_output.extend(parsed)
             except Exception as e:
                 print(f"Error parsing output for index {i}: {e}")
+                print(f"DataFrame shape: {input_text.shape}, trying to access index {i}")
+                print(f"Available indices: {list(input_text.index)}")
                 continue
 
     return parsed_output
