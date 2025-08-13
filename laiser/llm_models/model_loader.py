@@ -89,27 +89,42 @@ def load_model_from_transformer( model_id: str = None,token: str = ""):
 
 DEFAULT_VLLM_MODEL_ID = "marcsun13/gemma-2-9b-it-GPTQ"
 
-def load_model_from_vllm(model_id: str = None, token: str = None):
+def load_model_from_vllm(model_id: str = None, token: str = None, dtype: str = None):
 
     if not VLLM_AVAILABLE:
         raise ImportError("vLLM is not installed. Cannot load model using vLLM backend.")
 
     model_id = model_id or DEFAULT_VLLM_MODEL_ID
 
+    # Determine the appropriate dtype based on model type if not explicitly provided
+    def get_dtype_for_model(model_name):
+        """Get appropriate dtype for specific model types"""
+        model_name_lower = model_name.lower()
+        if 'gemma2' in model_name_lower or 'gemma-2' in model_name_lower:
+            return "bfloat16"  # Gemma2 requires bfloat16 or float32
+        else:
+            return "float16"   # Default for other models
+
+    # Use provided dtype or auto-detect
+    if dtype is None:
+        dtype = get_dtype_for_model(model_id)
+
     try:
         llm = LLM(
             model=model_id,
-            dtype="float16",
+            dtype=dtype,
             quantization="gptq",
         )
-        print(f"[INFO] Successfully loaded vLLM model: {model_id}")
+        print(f"[INFO] Successfully loaded vLLM model: {model_id} with dtype: {dtype}")
     except Exception as e:
-        print(f"[WARN] Failed to load model '{model_id}': {e}")
+        print(f"[WARN] Failed to load model '{model_id}' with dtype '{dtype}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_VLLM_MODEL_ID}")
+        fallback_dtype = get_dtype_for_model(DEFAULT_VLLM_MODEL_ID)
         llm = LLM(
             model=DEFAULT_VLLM_MODEL_ID,
-            dtype="float16",
+            dtype=fallback_dtype,
             quantization="gptq",
         )
+        print(f"[INFO] Loaded fallback model with dtype: {fallback_dtype}")
     
     return llm

@@ -38,8 +38,8 @@ dependencies = [
     "requests>=2.25.0",
     "tqdm>=4.62.0",
     "skillNer==1.0.3",
-    "ipython==9.4.0",
-    "psutil==7.0.0",
+    "ipython",
+    "psutil",
     "google-generativeai==0.8.5"
 ]
 
@@ -63,7 +63,7 @@ Documentation = "https://github.com/LAiSER-Software/extract-module/blob/main/REA
 "Bug Reports" = "https://github.com/LAiSER-Software/extract-module/issues"
 
 [tool.setuptools]
-packages = ["laiser"]
+packages = {find = {where = ["."], include = ["laiser*"]}}
 
 [tool.setuptools.dynamic]
 version = {attr = "laiser.__version__"}
