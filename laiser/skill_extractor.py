@@ -16,7 +16,7 @@ Owner:  George Washington University Institute of Public Policy
 
 License:
 --------
-Copyright 2024 George Washington University Institute of Public Policy
+Copyright 2025 George Washington University Institute of Public Policy
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -67,15 +67,12 @@ Rev No.     Date            Author              Description
 [1.1.2]     03/20/2025      Prudhvi Chekuri     Fix Levels Toggle
 [1.2.0]     06/12/2025      Satya Phanindra K.  Added support for ESCO skills using FAISS index and SentenceTransformers
 [1.2.1]     06/29/2025      Anket Patil         Added support for API-based LLM models 
-
+[1.2.2]     08/13/2025      Satya Phanindra K.  Final check before deprecation
 
 
 TODO:
 -----
-- 1: Add references to utils and global parameter file
-- 2: sort taxonomy inputs
-- 3: include rsd_name instead of keywords from osn
-- 4: Optimize the `align_skills` function.
+
 """
 
 # native packages
@@ -156,14 +153,13 @@ class Skill_Extractor:
         print("Embedding ESCO skills...")
         esco_embeddings = model.encode(self.skill_names, convert_to_numpy=True, show_progress_bar=True)
 
-        # ⚡ Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
+        # Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
         dimension = esco_embeddings.shape[1]
         index = faiss.IndexFlatIP(dimension)
         faiss.normalize_L2(esco_embeddings)
         index.add(esco_embeddings)
         
         # save the index to disk
-        # TODO: switch from FAISS to a more persistent and cloud supported vector database.
         print("Saving FAISS index to disk...")
         # Get the directory where the script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -272,7 +268,7 @@ class Skill_Extractor:
         return
 
 
-    # TODO: Deprecate flow, handle this abandoned flow in future releases
+    # TODO: Deprecated flow, remove this abandoned flow after 0.3.0 release
     # Declaring a private method for extracting raw skills from input text
     def extract_raw(self, input_text, text_columns, id_column, input_type, batch_size):
         """
@@ -328,7 +324,7 @@ class Skill_Extractor:
 
         return list(extracted_skills_set)
             
-    # TODO: Deprecate flow, handle this abandoned flow in future releases
+    # TODO: Deprecated flow, remove this abandoned flow after 0.3.0 release
     def align_skills(self, raw_skills, document_id='0'):
         """
         This function aligns the skills provided to the available taxonomy
@@ -370,7 +366,7 @@ class Skill_Extractor:
 
         return matches
 
-    # TODO: Deprecate flow, handle this abandoned flow in future releases
+    # TODO: Deprecated flow, remove this abandoned flow after 0.3.0 release
     def align_KSAs(self, extracted_df, id_column):
 
         """

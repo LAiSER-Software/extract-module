@@ -1,7 +1,55 @@
 """
-Configuration constants for LAiSER project
+Module Description:
+-------------------
+This module defines configuration constants for the LAiSER project, including model identifiers, URLs, prompt templates, and other settings used throughout the codebase.
 
-This module contains all configuration constants used across the project.
+Ownership:
+----------
+Project: Leveraging Artificial intelligence for Skills Extraction and Research (LAiSER)
+Owner:  George Washington University Insitute of Public Policy
+  Program on Skills, Credentials and Workforce Policy
+  Media and Public Affairs Building
+  805 21st Street NW
+  Washington, DC 20052
+  PSCWP@gwu.edu
+  https://gwipp.gwu.edu/program-skills-credentials-workforce-policy-pscwp
+
+License:
+--------
+Copyright 2025 George Washington University Insitute of Public Policy
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files 
+(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, 
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE 
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR 
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+Input Requirements:
+-------------------
+- No direct input required. This module provides constants and templates for use by other modules.
+
+Output/Return Format:
+---------------------
+- No direct output. Other modules import and use the constants and templates defined here.
+
+"""
+
+"""
+Revision History:
+-----------------
+Rev No.     Date            Author              Description
+[1.0.0]     08/13/2025      Satya Phanindra K.  Initial Version
+
+
+TODO:
+-----
 """
 
 import os
@@ -9,7 +57,7 @@ from typing import Dict, Any
 
 # Model Configuration
 DEFAULT_TRANSFORMER_MODEL_ID = "google/gemma-2-9b-it"
-DEFAULT_VLLM_MODEL_ID = "marcsun13/gemma-2-9b-it-GPTQ"
+DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-8x7B-Instruct-v0.1-AWQ"
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 DEFAULT_SPACY_MODEL = "en_core_web_lg"
 
@@ -47,17 +95,17 @@ SCQF_LEVELS: Dict[int, str] = {
 
 # Prompt templates
 SKILL_EXTRACTION_PROMPT_JOB = """
-<start_of_turn>user
+[INST]user
 Name all the skills present in the following description in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
 Below text is the Description:
 
 {query}
-<end_of_turn>
-<start_of_turn>model
+[/INST]
+[INST]model
 """
 
 SKILL_EXTRACTION_PROMPT_SYLLABUS = """
-<start_of_turn>user
+[INST]user
 Name all the skills present in the following course details in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
 
 Course Description:
@@ -66,11 +114,11 @@ Course Description:
 Learning Outcomes:
 {learning_outcomes}
 
-<end_of_turn>
-<start_of_turn>model
+[/INST]
+[INST]model
 """
 
-KSA_EXTRACTION_PROMPT = """user
+KSA_EXTRACTION_PROMPT = """[INST]user
 **Objective:** Given a {input_desc}, complete the following tasks with structured outputs.
 
 ### Semantic matches from Taxonomy Skills:
@@ -108,10 +156,11 @@ KSA_EXTRACTION_PROMPT = """user
 
 **Response:** Provide only the requested structured information without additional explanations.
 
-model
+[/INST]
+[INST]model
 """
 
-KSA_DETAILS_PROMPT = """user
+KSA_DETAILS_PROMPT = """[INST]user
 Given the following context, provide concise lists for the specified skill.
 
 Skill: {skill}
@@ -124,7 +173,8 @@ For the skill above produce:
 - Task Abilities: {num_key_tas} bullet items, each ≤ 3 words.
 
 Respond strictly in valid JSON with the exact keys 'Knowledge Required' and 'Task Abilities'.
-model"""
+[/INST]
+[INST]model"""
 
 # File paths
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))

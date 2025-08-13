@@ -3,8 +3,7 @@ import pandas as pd
 import argparse
 from laiser.skill_extractor import Skill_Extractor
 
-# TODO: verify if everything is working fine with the latest version of the library
-# Check with and without GPU availablility
+# TODO: Check with and without GPU availablility
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Run Skill Extractor on jobs and syllabi data.')
