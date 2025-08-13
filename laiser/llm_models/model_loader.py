@@ -89,20 +89,38 @@ def load_model_from_transformer( model_id: str = None,token: str = ""):
 
 DEFAULT_VLLM_MODEL_ID = "marcsun13/gemma-2-9b-it-GPTQ"
 
-def load_model_from_vllm(model_id: str = None, token: str = None, dtype: str = None):
+def load_model_from_vllm(model_id: str = None, token: str = None, dtype: str = None, quantization: str = None):
 
     if not VLLM_AVAILABLE:
         raise ImportError("vLLM is not installed. Cannot load model using vLLM backend.")
 
     model_id = model_id or DEFAULT_VLLM_MODEL_ID
     dtype = dtype or "auto"  # Let vLLM auto-detect the best dtype
+    
+    # T4-friendly quantization suggestions
+    if quantization is None:
+        # Auto-detect quantization based on model name for T4 compatibility
+        model_lower = model_id.lower()
+        if 'awq' in model_lower:
+            quantization = "awq"
+        elif 'gptq' in model_lower:
+            quantization = "gptq"
+        # Add other quantization auto-detection as needed
 
     try:
-        llm = LLM(
-            model=model_id,
-            dtype=dtype,
-        )
-        print(f"[INFO] Successfully loaded vLLM model: {model_id} with dtype: {dtype}")
+        llm_args = {
+            "model": model_id,
+            "dtype": dtype,
+        }
+        
+        # Add quantization if specified
+        if quantization:
+            llm_args["quantization"] = quantization
+            
+        llm = LLM(**llm_args)
+        
+        quant_info = f" with {quantization} quantization" if quantization else ""
+        print(f"[INFO] Successfully loaded vLLM model: {model_id} with dtype: {dtype}{quant_info}")
     except Exception as e:
         print(f"[WARN] Failed to load model '{model_id}' with dtype '{dtype}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_VLLM_MODEL_ID}")
