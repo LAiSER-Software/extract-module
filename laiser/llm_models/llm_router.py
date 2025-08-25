@@ -48,10 +48,47 @@ Rev No.     Date            Author              Description
 [1.0.0]     6/30/2025      Anket Patil          Centralize LLM dispatch logic using router function
 """
 
-from laiser.llm_models.gemini import gemini_generate
-from laiser.llm_models.hugging_face_llm import llm_generate_vllm
+# Import with error handling for optional dependencies
+try:
+    from laiser.llm_models.gemini import gemini_generate
+except ImportError as e:
+    print(f"Warning: Gemini support not available: {e}")
+    def gemini_generate(*args, **kwargs):
+        raise ImportError("Gemini support is not available. Please install google-generativeai package.")
 
-def llm_router(prompt: str, model_id: str, use_gpu: bool,llm,  tokenizer=None, model=None,api_key=None):
+try:
+    from laiser.llm_models.hugging_face_llm import llm_generate_vllm
+except ImportError as e:
+    print(f"Warning: HuggingFace LLM support not available: {e}")
+    def llm_generate_vllm(*args, **kwargs):
+        raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
+
+def llm_router(prompt: str, model_id: str, use_gpu: bool, llm, tokenizer=None, model=None, api_key=None):
+    """
+    Route LLM requests to appropriate model implementation.
+    
+    Parameters
+    ----------
+    prompt : str
+        The prompt to send to the model
+    model_id : str
+        Model identifier ('gemini' or other)
+    use_gpu : bool
+        Whether to use GPU
+    llm : object
+        vLLM model instance
+    tokenizer : object, optional
+        Tokenizer for transformer models
+    model : object, optional
+        Model instance for transformer models
+    api_key : str, optional
+        API key for external services
+    
+    Returns
+    -------
+    str
+        Generated response from the model
+    """
     if model_id == 'gemini':
         return gemini_generate(prompt, api_key)
 

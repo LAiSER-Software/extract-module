@@ -16,7 +16,7 @@ Owner:  George Washington University Institute of Public Policy
 
 License:
 --------
-Copyright 2024 George Washington University Institute of Public Policy
+Copyright 2025 George Washington University Institute of Public Policy
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -51,6 +51,8 @@ Rev No.     Date            Author              Description
 [1.0.3]     03/12/2025      Prudhvi Chekuri     Implement functions to extract levels, KSAs from job descriptions and syllabi data using vLLM
 [1.0.4]     03/15/2025      Prudhvi Chekuri     Add exception handling
 [1.0.5]     06/29/2025      Anket Patil         Integrate LLM Router for multi-LLM support
+[1.0.6]     08/10/2025      Satya Phanindra K.  Refactor code for improved readability and maintainability
+[1.0.7]     08/13/2025      Satya Phanindra K.  Update prompt template for TheBloke/Mistral-7B-Instruct-v0.1-AWQ model
 
 
 TODO:
@@ -63,8 +65,24 @@ import torch
 import numpy as np
 import json
 
+# Add missing imports
+try:
+    from vllm import SamplingParams
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+    SamplingParams = None
+
 from laiser.utils import get_top_esco_skills
-from laiser.llm_models.llm_router import llm_router
+
+# Import llm_router with error handling
+try:
+    from laiser.llm_models.llm_router import llm_router
+except ImportError as e:
+    print(f"Warning: Could not import llm_router: {e}")
+    # Provide a fallback function
+    def llm_router(*args, **kwargs):
+        raise ImportError("llm_router is not available. Please check your installation.")
 
 torch.cuda.empty_cache()
 
@@ -84,7 +102,7 @@ def fetch_model_output(response):
     
     """
     # Find the content between the model start tag and the last <eos> tag
-    pattern = r'<start_of_turn>model\s*<eos>(.*?)<eos>\s*$'
+    pattern = r'[INST]model\s*<eos>(.*?)<eos>\s*$'
     match = re.search(pattern, response, re.DOTALL)
 
     if match:
@@ -123,12 +141,12 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
     results = []
 
     prompt_template = """
-    <start_of_turn>user
+    [INST]user
     Name all the skills present in the following description in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
     Below text is the Description:
 
     {query}
-    <end_of_turn>\n<start_of_turn>model
+    [/INST]\n[INST]model
     """
 
     for i in range(0, len(queries), batch_size):
@@ -145,7 +163,7 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
 
         for full_output in decoded:
             # Extract only the model's response
-            response = full_output.split("<start_of_turn>model<eos>")[-1].strip()
+            response = full_output.split("[INST]model<eos>")[-1].strip()
             processed_response = fetch_model_output(response)
             results.append(processed_response)
 
@@ -183,17 +201,17 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
 
     if input_type == "job_desc":
         prompt_template = """
-        <start_of_turn>user
+        [INST]user
         Name all the skills present in the following description in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
         Below text is the Description:
 
         {query}
-        <end_of_turn>\n<start_of_turn>model
+        [/INST]\n[INST]model
         """
         prompt = prompt_template.format(query=input_text[text_columns[0]])
     elif input_type == "syllabus":
         prompt_template = """
-        <start_of_turn>user
+        [INST]user
         Name all the skills present in the following course details in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
 
         Course Description:
@@ -203,8 +221,8 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
         Learning Outcomes:
         {learning_outcomes}
 
-        <end_of_turn>
-        <start_of_turn>model
+        [/INST]
+        [INST]model
         """
         prompt = prompt_template.format(description=input_text[text_columns[0]], learning_outcomes=input_text[text_columns[1]])
 
@@ -218,7 +236,7 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
 
     generated_ids = model.generate(**model_inputs, max_new_tokens=1000, do_sample=True, pad_token_id=tokenizer.eos_token_id)
     decoded = tokenizer.decode(generated_ids[0], skip_special_tokens=False)
-    response = decoded.split("<start_of_turn>model<eos>")[-1].strip()
+    response = decoded.split("[INST]model<eos>")[-1].strip()
     processed_response = fetch_model_output(response)
     return (processed_response)
 
@@ -276,7 +294,6 @@ def parse_output_vllm(response):
 
 
 def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas):
-    # TODO: Verify the docstring and update missing/incorrect information
     """
     Create a structured prompt for the KSA (Knowledge, Skills, Abilities) extraction task.
     
@@ -352,11 +369,18 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
 model
 """
 
-    input_desc = "job description" if input_type == "syllabi" else "course syllabus description and its learning outcomes"
-    if input_type == "syllabi":
-        input_text = f"""### Input:\n**Course Description:** {query["description"]}\n**Learning Outcomes:** {query["learning_outcomes"]}"""
+    input_desc = "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
+    
+    # Convert pandas Series to dict if needed
+    if hasattr(query, 'to_dict'):
+        query_dict = query.to_dict()
     else:
-        input_text = f"""### Input:\n{query["description"]}"""
+        query_dict = query
+    
+    if input_type == "syllabi":
+        input_text = f"""### Input:\n**Course Description:** {query_dict["description"]}\n**Learning Outcomes:** {query_dict["learning_outcomes"]}"""
+    else:
+        input_text = f"""### Input:\n{query_dict["description"]}"""
 
     # Prepare ESCO context for each input
     esco_context = []
@@ -393,12 +417,15 @@ def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_ke
     
     """
 
+    if not VLLM_AVAILABLE:
+        raise ImportError("vLLM is not installed. Please install it to use this function.")
+    
     result = []
 
     sampling_params = SamplingParams(max_tokens=1000, seed=42)
 
     for i in range(0, len(queries), batch_size):
-        prompts = [create_ksa_prompt(queries.iloc[i], input_type, num_key_skills, num_key_kr, num_key_tas) for i in range(i, min(i+batch_size, len(queries)))]
+        prompts = [create_ksa_prompt(queries.iloc[j], input_type, num_key_skills, num_key_kr, num_key_tas) for j in range(i, min(i+batch_size, len(queries)))]
 
         try:
             output = llm.generate(prompts, sampling_params=sampling_params)
@@ -448,13 +475,17 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
             try:
                 parsed = parse_output_vllm(result[i].outputs[0].text)
                 for item in parsed:
-                    item[id_column] = input_text.iloc[i][id_column]
-                    item['description'] = input_text.iloc[i]['description']
+                    # Use iloc to access by position, which matches the result index
+                    row_data = input_text.iloc[i]
+                    item[id_column] = row_data[id_column]
+                    item['description'] = row_data['description']
                     if 'learning_outcomes' in input_text.columns:
-                        item['learning_outcomes'] = input_text.iloc[i]['learning_outcomes']
+                        item['learning_outcomes'] = row_data['learning_outcomes']
                 parsed_output.extend(parsed)
             except Exception as e:
                 print(f"Error parsing output for index {i}: {e}")
+                print(f"DataFrame shape: {input_text.shape}, trying to access index {i}")
+                print(f"Available indices: {list(input_text.index)}")
                 continue
 
     return parsed_output

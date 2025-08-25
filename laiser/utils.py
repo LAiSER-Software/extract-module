@@ -36,14 +36,12 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 """
 Revision History:
 -----------------
-Rev No.     Date            Author              Description
-[1.0.0]     06/01/2024      Vedant M.           Initial Version
-[1.0.1]     06/10/2024      Vedant M.           added logging function
+| Rev No.|     Date    |        Author       |       Description |
+|--------|-------------|---------------------|--------------------|
+| 1.0.0 | 06/01/2024 |  Vedant M.           |       Initial Version |
+| 1.0.1 | 06/10/2024 |  Vedant M.           |       added logging function |
+| 1.0.2 | 08/13/2025 |  Phanindra Kumar K.  |       added error handling |
 
-
-TODO:
------
-- 1:
 """
 
 import numpy as np
@@ -70,7 +68,6 @@ def cosine_similarity(vec1, vec2):
         return 0.0
     return np.dot(vec1, vec2) / product_of_magnitude
 
-# TODO: Clean/Refactor the following functions to use FAISS for ESCO skills
 def build_faiss_index_esco():
     """
     Builds a FAISS index for ESCO skills
@@ -96,7 +93,6 @@ def build_faiss_index_esco():
     index.add(esco_embeddings)
     
     # save the index to disk
-    # TODO: store this in a persistent storage like S3 or a database and remove this step from initialization
     print("Saving FAISS index to disk...")
     faiss.write_index(index, "esco_faiss_index.index")
     print("FAISS index for ESCO skills built and saved for reusability.")

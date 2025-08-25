@@ -16,7 +16,7 @@ Owner:  George Washington University Institute of Public Policy
 
 License:
 --------
-Copyright 2024 George Washington University Institute of Public Policy
+Copyright 2025 George Washington University Institute of Public Policy
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -67,15 +67,12 @@ Rev No.     Date            Author              Description
 [1.1.2]     03/20/2025      Prudhvi Chekuri     Fix Levels Toggle
 [1.2.0]     06/12/2025      Satya Phanindra K.  Added support for ESCO skills using FAISS index and SentenceTransformers
 [1.2.1]     06/29/2025      Anket Patil         Added support for API-based LLM models 
-
+[1.2.2]     08/13/2025      Satya Phanindra K.  Final check before deprecation
 
 
 TODO:
 -----
-- 1: Add references to utils and global parameter file
-- 2: sort taxonomy inputs
-- 3: include rsd_name instead of keywords from osn
-- 4: Optimize the `align_skills` function.
+
 """
 
 # native packages
@@ -156,22 +153,21 @@ class Skill_Extractor:
         print("Embedding ESCO skills...")
         esco_embeddings = model.encode(self.skill_names, convert_to_numpy=True, show_progress_bar=True)
 
-        # ⚡ Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
+        # Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
         dimension = esco_embeddings.shape[1]
         index = faiss.IndexFlatIP(dimension)
         faiss.normalize_L2(esco_embeddings)
         index.add(esco_embeddings)
         
         # save the index to disk
-        # TODO: switch from FAISS to a more persistent and cloud supported vector database.
         print("Saving FAISS index to disk...")
         # Get the directory where the script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        # Create input directory if it doesn't exist
-        input_dir = os.path.join(script_dir, "input")
-        os.makedirs(input_dir, exist_ok=True)
-        # Save index to input directory
-        index_path = os.path.join(input_dir, "esco_faiss_index.index")
+        # Create public directory if it doesn't exist
+        public_dir = os.path.join(script_dir, "public")
+        os.makedirs(public_dir, exist_ok=True)
+        # Save index to public directory
+        index_path = os.path.join(public_dir, "esco_faiss_index.index")
         faiss.write_index(index, index_path)
         print("FAISS index for ESCO skills built and saved for reusability.")
         self.index = index
@@ -272,7 +268,7 @@ class Skill_Extractor:
         return
 
 
-    # TODO: Deprecate flow, handle this abandoned flow in future releases
+    # TODO: Deprecated flow, remove this abandoned flow after 0.3.0 release
     # Declaring a private method for extracting raw skills from input text
     def extract_raw(self, input_text, text_columns, id_column, input_type, batch_size):
         """
@@ -328,7 +324,7 @@ class Skill_Extractor:
 
         return list(extracted_skills_set)
             
-    # TODO: Deprecate flow, handle this abandoned flow in future releases
+    # TODO: Deprecated flow, remove this abandoned flow after 0.3.0 release
     def align_skills(self, raw_skills, document_id='0'):
         """
         This function aligns the skills provided to the available taxonomy
@@ -370,7 +366,7 @@ class Skill_Extractor:
 
         return matches
 
-    # TODO: Deprecate flow, handle this abandoned flow in future releases
+    # TODO: Deprecated flow, remove this abandoned flow after 0.3.0 release
     def align_KSAs(self, extracted_df, id_column):
 
         """
@@ -593,7 +589,7 @@ class Skill_Extractor:
         try:    
             if warnings:
                 print("\033[93m" + "=" * 80 + "\033[0m")
-                print("\033[93m\033[1m⚠️  WARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution! ⚠️\033[0m")
+                print("\033[93m\033[1mWARNING: LAiSER is currently in development mode. Features may be experimental. Use with caution!\033[0m")
                 print("\033[93m" + "=" * 80 + "\033[0m")
 
             if torch.cuda.is_available() and self.use_gpu:

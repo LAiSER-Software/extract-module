@@ -35,15 +35,15 @@ The tool emphasizes standardization and transparency, offering a common framewor
 
 - Install LAiSER using pip:
 
-  # For GPU support (recommended if you have a CUDA-capable GPU):
+  ### For GPU support (recommended if you have a CUDA-capable GPU):
   ```shell
   pip install laiser[gpu]
   ```
-  # For CPU-only environments:
+  ### For CPU-only environments:
   ```shell
   pip install laiser[cpu]
   ```
-  # By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
+  ### By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
 
 **NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
 
@@ -62,7 +62,22 @@ LAiSER's Jupyter notebook is, currently, the fastest way to get started with the
 - Once the notebook is imported in google colaboratory, connect to a GPU-accelerated runtime(T4 GPU) and run the cells in the notebook.
 
 - Sample code to import and verify laiser module
-  ```shell
+
+  **Using the new refactored API (recommended):**
+  ```python
+  from laiser.skill_extractor_refactored import SkillExtractorRefactored
+  print('\n\nInitializing the Skill Extractor...')
+  # Replace 'your_model_id' and 'your_hf_token' with your actual credentials.
+  model_id = "your_model_id"  # e.g., "microsoft/DialoGPT-medium"
+  hf_token = "your_hf_token"
+  use_gpu = True  # Change to False if you are not using a GPU
+  se = SkillExtractorRefactored(model_id=model_id, hf_token=hf_token, use_gpu=use_gpu)
+  print('The Skill Extractor has been initialized successfully!\n')
+  print("LAiSER package loaded successfully!")
+  ```
+
+  **Legacy API (backward compatibility):**
+  ```python
   from laiser.skill_extractor import Skill_Extractor
   print('\n\nInitializing the Skill Extractor...')
   # Replace 'your_model_id' and 'your_hf_token' with your actual credentials.
