@@ -63,6 +63,9 @@ import pandas as pd
 from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 
+import json
+import re
+
 from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K
 from laiser.exceptions import LAiSERError, InvalidInputError
 from laiser.services import SkillExtractionService
@@ -360,7 +363,7 @@ class SkillExtractorRefactored:
     
 
     
-    def extract_and_align(
+    def extract_and_align_old(
         self,
         data: pd.DataFrame,
         id_column: str = 'Research ID',
@@ -436,6 +439,169 @@ class SkillExtractorRefactored:
                     continue
             
             return pd.DataFrame(results)
+            
+        except Exception as e:
+            raise LAiSERError(f"Batch extraction failed: {e}")
+    
+    def strong_preprocessing_prompt(self,raw_description):
+        prompt = f"""
+    You are a data preprocessing assistant trained to clean job descriptions for skill extraction.
+
+    Your task is to remove the following from the text:
+    - Company names, slogans, branding language
+    - Locations, phone numbers, email addresses, URLs
+    - Salary information, job ID, dates, scheduling info (e.g. 9am-5pm, weekends required)
+    - HR/legal boilerplate (EEO, diversity statements, veteran status, disability policies)
+    - Culture fluff like "fun environment", "fast-paced", "initiative", "self-motivated", "join us", "own your tomorrow", "apply now"
+    - Internal team names or product names (e.g. ACE, THD, IMT)
+    - Benefits sections (e.g. health & wellness, sabbatical, 401k, maternity, vacation)
+
+    Your output must *only retain the task-related job duties, technical responsibilities, required skills, qualifications, and tools* without rephrasing.
+
+    Input:
+    \"\"\"
+    {raw_description}
+    \"\"\"
+
+    Return only the cleaned job description.
+    ### CLEANED JOB DESCRIPTION:
+    """
+        response = llm_router(prompt, self.model_id, self.use_gpu, self.llm, 
+                                self.tokenizer, self.model, self.api_key)
+        cleaned = response.split("### CLEANED JOB DESCRIPTION:")[-1].strip()
+        return cleaned
+    # === Complete Pipeline ===
+    # === Extraction Prompt (same style as before, no RAG context) ===
+    
+    # === Extract Skills from LLM Output (one per line, optional parenthetical removal) ===
+  
+    def skill_extraction_prompt(self, cleaned_description):
+        prompt = f"""
+        task: "Skill Extraction from Job Descriptions"
+
+        description: |
+        You are an expert AI system specialized in extracting technical and professional skills from job descriptions for workforce analytics.
+        Your goal is to analyze the following job description and output only the specific skill names that are required, mentioned, or strongly implied.
+
+        extraction_instructions:
+        - Extract only concrete, job-relevant skills (not soft traits, company values, or general workplace behaviors).
+        - Include a skill if it is clearly mentioned or strongly implied as necessary for the role.
+        - Exclude company policies, benefit programs, HR or legal statements, and generic terms (e.g., "communication," "leadership") unless used in a technical/professional context.
+        - Use only concise skill phrases (prefer noun phrases, avoid sentences).
+        - Do not invent new skills or make assumptions beyond the provided text.
+
+        formatting_rules:
+        - Return the output as valid JSON.
+        - The JSON must have a single key "skills" whose value is a list of skill strings.
+        - Each skill string must be between 1 and 5 words.
+        - Do not include explanations, metadata, or anything other than the JSON object.
+
+        job_description: |
+        {cleaned_description}
+
+        ### OUTPUT FORMAT
+        {{
+        "skills": [
+            "skill1",
+            "skill2",
+            "skill3"
+        ]
+        }}
+        """
+        return prompt
+
+    def extract_and_map_skills(self,input_data,text_columns):
+        # 1. Clean job description (build text from dict)
+        text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
+        cleaned_desc = self.strong_preprocessing_prompt(text_blob)
+        # print("Cleaned Desc:::::::",cleaned_desc)
+        extraction_prompt = self.skill_extraction_prompt(cleaned_desc)
+        response = llm_router(extraction_prompt, self.model_id, self.use_gpu, self.llm, 
+                                self.tokenizer, self.model, self.api_key)
+        print("Second llm response",response)
+        skills = []
+        try:
+            # Some LLMs may return text with junk before/after JSON → extract JSON substring
+            start = response.find("{")
+            end = response.rfind("}") + 1
+            if start != -1 and end != -1:
+                json_str = response[start:end]
+                parsed = json.loads(json_str)
+                skills = parsed.get("skills", [])
+            else:
+                print("Warning: JSON not found in response")
+        except Exception as e:
+            print("Warning: failed to parse JSON:", e)
+
+        print("Cleaned skill list:", skills)
+        return skills
+
+    def extract_and_align(
+        self,
+        data: pd.DataFrame,
+        id_column: str = 'Research ID',
+        text_columns: List[str] = None,
+        input_type: str = "job_desc",
+        top_k: Optional[int] = None,
+        levels: bool = False,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        warnings: bool = True
+    ) -> pd.DataFrame:
+        """
+        Extract and align skills from a dataset (main interface method).
+        
+        This method maintains backward compatibility with the original API.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        id_column : str
+            Column name for document IDs
+        text_columns : List[str]
+            Column names containing text data
+        input_type : str
+            Type of input data
+        top_k : int, optional
+            Number of top skills to return
+        levels : bool
+            Whether to extract skill levels
+        batch_size : int
+            Batch size for processing
+        warnings : bool
+            Whether to show warnings
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with extracted and aligned skills
+        """
+        if text_columns is None:
+            text_columns = ["description"]
+        
+        try:
+            results = []
+            
+            for idx, row in data.iterrows():
+                try:
+                    # Prepare input data
+                    input_data = {col: row.get(col, '') for col in text_columns}
+                    input_data['id'] = row.get(id_column, str(idx))
+                    print("Starting Cleaning")
+                    skills = self.extract_and_map_skills(input_data,text_columns)
+                    print("Extracted raw skills before alignment:", skills)
+                    full_description = ' '.join([str(input_data.get(col, '')) for col in text_columns])
+                    aligned = self.align_skills(skills, str(input_data['id']), full_description)
+                    results.extend(aligned.to_dict('records'))
+                    # Extract skills
+        
+                except Exception as e:
+                    if warnings:
+                        print(f"Warning: Failed to process row {idx}: {e}")
+                    continue
+            df = pd.DataFrame(results)
+            df.to_csv("skills_alignment_results.csv", index=False, encoding="utf-8")
+            return pd.DataFrame(df)
             
         except Exception as e:
             raise LAiSERError(f"Batch extraction failed: {e}")
