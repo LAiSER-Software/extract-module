@@ -58,7 +58,7 @@ from typing import Dict, Any
 # Model Configuration
 DEFAULT_TRANSFORMER_MODEL_ID = "google/gemma-2-9b-it"
 DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-8x7B-Instruct-v0.1-AWQ"
-DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_SPACY_MODEL = "en_core_web_lg"
 
 # Similarity thresholds
