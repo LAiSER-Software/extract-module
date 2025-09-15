@@ -206,59 +206,56 @@ class SkillAlignmentService:
     
 
     
-    def align_skills_to_taxonomy(self, raw_skills: List[str], document_id: str = '0', description: str = '') -> pd.DataFrame:
-        """Align raw skills to skill taxonomy using similarity"""
+    def align_skills_to_taxonomy(self,raw_skills: List[str],document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = 25,) -> pd.DataFrame:
+        """Align raw skills to taxonomy using the FAISS index in laiser/public/skills_v03.index"""
         try:
-            # Validate input
+            # --- validation (unchanged) ---
             if raw_skills is None:
-                print("Warning: raw_skills is None, returning empty DataFrame")
-                return pd.DataFrame(columns=['Research ID', 'Description', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
-            
+                return pd.DataFrame(columns=['Research ID','Description','Raw Skill','Knowledge Required','Task Abilities','Skill Tag','Correlation Coefficient'])
             if not isinstance(raw_skills, list):
-                print(f"Warning: raw_skills is not a list (type: {type(raw_skills)}), converting to list")
                 raw_skills = [str(raw_skills)] if raw_skills else []
-            
-            if len(raw_skills) == 0:
-                print("Warning: raw_skills is empty, returning empty DataFrame")
-                return pd.DataFrame(columns=['Research ID', 'Description', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
-            
-            combined_df = self.data_access.load_combined_skills()
-            model = self.data_access.get_embedding_model()
-            
-            # Get embeddings for skills in taxonomy
-            skill_embeddings = model.encode(combined_df['SkillLabel'].tolist(), convert_to_numpy=True)
-            
-            aligned_results = []
-            print("Aligning skills to taxonomy...\n")
-            print("Type of raw_skills:", type(raw_skills), "\n")
-            print("Contents of raw_skills:", raw_skills)
+            if not raw_skills:
+                return pd.DataFrame(columns=['Research ID','Description','Raw Skill','Knowledge Required','Task Abilities','Skill Tag','Correlation Coefficient'])
 
+            # --- use existing services ---
+            combined_df = self.data_access.load_combined_skills()          # has SkillLabel / SkillTag
+            model = self.data_access.get_embedding_model()
+            self.faiss_manager.initialize_index()                           # loads laiser/public/skills_v03.index if present
+
+            rows = []
             for skill in raw_skills:
-                if not skill or len(skill.strip()) == 0:
+                if not isinstance(skill, str) or not skill.strip():
                     continue
-                
-                # Get embedding for raw skill
-                skill_embedding = model.encode([skill], convert_to_numpy=True)
-                
-                # Calculate similarities
-                similarities = np.dot(skill_embeddings, skill_embedding.T).flatten()
-                
-                # Find best match
-                best_idx = np.argmax(similarities)
-                best_similarity = similarities[best_idx]
-                
-                aligned_results.append({
+
+                q = model.encode([skill], convert_to_numpy=True).astype(np.float32)
+                hits = self.faiss_manager.search_similar_skills(q, top_k=top_k)  # uses FAISS .index
+                if not hits or hits[0]['Similarity'] < similarity_threshold:
+                    continue
+
+                best_label = hits[0]['Skill']  # ESCO preferredLabel from index
+                # map label -> tag if available in combined skills
+                try:
+                    taxonmy_skill_name = combined_df.loc[combined_df['SkillLabel'] == best_label, 'SkillTag'].iloc[0]
+                except Exception:
+                    taxonmy_skill_name = best_label  # fallback
+
+                rows.append({
                     'Research ID': document_id,
-                    'Description': description,  # Use the passed description
-                    'Raw Skill': skill,
+                    'Description': description,
+                    'Raw Skill': skill,                      # keep the input skill here
+                    'Taxonomy Skill': taxonmy_skill_name,                        # canonical tag/id
                     'Knowledge Required': '[]',
                     'Task Abilities': '[]',
-                    'Skill Tag': combined_df.iloc[best_idx]['SkillTag'],  # Use SkillTag (ESCO ID) instead of SkillLabel
-                    'Correlation Coefficient': float(best_similarity)
+                    
+                    'Correlation Coefficient': float(hits[0]['Similarity']),
                 })
-            
-            return pd.DataFrame(aligned_results)
+
+            return pd.DataFrame(rows, columns=[
+                'Research ID','Description','Raw Skill','Knowledge Required','Task Abilities','Skill Tag','Correlation Coefficient'
+            ])
+
         except Exception as e:
+            from laiser.exceptions import SkillExtractionError
             raise SkillExtractionError(f"Failed to align skills to taxonomy: {e}")
 
 

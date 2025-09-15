@@ -175,7 +175,7 @@ class FAISSIndexManager:
         """Initialize FAISS index (load or build)"""
         # Define paths
         script_dir = Path(__file__).parent
-        local_index_path = script_dir / "public" / "esco_faiss_index.index"
+        local_index_path = script_dir / "public" / "skills_v03.index"
         
         # Try to load existing index
         if not force_rebuild:
@@ -193,31 +193,64 @@ class FAISSIndexManager:
             self.skill_names = esco_df["preferredLabel"].tolist()
             self.index = self.data_access.build_faiss_index(self.skill_names)
             self.data_access.save_faiss_index(self.index, str(local_index_path))
-        
+        else:
+            # ✅ ensure skill_names is populated even on load
+            esco_df = self.data_access.load_esco_skills()
+            self.skill_names = esco_df["preferredLabel"].tolist()
+
         return self.index
-    
+
     def search_similar_skills(self, query_embedding: np.ndarray, top_k: int = 25) -> List[Dict[str, Any]]:
         """Search for similar skills using FAISS index"""
         if self.index is None:
-            raise FAISSIndexError("FAISS index not initialized")
-        
+            raise FAISSIndexError("FAISS index not initialized. Call initialize_index() first.")
+
+        if self.skill_names is None:
+            try:
+                esco_df = self.data_access.load_esco_skills()
+                self.skill_names = esco_df["preferredLabel"].tolist()
+            except Exception as e:
+                raise FAISSIndexError(f"Failed to load skill names for index: {e}")
+
         try:
-            # Normalize query embedding
-            query_embedding = query_embedding.reshape(1, -1)
-            faiss.normalize_L2(query_embedding)
-            
+            # Ensure correct dtype/shape/layout
+            q = np.asarray(query_embedding, dtype=np.float32)
+            if q.ndim == 1:
+                q = q.reshape(1, -1)
+            if not q.flags["C_CONTIGUOUS"]:
+                q = np.ascontiguousarray(q)
+
+            # Dimension check
+            d_index = int(self.index.d)
+            d_query = int(q.shape[1])
+            if d_query != d_index:
+                raise FAISSIndexError(
+                    f"Embedding dimension mismatch: query={d_query}, index={d_index}. "
+                    f"Ensure DEFAULT_EMBEDDING_MODEL matches the model used to build the index."
+                )
+
+            # Normalize and cap top_k
+            faiss.normalize_L2(q)
+            if getattr(self.index, "ntotal", 0) <= 0:
+                return []
+            top_k = max(1, min(int(top_k), int(self.index.ntotal)))
+
             # Search
-            scores, indices = self.index.search(query_embedding, top_k)
-            
+            scores, indices = self.index.search(q, top_k)
+
             results = []
-            for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
-                if idx < len(self.skill_names):
+            for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
+                if idx == -1:
+                    continue  # FAISS may return -1 for padded results
+                if 0 <= idx < len(self.skill_names):
                     results.append({
-                        'Skill': self.skill_names[idx],
-                        'Similarity': float(score),
-                        'Rank': i + 1
+                        "Skill": self.skill_names[idx],
+                        "Similarity": float(score),
+                        "Rank": rank
                     })
-            
+
             return results
         except Exception as e:
-            raise FAISSIndexError(f"Failed to search similar skills: {e}")
+            # Bubble up a helpful message
+            raise FAISSIndexError(f"Failed to search similar skills: {repr(e)}")
+
