@@ -518,7 +518,6 @@ class SkillExtractorRefactored:
         extraction_prompt = self.skill_extraction_prompt(cleaned_desc)
         response = llm_router(extraction_prompt, self.model_id, self.use_gpu, self.llm, 
                                 self.tokenizer, self.model, self.api_key)
-        print("Second llm response",response)
         skills = []
         try:
             # Some LLMs may return text with junk before/after JSON → extract JSON substring
@@ -533,7 +532,6 @@ class SkillExtractorRefactored:
         except Exception as e:
             print("Warning: failed to parse JSON:", e)
 
-        print("Cleaned skill list:", skills)
         return skills
 
     def extract_and_align(
@@ -587,12 +585,18 @@ class SkillExtractorRefactored:
                     # Prepare input data
                     input_data = {col: row.get(col, '') for col in text_columns}
                     input_data['id'] = row.get(id_column, str(idx))
-                    print("Starting Cleaning")
                     skills = self.extract_and_map_skills(input_data,text_columns)
-                    print("Extracted raw skills before alignment:", skills)
                     full_description = ' '.join([str(input_data.get(col, '')) for col in text_columns])
-                    aligned = self.align_skills(skills, str(input_data['id']), full_description)
-                    results.extend(aligned.to_dict('records'))
+                    aligned,correlations = self.align_skills(skills, str(input_data['id']), full_description)
+                    aligned_df = pd.DataFrame({
+                    "Research ID": str(input_data['id']),
+                    "Description": full_description,
+                    "Raw LLM Skill": skills[:len(aligned)],
+                    "Taxonomy Skill": aligned,
+                    "Correlation Coefficient": correlations
+                    })
+
+                    results.extend(aligned_df.to_dict('records'))
                     # Extract skills
         
                 except Exception as e:
