@@ -20,8 +20,8 @@ from laiser.config import (
 )
 from laiser.exceptions import SkillExtractionError, InvalidInputError
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
-
-
+import faiss
+from pathlib import Path
 class PromptBuilder:
     """Builds prompts for different types of skill extraction tasks"""
     
@@ -208,55 +208,23 @@ class SkillAlignmentService:
     
     def align_skills_to_taxonomy(self,raw_skills: List[str],document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = 25,) -> pd.DataFrame:
         """Align raw skills to taxonomy using the FAISS index in laiser/public/skills_v03.index"""
-        try:
-            # --- validation (unchanged) ---
-            if raw_skills is None:
-                return pd.DataFrame(columns=['Research ID','Description','Raw Skill','Knowledge Required','Task Abilities','Skill Tag','Correlation Coefficient'])
-            if not isinstance(raw_skills, list):
-                raw_skills = [str(raw_skills)] if raw_skills else []
-            if not raw_skills:
-                return pd.DataFrame(columns=['Research ID','Description','Raw Skill','Knowledge Required','Task Abilities','Skill Tag','Correlation Coefficient'])
-
-            # --- use existing services ---
-            combined_df = self.data_access.load_combined_skills()          # has SkillLabel / SkillTag
-            model = self.data_access.get_embedding_model()
-            self.faiss_manager.initialize_index()                           # loads laiser/public/skills_v03.index if present
-
-            rows = []
-            for skill in raw_skills:
-                if not isinstance(skill, str) or not skill.strip():
-                    continue
-
-                q = model.encode([skill], convert_to_numpy=True).astype(np.float32)
-                hits = self.faiss_manager.search_similar_skills(q, top_k=top_k)  # uses FAISS .index
-                if not hits or hits[0]['Similarity'] < similarity_threshold:
-                    continue
-
-                best_label = hits[0]['Skill']  # ESCO preferredLabel from index
-                # map label -> tag if available in combined skills
-                try:
-                    taxonmy_skill_name = combined_df.loc[combined_df['SkillLabel'] == best_label, 'SkillTag'].iloc[0]
-                except Exception:
-                    taxonmy_skill_name = best_label  # fallback
-
-                rows.append({
-                    'Research ID': document_id,
-                    'Description': description,
-                    'Raw Skill': skill,                      # keep the input skill here
-                    'Taxonomy Skill': taxonmy_skill_name,                        # canonical tag/id
-                    'Knowledge Required': '[]',
-                    'Task Abilities': '[]',
-                    
-                    'Correlation Coefficient': float(hits[0]['Similarity']),
-                })
-
-            return pd.DataFrame(rows, columns=[
-                'Research ID','Description','Raw Skill','Knowledge Required','Task Abilities','Skill Tag','Correlation Coefficient'
-            ])
-
-        except Exception as e:
-            from laiser.exceptions import SkillExtractionError
-            raise SkillExtractionError(f"Failed to align skills to taxonomy: {e}")
+        mapped_skills = []
+        correlations = []
+        script_dir = Path(__file__).parent
+        local_index_path = script_dir / "public" / "skills_v03.index"
+        local_json_path = script_dir / "public" / "skills_df.json"
+        skill_df = pd.read_json(str(local_json_path))
+        index = faiss.read_index(str(local_index_path))
+        model = self.data_access.get_embedding_model()
+        for skill in raw_skills:
+            query_vec = model.encode([skill], normalize_embeddings=True)
+            D, I = index.search(np.array(query_vec).astype('float32'), top_k)
+            # Take only the top match by default
+            if D[0][0] >= similarity_threshold:
+                canonical_skill = skill_df.iloc[I[0][0]]["skill"]
+                mapped_skills.append(canonical_skill)
+                correlations.append(float(D[0][0]))
+        return mapped_skills,correlations
 
 
 class SkillExtractionService:
