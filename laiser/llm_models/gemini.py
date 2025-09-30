@@ -63,7 +63,7 @@ def gemini_generate(prompt: str,api_key: str) -> str:
     """
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-2.5-pro")
         response = model.generate_content(prompt)
         raw_text = response.text if response and response.text else ""
         raw_text = raw_text.strip()
