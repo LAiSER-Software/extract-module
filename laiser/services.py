@@ -20,8 +20,8 @@ from laiser.config import (
 )
 from laiser.exceptions import SkillExtractionError, InvalidInputError
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
-
-
+import faiss
+from pathlib import Path
 class PromptBuilder:
     """Builds prompts for different types of skill extraction tasks"""
     
@@ -206,60 +206,25 @@ class SkillAlignmentService:
     
 
     
-    def align_skills_to_taxonomy(self, raw_skills: List[str], document_id: str = '0', description: str = '') -> pd.DataFrame:
-        """Align raw skills to skill taxonomy using similarity"""
-        try:
-            # Validate input
-            if raw_skills is None:
-                print("Warning: raw_skills is None, returning empty DataFrame")
-                return pd.DataFrame(columns=['Research ID', 'Description', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
-            
-            if not isinstance(raw_skills, list):
-                print(f"Warning: raw_skills is not a list (type: {type(raw_skills)}), converting to list")
-                raw_skills = [str(raw_skills)] if raw_skills else []
-            
-            if len(raw_skills) == 0:
-                print("Warning: raw_skills is empty, returning empty DataFrame")
-                return pd.DataFrame(columns=['Research ID', 'Description', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
-            
-            combined_df = self.data_access.load_combined_skills()
-            model = self.data_access.get_embedding_model()
-            
-            # Get embeddings for skills in taxonomy
-            skill_embeddings = model.encode(combined_df['SkillLabel'].tolist(), convert_to_numpy=True)
-            
-            aligned_results = []
-            print("Aligning skills to taxonomy...\n")
-            print("Type of raw_skills:", type(raw_skills), "\n")
-            print("Contents of raw_skills:", raw_skills)
-
-            for skill in raw_skills:
-                if not skill or len(skill.strip()) == 0:
-                    continue
-                
-                # Get embedding for raw skill
-                skill_embedding = model.encode([skill], convert_to_numpy=True)
-                
-                # Calculate similarities
-                similarities = np.dot(skill_embeddings, skill_embedding.T).flatten()
-                
-                # Find best match
-                best_idx = np.argmax(similarities)
-                best_similarity = similarities[best_idx]
-                
-                aligned_results.append({
-                    'Research ID': document_id,
-                    'Description': description,  # Use the passed description
-                    'Raw Skill': skill,
-                    'Knowledge Required': '[]',
-                    'Task Abilities': '[]',
-                    'Skill Tag': combined_df.iloc[best_idx]['SkillTag'],  # Use SkillTag (ESCO ID) instead of SkillLabel
-                    'Correlation Coefficient': float(best_similarity)
-                })
-            
-            return pd.DataFrame(aligned_results)
-        except Exception as e:
-            raise SkillExtractionError(f"Failed to align skills to taxonomy: {e}")
+    def align_skills_to_taxonomy(self,raw_skills: List[str],document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = 25,) -> pd.DataFrame:
+        """Align raw skills to taxonomy using the FAISS index in laiser/public/skills_v03.index"""
+        mapped_skills = []
+        correlations = []
+        script_dir = Path(__file__).parent
+        local_index_path = script_dir / "public" / "skills_v03.index"
+        local_json_path = script_dir / "public" / "skills_df.json"
+        skill_df = pd.read_json(str(local_json_path))
+        index = faiss.read_index(str(local_index_path))
+        model = self.data_access.get_embedding_model()
+        for skill in raw_skills:
+            query_vec = model.encode([skill], normalize_embeddings=True)
+            D, I = index.search(np.array(query_vec).astype('float32'), top_k)
+            # Take only the top match by default
+            if D[0][0] >= similarity_threshold:
+                canonical_skill = skill_df.iloc[I[0][0]]["skill"]
+                mapped_skills.append(canonical_skill)
+                correlations.append(float(D[0][0]))
+        return mapped_skills,correlations
 
 
 class SkillExtractionService:

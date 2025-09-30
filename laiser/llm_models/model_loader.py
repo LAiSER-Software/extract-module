@@ -87,7 +87,7 @@ def load_model_from_transformer( model_id: str = None,token: str = ""):
     return tokenizer, model
 
 
-DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-8x7B-Instruct-v0.1-AWQ"
+DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 
 def load_model_from_vllm(model_id: str = None, token: str = None, dtype: str = None, quantization: str = None):
 
