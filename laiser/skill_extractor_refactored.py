@@ -364,14 +364,7 @@ class SkillExtractorRefactored:
                     input_data['id'] = row.get(id_column, str(idx))
                     skills = self.extract_and_map_skills(input_data,text_columns)
                     full_description = ' '.join([str(input_data.get(col, '')) for col in text_columns])
-                    aligned,correlations = self.align_skills(skills, str(input_data['id']), full_description)
-                    aligned_df = pd.DataFrame({
-                    "Research ID": str(input_data['id']),
-                    "Description": full_description,
-                    "Raw LLM Skill": skills[:len(aligned)],
-                    "Taxonomy Skill": aligned,
-                    "Correlation Coefficient": correlations
-                    })
+                    aligned_df = self.align_skills(skills, str(input_data['id']), full_description)
 
                     results.extend(aligned_df.to_dict('records'))
                     # Extract skills

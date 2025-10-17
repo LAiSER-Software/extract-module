@@ -152,7 +152,7 @@ ESCO.150,Shiva (digital game creation systems)
 ESCO.151,design pharmaceutical manufacturing systems
 ESCO.152,wire security sensors
 ESCO.153,OWASP ZAP
-ESCO.154,"evaluate data, information and digital content"
+ESCO.154,evaluate data, information and digital content
 ESCO.155,solution deployment
 ESCO.156,Drupal
 ESCO.157,manage changes in ICT system
@@ -372,7 +372,7 @@ ESCO.370,tend CNC milling machine
 ESCO.371,microsystem test procedures
 ESCO.372,analyse scanned data of the body
 ESCO.373,manage ICT data architecture
-ESCO.374,"manage data, information and digital content"
+ESCO.374,manage data, information and digital content
 ESCO.375,MySQL
 ESCO.376,design cloud networks
 ESCO.377,use specialised equipment
@@ -631,7 +631,7 @@ ESCO.629,develop shipping itineraries
 ESCO.630,develop virtual game engine
 ESCO.631,predictive maintenance
 ESCO.632,operate on-board computer systems
-ESCO.633,"design the digital interface of gambling, betting and lottery games"
+ESCO.633,design the digital interface of gambling, betting and lottery games
 ESCO.634,keep up-to-date to computer trends
 ESCO.635,execute ICT audits
 ESCO.636,design database in the cloud
@@ -782,7 +782,7 @@ ESCO.780,edit digital moving images
 ESCO.781,ICT software specifications
 ESCO.782,estimate costs of installing telecommunication devices
 ESCO.783,query languages
-ESCO.784,"data extraction, transformation and loading tools"
+ESCO.784,data extraction, transformation and loading tools
 ESCO.785,conduct ICT code review
 ESCO.786,tools for software configuration management
 ESCO.787,develop reporting software
@@ -1138,7 +1138,7 @@ ESCO.1136,design ventilation network
 ESCO.1137,evaluate musical ideas
 ESCO.1138,track changes in text editing
 ESCO.1139,prepare well data sheets
-ESCO.1140,"browse, search and filter data, information and digital content"
+ESCO.1140,browse, search and filter data, information and digital content
 ESCO.1141,Hadoop
 ESCO.1142,computational biology
 ESCO.1143,principles of artificial intelligence
@@ -1307,7 +1307,7 @@ OSN.21,Implement Teamwork-Fostering Processes
 OSN.22,Technology Assessment
 OSN.23,Define Data to be Organized
 OSN.24,Usage Data Structure Creation
-OSN.25,"Strengths, Weaknesses, Opportunities, and Threats (SWOT) Diagram Completion"
+OSN.25,Strengths, Weaknesses, Opportunities, and Threats (SWOT) Diagram Completion
 OSN.26,Awareness of Harmful Practices
 OSN.27,Areas for Improved Efficiency Identification
 OSN.28,Penetration Testing Solutions Development
@@ -1406,7 +1406,7 @@ OSN.120,Collaborative Troubleshooting
 OSN.121,Data Point Alignment
 OSN.122,Business Data Optimization
 OSN.123,Data Repository Extraction
-OSN.124,"Extract, Transform, and Load (ETL) Data Transformation"
+OSN.124,Extract, Transform, and Load (ETL) Data Transformation
 OSN.125,Data Repository Loading
 OSN.126,Audience Identification
 OSN.127,Message Medium Identification
@@ -1900,8 +1900,8 @@ OSN.614,Process and Product Optimization Identification
 OSN.615,Value-Add Improvement Execution
 OSN.616,Version Control Software Integration
 OSN.617,Application Development Alignment
-OSN.618,"Application, Service, or Data Store Design"
-OSN.619,"Application, Service, or Data Store Engineering"
+OSN.618,Application, Service, or Data Store Design
+OSN.619,Application, Service, or Data Store Engineering
 OSN.620,Code and Services Coordination
 OSN.621,Code Coordination
 OSN.622,System Development Coordination
@@ -1945,7 +1945,7 @@ OSN.659,Media Content Interface Guideline Documentation
 OSN.660,Technology-Related Documentation
 OSN.661,Data Structure Map Creation
 OSN.662,Data Structure Operation
-OSN.663,"List, Stack, and Queue Differentiation"
+OSN.663,List, Stack, and Queue Differentiation
 OSN.664,Business Problem Visualization Creation
 OSN.665,Color-Blindness Chart Building
 OSN.666,Database Issue Corrections

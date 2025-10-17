@@ -59,7 +59,7 @@ except ImportError:
     LLM = None
     VLLM_AVAILABLE = False
 
-DEFAULT_TRANSFORMER_MODEL_ID = "google/gemma-2-9b-it"
+DEFAULT_TRANSFORMER_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 
 def load_model_from_transformer( model_id: str = None,token: str = ""):
     model_id = model_id or DEFAULT_TRANSFORMER_MODEL_ID

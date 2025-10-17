@@ -434,7 +434,22 @@ class Skill_Extractor:
 
         return matches
 
-   
+    def _get_skill_tag_from_label(self, skill_label):
+        """Get SkillTag for a given SkillLabel using combined.csv mapping"""
+        try:
+            # Load combined skills data
+            combined_df = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv")
+
+            # Find the matching row
+            match = combined_df[combined_df['SkillLabel'].str.strip() == skill_label.strip()]
+            if not match.empty:
+                return str(match.iloc[0]['SkillTag'])
+            else:
+                return ""  # Return empty string if no match found
+        except Exception as e:
+            print(f"Warning: Failed to get SkillTag for '{skill_label}': {e}")
+            return ""
+
     def get_top_esco_skills(self, input_text, top_k=25):
         """
         Retrieve the top-k ESCO skills most semantically similar to the input text using the
@@ -560,7 +575,9 @@ class Skill_Extractor:
             for skill_obj in top_esco:
                 raw_skill = skill_obj["Skill"]
                 coeff = skill_obj["score"]
-                tag = f"ESCO.{skill_obj['index']}"
+
+                # Get the proper SkillTag from combined.csv mapping
+                skill_tag = self._get_skill_tag_from_label(raw_skill)
 
                 # Fetch Knowledge Required & Task Abilities using the LLM if GPU/LLM available
                 knowledge_required, task_abilities = [], []
@@ -573,7 +590,7 @@ class Skill_Extractor:
                     "Raw Skill": raw_skill,
                     "Knowledge Required": knowledge_required,
                     "Task Abilities": task_abilities,
-                    "Skill Tag": tag,
+                    "Skill Tag": skill_tag,
                     "Correlation Coefficient": coeff
                 })
 
