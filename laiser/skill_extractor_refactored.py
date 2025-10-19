@@ -204,6 +204,47 @@ class SkillExtractorRefactored:
             print(f"Failed to initialize transformer model: {e}")
             # For CPU fallback, we might want to use SkillNer or other alternatives
             print("Consider using SkillNer for CPU-only extraction.")
+
+    def _parse_skills_from_response(self, response: str) -> List[str]:
+        if not response or not response.strip():
+            return []
+
+        fragments: List[str] = []
+        stripped = response.strip()
+
+        code_match = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL)
+        if code_match:
+            fragments.append(code_match.group(1).strip())
+
+        brace_match = re.search(r"\{.*?\}", stripped, re.DOTALL)
+        if brace_match:
+            fragments.append(brace_match.group(0).strip())
+
+        list_match = re.search(r"\[.*?\]", stripped, re.DOTALL)
+        if list_match:
+            fragments.append(list_match.group(0).strip())
+
+        fragments.append(stripped)
+
+        seen = set()
+        for fragment in fragments:
+            if not fragment or fragment in seen:
+                continue
+            seen.add(fragment)
+            for candidate in (fragment,):
+                try:
+                    loaded = json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
+                if isinstance(loaded, dict):
+                    skills = loaded.get("skills")
+                    if isinstance(skills, list):
+                        return [str(s).strip() for s in skills if str(s).strip()]
+                elif isinstance(loaded, list):
+                    return [str(s).strip() for s in loaded if str(s).strip()]
+
+        return []
     
     def align_skills(self, raw_skills: List[str], document_id: str = '0', description: str = '') -> pd.DataFrame:
         """
@@ -295,20 +336,10 @@ class SkillExtractorRefactored:
         extraction_prompt = self.skill_extraction_prompt(cleaned_desc)
         response = llm_router(extraction_prompt, self.model_id, self.use_gpu, self.llm, 
                                 self.tokenizer, self.model, self.api_key)
-        skills = []
-        try:
-            # Some LLMs may return text with junk before/after JSON → extract JSON substring
-            start = response.find("{")
-            end = response.rfind("}") + 1
-            if start != -1 and end != -1:
-                json_str = response[start:end]
-                parsed = json.loads(json_str)
-                skills = parsed.get("skills", [])
-            else:
-                print("Warning: JSON not found in response")
-        except Exception as e:
-            print("Warning: failed to parse JSON:", e)
-
+        skills = self._parse_skills_from_response(response)
+        if not skills:
+            preview = response.strip().replace("\n", " ")[:200]
+            print(f"Warning: failed to parse skills from response: {preview}")
         return skills
 
     def extract_and_align(
