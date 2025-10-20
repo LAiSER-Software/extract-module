@@ -244,6 +244,21 @@ class SkillExtractorRefactored:
                 elif isinstance(loaded, list):
                     return [str(s).strip() for s in loaded if str(s).strip()]
 
+        quoted_skills = re.findall(r"\"([^\"]{1,100})\"", stripped)
+        if quoted_skills:
+            cleaned = []
+            for skill in quoted_skills:
+                skill = skill.strip()
+                if not skill:
+                    continue
+                if not (1 <= len(skill.split()) <= 5):
+                    continue
+                if skill.lower().startswith("skills"):
+                    continue
+                cleaned.append(skill)
+            if cleaned:
+                return cleaned
+
         return []
     
     def align_skills(self, raw_skills: List[str], document_id: str = '0', description: str = '') -> pd.DataFrame:
