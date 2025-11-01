@@ -107,6 +107,38 @@ class DataAccessLayer:
             except Exception as e:
                 raise LAiSERError(f"Failed to load combined skills data: {e}")
         return self._combined_df
+
+    def get_skill_label_to_tag_mapping(self) -> Dict[str, str]:
+        """Create mapping from SkillLabel to SkillTag"""
+        combined_df = self.load_combined_skills()
+        if combined_df is None or combined_df.empty:
+            return {}
+
+        # Create mapping from SkillLabel to SkillTag
+        mapping = {}
+        for _, row in combined_df.iterrows():
+            skill_label = str(row.get('SkillLabel', '')).strip()
+            skill_tag = str(row.get('SkillTag', '')).strip()
+            if skill_label and skill_tag:
+                mapping[skill_label] = skill_tag
+
+        return mapping
+
+    def get_skill_tag_to_label_mapping(self) -> Dict[str, str]:
+        """Create mapping from SkillTag to SkillLabel"""
+        combined_df = self.load_combined_skills()
+        if combined_df is None or combined_df.empty:
+            return {}
+
+        # Create mapping from SkillTag to SkillLabel
+        mapping = {}
+        for _, row in combined_df.iterrows():
+            skill_label = str(row.get('SkillLabel', '')).strip()
+            skill_tag = str(row.get('SkillTag', '')).strip()
+            if skill_label and skill_tag:
+                mapping[skill_tag] = skill_label
+
+        return mapping
     
     def build_faiss_index(self, skill_names: List[str]) -> faiss.IndexFlatIP:
         """Build FAISS index for given skill names"""

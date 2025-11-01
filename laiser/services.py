@@ -209,13 +209,19 @@ class SkillAlignmentService:
     def align_skills_to_taxonomy(self,raw_skills: List[str],document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = 25,) -> pd.DataFrame:
         """Align raw skills to taxonomy using the FAISS index in laiser/public/skills_v03.index"""
         mapped_skills = []
+        skill_tags = []
         correlations = []
+
         script_dir = Path(__file__).parent
         local_index_path = script_dir / "public" / "skills_v03.index"
         local_json_path = script_dir / "public" / "skills_df.json"
         skill_df = pd.read_json(str(local_json_path))
         index = faiss.read_index(str(local_index_path))
         model = self.data_access.get_embedding_model()
+
+        # Get SkillLabel to SkillTag mapping
+        label_to_tag_mapping = self.data_access.get_skill_label_to_tag_mapping()
+
         for skill in raw_skills:
             query_vec = model.encode([skill], normalize_embeddings=True)
             D, I = index.search(np.array(query_vec).astype('float32'), top_k)
@@ -223,8 +229,24 @@ class SkillAlignmentService:
             if D[0][0] >= similarity_threshold:
                 canonical_skill = skill_df.iloc[I[0][0]]["skill"]
                 mapped_skills.append(canonical_skill)
+
+                # Get the corresponding SkillTag
+                skill_tag = label_to_tag_mapping.get(canonical_skill, "")
+                skill_tags.append(skill_tag)
+
                 correlations.append(float(D[0][0]))
-        return mapped_skills,correlations
+
+        # Create DataFrame with all the required columns
+        result_df = pd.DataFrame({
+            "Research ID": document_id,
+            "Description": description,
+            "Raw Skill": raw_skills[:len(mapped_skills)],
+            "Taxonomy Skill": mapped_skills,
+            "Skill Tag": skill_tags,
+            "Correlation Coefficient": correlations
+        })
+
+        return result_df
 
 
 class SkillExtractionService:

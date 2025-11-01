@@ -37,7 +37,7 @@ data = pd.DataFrame([
 
 extractor = SkillExtractorRefactored(
             model_id="gemini",
-            api_key="AIzaSyB7nzaQqx6BMcSuZKn_Ptbrhcj0_t4us14",
+            api_key="AIzaSyAdYOILwr2YcCJvX7K-I5M8yjwF1wX5bZk",
             use_gpu=False
         )
 # Ensure pandas prints everything
