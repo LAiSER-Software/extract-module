@@ -11,6 +11,9 @@ authors:
   - name: Satya Phanindra Kumar Kalaga
     orcid: 0009-0004-6447-3760
     affiliation: 1
+  - name: Bharat Khandelwal
+    orcid: 0009-0001-9491-5468
+    affiliation: 1
 affiliations:
   - name: Program on Skills, Credentials and Workforce Policy, Institute of Public Policy, The George Washington University, USA
     index: 1
