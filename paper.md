@@ -1,31 +1,38 @@
-# Leveraging Artificial Intelligence for Skill Extraction & Research (LAiSER): A Taxonomy-Aware Framework for Labor Market Intelligence
-
-**Satya Phanindra Kumar Kalaga**  
-*Program on Skills, Credentials and Workforce Policy*  
-*Institute of Public Policy*  
-*The George Washington University*  
-*Washington, DC 20052*  
-*Email: pscwp@gwu.edu*
-
-**Date:** November 2025
-
+---
+title: 'LAiSER: A Taxonomy-Aware Framework for Skill Extraction and Research'
+tags:
+  - Python
+  - natural language processing
+  - skill extraction
+  - labor market intelligence
+  - large language models
+  - workforce analytics
+authors:
+  - name: Satya Phanindra Kumar Kalaga
+    orcid: 0009-0004-6447-3760
+    affiliation: 1
+affiliations:
+  - name: Program on Skills, Credentials and Workforce Policy, Institute of Public Policy, The George Washington University, USA
+    index: 1
+date: 1 November 2025
+bibliography: paper.bib
 ---
 
-## Abstract
+# Summary
 
 This paper presents LAiSER, a comprehensive artificial intelligence framework designed to extract, standardize, and align skill information from unstructured textual data with established skill taxonomies. The system addresses a critical challenge in workforce development and educational policy: the lack of standardized, machine-readable skill information that can facilitate communication between learners, educators, and employers. LAiSER employs a novel two-stage pipeline that combines advanced language models with semantic vector search to achieve high-precision skill extraction and taxonomy alignment. The framework supports multiple computational backends, including GPU-accelerated inference, cloud-based APIs, and CPU-only environments, making it accessible to diverse research and operational contexts. Initial deployments demonstrate the system's capability to process large-scale datasets while maintaining accuracy in skill identification and classification.
 
-**Keywords:** skill extraction, natural language processing, labor market intelligence, taxonomy alignment, large language models, workforce analytics, semantic similarity, FAISS, ESCO
+# Statement of need
 
----
+The contemporary labor market is characterized by rapid technological change, evolving skill requirements, and a growing disconnect between educational curricula and industry needs [@Autor2013]. Traditional approaches to skill extraction rely heavily on manual annotation, expert judgment, or simple keyword matching—methods that are labor-intensive, error-prone, and fail to capture the semantic richness of skill descriptions [@Boselli2018]. LAiSER fills this gap by providing an accessible, flexible, and accurate framework for automated skill extraction and taxonomy alignment, enabling researchers, educators, and workforce development professionals to analyze skill demands at scale.
 
 ## 1. Introduction
 
 ### 1.1 Motivation
 
-The contemporary labor market is characterized by rapid technological change, evolving skill requirements, and a growing disconnect between educational curricula and industry needs (Autor & Dorn, 2013). This misalignment creates significant challenges for multiple stakeholders: learners struggle to identify relevant competencies, educators lack precise understanding of labor market demands, and employers face difficulties in communicating skill requirements effectively. A fundamental barrier to addressing these challenges is the absence of a standardized, computationally tractable representation of skills that can bridge the semantic gap between different domains and stakeholders.
+The contemporary labor market is characterized by rapid technological change, evolving skill requirements, and a growing disconnect between educational curricula and industry needs [@Autor2013]. This misalignment creates significant challenges for multiple stakeholders: learners struggle to identify relevant competencies, educators lack precise understanding of labor market demands, and employers face difficulties in communicating skill requirements effectively. A fundamental barrier to addressing these challenges is the absence of a standardized, computationally tractable representation of skills that can bridge the semantic gap between different domains and stakeholders.
 
-Traditional approaches to skill extraction rely heavily on manual annotation, expert judgment, or simple keyword matching—methods that are labor-intensive, error-prone, and fail to capture the semantic richness of skill descriptions (Boselli et al., 2018). Furthermore, the proliferation of domain-specific vocabularies for describing competencies has resulted in a fragmented landscape where the same skill may be described using vastly different terminology across contexts.
+Traditional approaches to skill extraction rely heavily on manual annotation, expert judgment, or simple keyword matching—methods that are labor-intensive, error-prone, and fail to capture the semantic richness of skill descriptions [@Boselli2018]. Furthermore, the proliferation of domain-specific vocabularies for describing competencies has resulted in a fragmented landscape where the same skill may be described using vastly different terminology across contexts.
 
 ### 1.2 Contribution
 
@@ -35,7 +42,7 @@ This paper introduces LAiSER, a comprehensive framework that addresses these lim
 
 2. **Multi-Model Skill Extraction**: A flexible architecture supporting multiple large language models (LLMs) with automatic fallback mechanisms, enabling deployment across different computational environments and budget constraints.
 
-3. **Taxonomy-Aware Alignment**: A semantic similarity-based alignment system leveraging FAISS vector search to map extracted skills to standardized taxonomies (e.g., ESCO), providing interoperability and enabling cross-domain skill analysis.
+3. **Taxonomy-Aware Alignment**: A semantic similarity-based alignment system leveraging FAISS vector search to map extracted skills to standardized taxonomies (e.g., ESCO [@ESCO2020]), providing interoperability and enabling cross-domain skill analysis.
 
 LAiSER is designed with research reproducibility, operational scalability, and practical utility as core principles. The system has been deployed in multiple research contexts and demonstrates robust performance across diverse text sources, including job advertisements, course syllabi, and training program descriptions.
 
@@ -57,7 +64,7 @@ LAiSER's architecture reflects four fundamental design principles:
 
 #### 2.2.1 Configuration and Data Access Layer
 
-The `config.py` module centralizes all system parameters, including model identifiers, similarity thresholds, prompt templates, and SCQF (Scottish Credit and Qualifications Framework) level descriptors. This centralization facilitates reproducible research by documenting all experimental parameters in a single location.
+The `config.py` module centralizes all system parameters, including model identifiers, similarity thresholds, prompt templates, and SCQF (Scottish Credit and Qualifications Framework) [@SCQF2019] level descriptors. This centralization facilitates reproducible research by documenting all experimental parameters in a single location.
 
 The `data_access.py` module implements a data access layer with support for both remote and local data sources. The `DataAccessLayer` class manages taxonomy loading, embedding model initialization, and skill-to-tag mapping, while the `FAISSIndexManager` handles vector index operations with intelligent caching to minimize redundant computations.
 
@@ -69,7 +76,7 @@ The service layer (`services.py`) encapsulates the core business logic through f
 
 **ResponseParser**: Implements robust parsing logic to extract structured skill information from LLM responses. The parser employs multiple fallback strategies to handle malformed JSON, unexpected formatting, and model-specific output variations, significantly improving system reliability.
 
-**SkillAlignmentService**: Manages the alignment of extracted skills with established taxonomies using semantic similarity search. The service leverages FAISS (Facebook AI Similarity Search) indices to efficiently retrieve the most relevant canonical skills from large taxonomies, with configurable similarity thresholds and top-k retrieval parameters.
+**SkillAlignmentService**: Manages the alignment of extracted skills with established taxonomies using semantic similarity search. The service leverages FAISS (Facebook AI Similarity Search) [@Johnson2019] indices to efficiently retrieve the most relevant canonical skills from large taxonomies, with configurable similarity thresholds and top-k retrieval parameters.
 
 **SkillExtractionService**: Serves as the primary orchestrator, coordinating interactions between the PromptBuilder, ResponseParser, and SkillAlignmentService to execute complete skill extraction pipelines.
 
@@ -123,7 +130,7 @@ This constrained generation approach dramatically improves the consistency and p
 
 Following extraction, raw skills are aligned to a standardized taxonomy (ESCO by default) using a semantic similarity approach:
 
-1. **Embedding Generation**: Each extracted skill and taxonomy skill is encoded using a sentence transformer model (default: `all-MiniLM-L6-v2`), producing dense vector representations that capture semantic meaning.
+1. **Embedding Generation**: Each extracted skill and taxonomy skill is encoded using a sentence transformer model [@Reimers2019] (default: `all-MiniLM-L6-v2`), producing dense vector representations that capture semantic meaning.
 
 2. **Vector Search**: FAISS indices enable efficient approximate nearest neighbor search over large taxonomy vocabularies (10,000+ skills), retrieving the top-k most similar canonical skills.
 
@@ -382,16 +389,4 @@ The author gratefully acknowledges the George Washington University Institute of
 
 The author thanks the open-source community, particularly GW Open Source Program Office and the developers of HuggingFace Transformers, FAISS, and spaCy, whose tools form the technical foundation of this framework. Special appreciation is extended to the contributors who volunteered their time to test and refine the LAiSER project on GitHub.
 
-## 12. References
-
-Autor, D. H., & Dorn, D. (2013). The growth of low-skill service jobs and the polarization of the US labor market. *American Economic Review*, 103(5), 1553-1597.
-
-Boselli, R., Cesarini, M., Mercorio, F., & Mezzanzanica, M. (2018). Classifying online job advertisements through machine learning. *Future Generation Computer Systems*, 86, 319-328.
-
-European Commission. (2020). *ESCO: European Skills, Competences, Qualifications and Occupations*. Retrieved from [https://ec.europa.eu/esco](https://ec.europa.eu/esco)
-
-Johnson, J., Douze, M., & Jégou, H. (2019). Billion-scale similarity search with GPUs. *IEEE Transactions on Big Data*, 7(3), 535-547.
-
-Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence embeddings using Siamese BERT-networks. *Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)*, 3982-3992.
-
-Scottish Credit and Qualifications Framework Partnership. (2019). *SCQF Handbook: User Guide*. Retrieved from [https://scqf.org.uk](https://scqf.org.uk)
+# References
