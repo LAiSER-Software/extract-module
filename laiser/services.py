@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Tuple, Optional, Union
 import pandas as pd
 
 from laiser.config import (
-    DEFAULT_TOP_K, 
+    DEFAULT_TOP_K,
     SCQF_LEVELS,
     SKILL_EXTRACTION_PROMPT_JOB,
     SKILL_EXTRACTION_PROMPT_SYLLABUS,
@@ -206,9 +206,37 @@ class SkillAlignmentService:
     
 
     
-    def align_skills_to_taxonomy(self,raw_skills: List[str],document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = 25,) -> pd.DataFrame:
-        """Align raw skills to taxonomy using the FAISS index in laiser/public/skills_v03.index"""
+    def align_skills_to_taxonomy(
+        self,
+        raw_skills: List[str],
+        document_id: str = '0',
+        description: str = '',
+        similarity_threshold: float = 0.20,
+        top_k: int = DEFAULT_TOP_K,
+    ) -> pd.DataFrame:
+        """
+        Align raw skills to taxonomy using the FAISS index.
+        
+        Parameters
+        ----------
+        raw_skills : List[str]
+            List of raw extracted skills to align
+        document_id : str
+            Document identifier
+        description : str
+            Full description text for context
+        similarity_threshold : float
+            Minimum similarity score for a match to be included (default: 0.20)
+        top_k : int
+            Maximum number of aligned skills to return (default: 25)
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with aligned skills, limited to top_k results above threshold
+        """
         mapped_skills = []
+        raw_skills_matched = []
         skill_tags = []
         correlations = []
 
@@ -224,23 +252,40 @@ class SkillAlignmentService:
 
         for skill in raw_skills:
             query_vec = model.encode([skill], normalize_embeddings=True)
-            D, I = index.search(np.array(query_vec).astype('float32'), top_k)
-            # Take only the top match by default
+            # Search for the single best match for each raw skill
+            D, I = index.search(np.array(query_vec).astype('float32'), 1)
+            
+            # Only include matches above the threshold
             if D[0][0] >= similarity_threshold:
                 canonical_skill = skill_df.iloc[I[0][0]]["skill"]
                 mapped_skills.append(canonical_skill)
+                raw_skills_matched.append(skill)
 
                 # Get the corresponding SkillTag
                 skill_tag = label_to_tag_mapping.get(canonical_skill, "")
                 skill_tags.append(skill_tag)
-
                 correlations.append(float(D[0][0]))
+
+        # Apply top_k limit: sort by correlation (descending) and take top_k
+        if len(mapped_skills) > top_k:
+            # Create temporary list of tuples for sorting
+            combined = list(zip(correlations, raw_skills_matched, mapped_skills, skill_tags))
+            # Sort by correlation score descending
+            combined.sort(key=lambda x: x[0], reverse=True)
+            # Take only top_k results
+            combined = combined[:top_k]
+            # Unzip back to separate lists
+            correlations, raw_skills_matched, mapped_skills, skill_tags = zip(*combined) if combined else ([], [], [], [])
+            correlations = list(correlations)
+            raw_skills_matched = list(raw_skills_matched)
+            mapped_skills = list(mapped_skills)
+            skill_tags = list(skill_tags)
 
         # Create DataFrame with all the required columns
         result_df = pd.DataFrame({
             "Research ID": document_id,
             "Description": description,
-            "Raw Skill": raw_skills[:len(mapped_skills)],
+            "Raw Skill": raw_skills_matched,
             "Taxonomy Skill": mapped_skills,
             "Skill Tag": skill_tags,
             "Correlation Coefficient": correlations
@@ -331,16 +376,40 @@ class SkillExtractionService:
         self, 
         raw_skills: List[str], 
         document_id: str = '0',
-        description: str = ''
+        description: str = '',
+        similarity_threshold: float = 0.20,
+        top_k: int = DEFAULT_TOP_K
     ) -> pd.DataFrame:
-        """Align extracted skills to taxonomy"""
+        """
+        Align extracted skills to taxonomy.
+        
+        Parameters
+        ----------
+        raw_skills : List[str]
+            List of raw extracted skills
+        document_id : str
+            Document identifier
+        description : str
+            Full description text for context
+        similarity_threshold : float
+            Minimum similarity score for a match to be included (default: 0.20)
+        top_k : int
+            Maximum number of aligned skills to return (default: 25)
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with aligned skills
+        """
         # Add validation before calling alignment service
         if raw_skills is None:
             print("Warning: No skills to align (raw_skills is None)")
-            return pd.DataFrame(columns=['Research ID', 'Description', 'Raw Skill', 'Knowledge Required', 'Task Abilities', 'Skill Tag', 'Correlation Coefficient'])
+            return pd.DataFrame(columns=['Research ID', 'Description', 'Raw Skill', 'Taxonomy Skill', 'Skill Tag', 'Correlation Coefficient'])
         
         if not isinstance(raw_skills, list):
             print(f"Warning: raw_skills is not a list, converting from {type(raw_skills)}")
             raw_skills = [str(raw_skills)] if raw_skills else []
         
-        return self.alignment_service.align_skills_to_taxonomy(raw_skills, document_id, description)
+        return self.alignment_service.align_skills_to_taxonomy(
+            raw_skills, document_id, description, similarity_threshold, top_k
+        )

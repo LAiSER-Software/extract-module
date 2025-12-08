@@ -261,7 +261,14 @@ class SkillExtractorRefactored:
 
         return []
     
-    def align_skills(self, raw_skills: List[str], document_id: str = '0', description: str = '') -> pd.DataFrame:
+    def align_skills(
+        self, 
+        raw_skills: List[str], 
+        document_id: str = '0', 
+        description: str = '',
+        similarity_threshold: float = 0.20,
+        top_k: int = DEFAULT_TOP_K
+    ) -> pd.DataFrame:
         """
         Align raw skills to taxonomy.
         
@@ -273,13 +280,19 @@ class SkillExtractorRefactored:
             Document identifier
         description : str
             Full description text for context
+        similarity_threshold : float
+            Minimum similarity score for a match to be included (default: 0.20)
+        top_k : int
+            Maximum number of aligned skills to return per document (default: 25)
         
         Returns
         -------
         pd.DataFrame
             DataFrame with aligned skills and similarity scores
         """
-        return self.skill_service.align_extracted_skills(raw_skills, document_id, description)
+        return self.skill_service.align_extracted_skills(
+            raw_skills, document_id, description, similarity_threshold, top_k
+        )
     
     def strong_preprocessing_prompt(self,raw_description):
         prompt = f"""
@@ -364,6 +377,7 @@ class SkillExtractorRefactored:
         text_columns: List[str] = None,
         input_type: str = "job_desc",
         top_k: Optional[int] = None,
+        similarity_threshold: Optional[float] = None,
         levels: bool = False,
         batch_size: int = DEFAULT_BATCH_SIZE,
         warnings: bool = True
@@ -384,7 +398,11 @@ class SkillExtractorRefactored:
         input_type : str
             Type of input data
         top_k : int, optional
-            Number of top skills to return
+            Maximum number of aligned skills to return per document (default: 25)
+        similarity_threshold : float, optional
+            Minimum similarity score for a match to be included (default: 0.20).
+            Higher values = stricter matching, fewer results.
+            Lower values = more lenient matching, more results.
         levels : bool
             Whether to extract skill levels
         batch_size : int
@@ -400,6 +418,10 @@ class SkillExtractorRefactored:
         if text_columns is None:
             text_columns = ["description"]
         
+        # Apply defaults for top_k and similarity_threshold
+        effective_top_k = top_k if top_k is not None else DEFAULT_TOP_K
+        effective_threshold = similarity_threshold if similarity_threshold is not None else 0.20
+        
         try:
             results = []
             
@@ -408,12 +430,17 @@ class SkillExtractorRefactored:
                     # Prepare input data
                     input_data = {col: row.get(col, '') for col in text_columns}
                     input_data['id'] = row.get(id_column, str(idx))
-                    skills = self.extract_and_map_skills(input_data,text_columns)
+                    skills = self.extract_and_map_skills(input_data, text_columns)
                     full_description = ' '.join([str(input_data.get(col, '')) for col in text_columns])
-                    aligned_df = self.align_skills(skills, str(input_data['id']), full_description)
+                    aligned_df = self.align_skills(
+                        skills, 
+                        str(input_data['id']), 
+                        full_description,
+                        similarity_threshold=effective_threshold,
+                        top_k=effective_top_k
+                    )
 
                     results.extend(aligned_df.to_dict('records'))
-                    # Extract skills
         
                 except Exception as e:
                     if warnings:
