@@ -322,7 +322,7 @@ class SkillExtractorRefactored:
         cleaned = response.split("### CLEANED JOB DESCRIPTION:")[-1].strip()
         return cleaned
         
-    def fs_gold_skill_extraction_prompt(cleaned_description):
+    def skill_extraction_prompt(self, cleaned_description):
         standard_prompt = f"""
         task: "Skill Extraction from Job Descriptions"
 
@@ -363,8 +363,6 @@ class SkillExtractorRefactored:
         }}
         """
         return standard_prompt
-
-fs_gold_prompt = fs_gold_skill_extraction_prompt(cleaned_description)
 
     def extract_and_map_skills(self,input_data,text_columns):
         # 1. Clean job description (build text from dict)
