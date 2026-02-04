@@ -170,3 +170,11 @@ cython_debug/
 .vscode/
 .automations/
 test_extraction.py
+
+# Ignore everything in tests/
+tests/*
+
+# But keep pytest test files
+!tests/test_*.py
+
+store/*
