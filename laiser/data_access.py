@@ -242,8 +242,10 @@ class FAISSIndexManager:
         self.metadata = None
     
     # Issue: Do we even need this? Can't this be done in init
+    # [GFI_OddEven]: Split these into two seperate modules load and build index
     def initialize_index(self, force_rebuild: bool = False, debug: bool = True ) -> faiss.IndexFlatIP:
         """Initialize FAISS index (load or build)"""
+
         # [GFI_HelloWorld]: config this not hardcode
         script_dir = Path(__file__).parent
         local_index_path = script_dir / "public" / "skills_v04.index"
@@ -259,7 +261,8 @@ class FAISSIndexManager:
             except Exception as e:
                 if debug:
                     logger.warning(f"[initialize_index] Load failed, rebuilding: {e}")
-            ## Issue: Handle all casses where any file is missing and we can recreate those without force rebuild. Might also verify files available and then decide whether to rebuild or not.
+            
+            # Issue: Handle all casses where any file is missing and we can recreate those without force rebuild. Might also verify files available and then decide whether to rebuild or not.
             if self.index is not None and self.metadata is not None:
                 return self.index, self.metadata
 
@@ -291,9 +294,7 @@ class FAISSIndexManager:
         self.index, self.embeddings = (self.data_access.build_faiss_index(combined['text'].tolist()))
         
         meta_df = combined[['skill', 'description', 'addtional_notes', 'source', 'source_url', 'text']].copy()
-        self.metadata = meta_df.to_dict(orient="records")
-
-        
+        self.metadata = meta_df
 
         self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
         self.data_access.save_faiss_index(self.index, str(local_index_path))

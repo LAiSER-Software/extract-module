@@ -260,7 +260,7 @@ class SkillAlignmentService:
             if similarity < similarity_threshold:
                 log_debug(f"[skill {i}] below threshold -> skip")
                 continue
-
+            meta = {}
             if not canonical_skill:
                 log_debug(f"[skill {i}] empty canonical_skill -> skip")
                 continue
