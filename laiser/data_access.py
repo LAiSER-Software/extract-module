@@ -62,6 +62,7 @@ import pandas as pd
 import faiss
 import numpy as np
 from pathlib import Path
+import json
 from typing import Optional, List, Dict, Any
 from sentence_transformers import SentenceTransformer
 
@@ -74,6 +75,8 @@ from laiser.config import (
 )
 from laiser.exceptions import FAISSIndexError, LAiSERError
 
+import logging
+logger = logging.getLogger(__name__)
 
 class DataAccessLayer:
     """Handles data loading and external API calls"""
@@ -82,6 +85,7 @@ class DataAccessLayer:
         self.embedding_model = None
         self._esco_df = None
         self._osn_df = None
+
         self._combined_df = None
     
     def get_embedding_model(self) -> SentenceTransformer:
@@ -100,7 +104,7 @@ class DataAccessLayer:
         return self._esco_df
     
     def load_osn_skills(self) -> pd.DataFrame:
-        """Load ESCO skills taxonomy data"""
+        """Load OSN skills taxonomy data"""
         if self._osn_df is None:
             try:
                 self._osn_df = pd.read_csv(OSN_SKILLS_URL)
@@ -108,6 +112,26 @@ class DataAccessLayer:
                 raise LAiSERError(f"Failed to load OSN skills data: {e}")
         return self._osn_df
     
+    def load_skill_metadata(self,file_path: str) -> pd.DataFrame:
+        """Load skills metadata JSON generated during FAISS index build"""
+        if self._combined_df is None:
+            try:
+                if not os.path.exists(file_path):
+                    raise FileNotFoundError(
+                        f"Skills metadata file not found at {file_path}. "
+                        "Build or download the FAISS index first."
+                    )
+
+                self._combined_df = pd.read_json(
+                    file_path,
+                    orient="records"
+                )
+            except Exception as e:
+                raise LAiSERError(f"Failed to load skills metadata: {e}")
+
+        return self._combined_df
+
+
     def load_combined_skills(self) -> pd.DataFrame:
         """Load combined skills taxonomy data"""
         if self._combined_df is None:
@@ -169,6 +193,17 @@ class DataAccessLayer:
         except Exception as e:
             raise FAISSIndexError(f"Failed to save FAISS index: {e}")
     
+    def save_skill_metadata_json(self, metadata: list, file_path: str) -> None:
+        """Save skills metadata to JSON file"""
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        except Exception as e:
+            raise LAiSERError(f"Failed to save skills metadata: {e}")
+
     def load_faiss_index(self, file_path: str) -> Optional[faiss.IndexFlatIP]:
         """Load FAISS index from file"""
         try:
@@ -206,64 +241,77 @@ class FAISSIndexManager:
         self.embeddings = None
         self.metadata = None
     
-    def initialize_index(self, force_rebuild: bool = False) -> faiss.IndexFlatIP:
+    # Issue: Do we even need this? Can't this be done in init
+    def initialize_index(self, force_rebuild: bool = False, debug: bool = True ) -> faiss.IndexFlatIP:
         """Initialize FAISS index (load or build)"""
-        # Define paths
+        # [GFI_HelloWorld]: config this not hardcode
         script_dir = Path(__file__).parent
         local_index_path = script_dir / "public" / "skills_v04.index"
         local_json_path = script_dir / "public" / "skills_df.json" 
         local_npy_path = script_dir / "public" / "skill_embeddings.npy"
-        # Try to load existing index
+ 
         if not force_rebuild:
-            self.index = self.data_access.load_faiss_index(str(local_index_path))
             
-            if self.index is None:
-                # Try to download from remote
-                if self.data_access.download_faiss_index(FAISS_INDEX_URL, str(local_index_path)):
-                    self.index = self.data_access.load_faiss_index(str(local_index_path))
+            ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
+            try:
+                self.index = self.data_access.load_faiss_index(str(local_index_path))
+                self.metadata = self.data_access.load_skill_metadata(str(local_json_path))
+            except Exception as e:
+                if debug:
+                    logger.warning(f"[initialize_index] Load failed, rebuilding: {e}")
+            ## Issue: Handle all casses where any file is missing and we can recreate those without force rebuild. Might also verify files available and then decide whether to rebuild or not.
+            if self.index is not None and self.metadata is not None:
+                return self.index, self.metadata
+
+        esco_df = self.data_access.load_esco_skills()
+        osn_df = self.data_access.load_osn_skills()
+        # === Standardize columns ===
+        esco_df = esco_df[['preferredLabel','altLabels', 'description','conceptUri']].copy()
+        esco_df = esco_df.rename(columns={'preferredLabel': 'skill', 'description': 'description', 'conceptUri': 'source_url','altLabels': 'addtional_notes' })
+        osn_df = osn_df[['RSD Name','Keywords','Skill Statement', 'Canonical URL']].copy()
+        osn_df = osn_df.rename(columns={'RSD Name': 'skill', 'Skill Statement': 'description', 'Canonical URL': 'source_url', 'Keywords': 'addtional_notes' })
+        esco_df['source'] = 'esco' 
+        osn_df['source'] = 'osn'    
+        combined = pd.concat([esco_df, osn_df], ignore_index=True)
+
+        for c in ['skill', 'description', 'source_url', 'addtional_notes']:
+            combined[c] = combined[c].astype('string').str.strip()
+        combined = combined.replace({'': pd.NA})
+
+        combined['addtional_notes'] = combined['addtional_notes'].fillna('')
+
+        combined = combined.dropna(subset=['skill'])
+
+        combined['text'] = (
+            combined['skill'].astype('string').str.strip() + ' | ' +
+            combined['description'].astype('string').str.strip() + ' | ' +
+            combined['addtional_notes'].astype('string').str.strip()
+        )
+
+        self.index, self.embeddings = (self.data_access.build_faiss_index(combined['text'].tolist()))
         
-        # Build new index if loading failed
-        if self.index is None or force_rebuild:
-            esco_df = self.data_access.load_esco_skills()
-            osn_df = self.data_access.load_osn_skills()
-            # === Standardize columns ===
-            esco_df = esco_df[['preferredLabel','altLabels', 'description','conceptUri']].copy()
-            esco_df = esco_df.rename(columns={'preferredLabel': 'skill', 'description': 'description', 'conceptUri': 'source_url','altLabels': 'addtional_notes' })
-            osn_df = osn_df[['RSD Name','Keywords','Skill Statement', 'Canonical URL']].copy()
-            osn_df = osn_df.rename(columns={'RSD Name': 'skill', 'Skill Statement': 'description', 'Canonical URL': 'source_url', 'Keywords': 'addtional_notes' })
-            esco_df['source'] = 'esco' 
-            osn_df['source'] = 'osn'    
+        meta_df = combined[['skill', 'description', 'addtional_notes', 'source', 'source_url', 'text']].copy()
+        self.metadata = meta_df.to_dict(orient="records")
 
-            # === Combine ===
-            combined = pd.concat([esco_df, osn_df], ignore_index=True)
+        
 
-            # quick cleanup (robust): trim + drop empty strings
-            for c in ['skill', 'description', 'source_url', 'addtional_notes']:
-                combined[c] = combined[c].astype('string').str.strip()
-            combined = combined.replace({'': pd.NA})
+        self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
+        self.data_access.save_faiss_index(self.index, str(local_index_path))
 
-            # don't drop rows just because notes are missing (notes often empty)
-            combined['addtional_notes'] = combined['addtional_notes'].fillna('')
+        ## [GFI_OOPS]: config this not hardcode
+        np.save(local_npy_path, self.embeddings)
 
-            combined = combined.dropna(subset=['skill'])
-            # === Build embedding text ===
-            combined['text'] = (
-                combined['skill'].astype('string').str.strip() + ' | ' +
-                combined['description'].astype('string').str.strip() + ' | ' +
-                combined['addtional_notes'].astype('string').str.strip()
+        return self.index, self.metadata 
+
+    def get_metadata(self):
+        """
+        Return loaded skill metadata.
+        """
+        if self.metadata is None:
+            raise FAISSIndexError(
+                "Metadata not initialized. Call initialize_index() first."
             )
-
-            self.index, self.embeddings = (self.data_access.build_faiss_index(combined['text'].tolist()))
-            combined[['skill', 'description', 'addtional_notes', 'source', 'source_url', 'text']].to_json( local_json_path,orient="records",indent=2)
-            np.save(local_npy_path, self.embeddings)
-            
-            self.data_access.save_faiss_index(self.index, str(local_index_path))
-        else:
-            # ✅ ensure skill_names is populated even on load
-            esco_df = self.data_access.load_esco_skills()
-            self.skill_names = esco_df["preferredLabel"].tolist()
-
-        return self.index
+        return self.metadata
 
     def search_similar_skills(self, query_embedding: np.ndarray, top_k: int = 25) -> List[Dict[str, Any]]:
         """Search for similar skills using FAISS index"""
@@ -311,7 +359,8 @@ class FAISSIndexManager:
                     results.append({
                         "Skill": self.skill_names[idx],
                         "Similarity": float(score),
-                        "Rank": rank
+                        "Rank": rank,
+                        "Index": int(idx)
                     })
 
             return results
