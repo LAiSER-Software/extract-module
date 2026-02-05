@@ -249,7 +249,7 @@ class FAISSIndexManager:
         local_index_path = script_dir / "public" / "skills_v04.index"
         local_json_path = script_dir / "public" / "skills_df.json" 
         local_npy_path = script_dir / "public" / "skill_embeddings.npy"
- 
+        local_combined_csv_path = script_dir / "public" / "combined.csv"
         if not force_rebuild:
             
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
@@ -281,7 +281,7 @@ class FAISSIndexManager:
         combined['addtional_notes'] = combined['addtional_notes'].fillna('')
 
         combined = combined.dropna(subset=['skill'])
-
+        combined.to_csv(local_combined_csv_path,index=True,encoding="utf-8")
         combined['text'] = (
             combined['skill'].astype('string').str.strip() + ' | ' +
             combined['description'].astype('string').str.strip() + ' | ' +
