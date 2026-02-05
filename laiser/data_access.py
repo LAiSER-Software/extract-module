@@ -242,11 +242,11 @@ class FAISSIndexManager:
         self.metadata = None
     
     # Issue: Do we even need this? Can't this be done in init
-    # [GFI_OddEven]: Split these into two seperate modules load and build index
+    # Issue [GFI_OddEven]: Split these into two seperate modules load and build index
     def initialize_index(self, force_rebuild: bool = False, debug: bool = True ) -> faiss.IndexFlatIP:
         """Initialize FAISS index (load or build)"""
 
-        # [GFI_HelloWorld]: config this not hardcode
+        # Issue [GFI_HelloWorld]: config this not hardcode
         script_dir = Path(__file__).parent
         local_index_path = script_dir / "public" / "skills_v04.index"
         local_json_path = script_dir / "public" / "skills_df.json" 
@@ -299,7 +299,7 @@ class FAISSIndexManager:
         self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
         self.data_access.save_faiss_index(self.index, str(local_index_path))
 
-        ## [GFI_OOPS]: config this not hardcode
+        # Issue [GFI_OOPS]: config this not hardcode
         np.save(local_npy_path, self.embeddings)
 
         return self.index, self.metadata 
