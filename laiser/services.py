@@ -21,6 +21,9 @@ from laiser.config import (
 from laiser.exceptions import SkillExtractionError, InvalidInputError
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
 
+import logging
+logger = logging.getLogger(__name__)
+
 class PromptBuilder:
     """Builds prompts for different types of skill extraction tasks"""
     
@@ -204,7 +207,6 @@ class SkillAlignmentService:
         self.faiss_manager = faiss_manager
         self.faiss_manager.initialize_index(force_rebuild=False)
 
-    
     def align_skills_to_taxonomy(
         self,
         raw_skills: List[str],
@@ -212,94 +214,113 @@ class SkillAlignmentService:
         description: str = '',
         similarity_threshold: float = 0.20,
         top_k: int = DEFAULT_TOP_K,
+        debug: bool = False
     ) -> pd.DataFrame:
-        """
-        Align raw skills to taxonomy using the FAISS index.
-        
-        Parameters
-        ----------
-        raw_skills : List[str]
-            List of raw extracted skills to align
-        document_id : str
-            Document identifier
-        description : str
-            Full description text for context
-        similarity_threshold : float
-            Minimum similarity score for a match to be included (default: 0.20)
-        top_k : int
-            Maximum number of aligned skills to return (default: 25)
-        
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame with aligned skills, limited to top_k results above threshold
-        """
         mapped_skills = []
         raw_skills_matched = []
-        skill_tags = []
+        taxonomy_descriptions = []
+        taxonomy_sources = []
         correlations = []
 
+        def log_debug(msg: str):
+            if debug:
+                logger.debug(msg)
+
+        log_debug(f"[align] raw_skills={len(raw_skills)} threshold={similarity_threshold} top_k={top_k}")
 
         model = self.data_access.get_embedding_model()
 
-        # Get SkillLabel to SkillTag mapping
-        label_to_tag_mapping = self.data_access.get_skill_label_to_tag_mapping()
+        # metadata loaded once
+        metadata = self.faiss_manager.get_metadata()
+        log_debug(f"[align] metadata type={type(metadata).__name__} len={len(metadata)}")
+        if isinstance(metadata, pd.DataFrame) and not metadata.empty:
+            log_debug(f"[align] metadata columns={list(metadata.columns)}")
 
-        for skill in raw_skills:
+        for i, skill in enumerate(raw_skills):
+            log_debug(f"[skill {i}] raw='{skill}'")
+
             query_vec = model.encode([skill], normalize_embeddings=True)
-            # Search for the single best match for each raw skill
+
             results = self.faiss_manager.search_similar_skills(
                 np.array(query_vec).astype("float32"), top_k=1
             )
+            log_debug(f"[skill {i}] results={results}")
 
             if not results:
+                log_debug(f"[skill {i}] no results -> skip")
                 continue
 
             best = results[0]
             similarity = float(best.get("Similarity", 0.0))
+            meta_idx = best.get("Index")
+            canonical_skill = str(best.get("Skill", "")).strip()
 
-            # Only include matches above the threshold
-            if similarity >= similarity_threshold:
-                canonical_skill = str(best.get("Skill", "")).strip()
-                if not canonical_skill:
-                    continue
+            log_debug(f"[skill {i}] best='{canonical_skill}' sim={similarity:.4f} meta_idx={meta_idx}")
 
-                mapped_skills.append(canonical_skill)
-                raw_skills_matched.append(skill)
+            if similarity < similarity_threshold:
+                log_debug(f"[skill {i}] below threshold -> skip")
+                continue
 
-                # Get the corresponding SkillTag
-                skill_tag = label_to_tag_mapping.get(canonical_skill, "")
-                skill_tags.append(skill_tag)
-                correlations.append(similarity)
+            if not canonical_skill:
+                log_debug(f"[skill {i}] empty canonical_skill -> skip")
+                continue
+            if meta_idx is None:
+                log_debug(f"[skill {i}] meta_idx is None (search_similar_skills may not return Index)")
+            elif int(meta_idx) >= len(metadata) or int(meta_idx) < 0:
+                log_debug(f"[skill {i}] meta_idx out of range: {meta_idx} (metadata len={len(metadata)})")
+            else:
+                # ✅ DataFrame row by position
+                meta = metadata.iloc[int(meta_idx)].to_dict()
+                log_debug(f"[skill {i}] meta keys={list(meta.keys())}")
+
+            # handle possible key casing differences
+            taxonomy_description = meta.get("description", meta.get("Description", ""))
+            taxonomy_source = meta.get("source", meta.get("Source", ""))
+
+            log_debug(
+                f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}"
+            )
+
+            mapped_skills.append(canonical_skill)
+            raw_skills_matched.append(skill)
+            taxonomy_descriptions.append(taxonomy_description)
+            taxonomy_sources.append(taxonomy_source)
+            correlations.append(similarity)
+
+        log_debug(f"[align] matched={len(mapped_skills)} of {len(raw_skills)}")
 
         # Apply top_k limit: sort by correlation (descending) and take top_k
         if len(mapped_skills) > top_k:
-            # Create temporary list of tuples for sorting
-            combined = list(zip(correlations, raw_skills_matched, mapped_skills, skill_tags))
-            # Sort by correlation score descending
-            combined.sort(key=lambda x: x[0], reverse=True)
-            # Take only top_k results
-            combined = combined[:top_k]
-            # Unzip back to separate lists
-            correlations, raw_skills_matched, mapped_skills, skill_tags = zip(*combined) if combined else ([], [], [], [])
-            correlations = list(correlations)
-            raw_skills_matched = list(raw_skills_matched)
-            mapped_skills = list(mapped_skills)
-            skill_tags = list(skill_tags)
+            log_debug(f"[align] trimming to top_k={top_k}")
 
-        # Create DataFrame with all the required columns
+            combined = list(zip(
+                correlations,
+                raw_skills_matched,
+                mapped_skills,
+                taxonomy_descriptions,
+                taxonomy_sources
+            ))
+            combined.sort(key=lambda x: x[0], reverse=True)
+            combined = combined[:top_k]
+
+            (correlations,
+            raw_skills_matched,
+            mapped_skills,
+            taxonomy_descriptions,
+            taxonomy_sources) = map(list, zip(*combined))  # ✅ FIX #2: keep lists aligned
+
         result_df = pd.DataFrame({
             "Research ID": document_id,
             "Description": description,
             "Raw Skill": raw_skills_matched,
             "Taxonomy Skill": mapped_skills,
-            "Skill Tag": skill_tags,
+            "Taxonomy Description": taxonomy_descriptions,
+            "Taxonomy Source": taxonomy_sources,
             "Correlation Coefficient": correlations
         })
 
+        log_debug(f"[align] result_df shape={result_df.shape}")
         return result_df
-
-
 class SkillExtractionService:
     """Main service for skill extraction operations"""
     
