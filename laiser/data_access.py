@@ -193,17 +193,21 @@ class DataAccessLayer:
         except Exception as e:
             raise FAISSIndexError(f"Failed to save FAISS index: {e}")
     
-    def save_skill_metadata_json(self, metadata: list, file_path: str) -> None:
-        """Save skills metadata to JSON file"""
+    def save_skill_metadata_json(self, metadata_df: pd.DataFrame, file_path: str) -> None:
+        """
+        Save skills metadata DataFrame to JSON file.
+        Expects a pandas DataFrame and serializes it safely.
+        """
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
+            records = metadata_df.to_dict(orient="records")
+
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
+                json.dump(records, f, indent=2, ensure_ascii=False)
 
         except Exception as e:
-            raise LAiSERError(f"Failed to save skills metadata: {e}")
-
+            raise RuntimeError(f"Failed to save skill metadata JSON: {e}")
     def load_faiss_index(self, file_path: str) -> Optional[faiss.IndexFlatIP]:
         """Load FAISS index from file"""
         try:
