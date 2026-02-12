@@ -311,7 +311,6 @@ class SkillAlignmentService:
 
         result_df = pd.DataFrame({
             "Research ID": document_id,
-            "Description": description,
             "Raw Skill": raw_skills_matched,
             "Taxonomy Skill": mapped_skills,
             "Taxonomy Description": taxonomy_descriptions,

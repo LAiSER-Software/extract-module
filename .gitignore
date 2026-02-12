@@ -178,3 +178,9 @@ tests/*
 !tests/test_*.py
 
 store/*
+
+benchmarks/*
+
+prompt_runs/*
+
+skills_alignment_results.csv

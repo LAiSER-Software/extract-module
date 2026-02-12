@@ -55,6 +55,11 @@ except ImportError as e:
     print(f"Warning: Gemini support not available: {e}")
     def gemini_generate(*args, **kwargs):
         raise ImportError("Gemini support is not available. Please install google-generativeai package.")
+# Import with error handling for optional dependencies
+try:
+    from laiser.llm_models.openai import openai_generate
+except ImportError as e:
+    print(f"Warning: openai support not available: {e}")
 
 try:
     from laiser.llm_models.hugging_face_llm import llm_generate_vllm
@@ -91,6 +96,8 @@ def llm_router(prompt: str, model_id: str, use_gpu: bool, llm, tokenizer=None, m
     """
     if model_id == 'gemini':
         return gemini_generate(prompt, api_key)
+    if model_id == 'openai':
+        return openai_generate(prompt, api_key)
 
     # Fallback: Hugging Face LLM
     return llm_generate_vllm(prompt, llm)

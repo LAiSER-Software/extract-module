@@ -43,9 +43,9 @@ def run_skill_extractor_smoke():
     ])
 
     extractor = SkillExtractorRefactored(
-        model_id="gemini",
+        model_id="openai",
         use_gpu=False,
-        api_key=os.getenv("GEMINI_API_KEY")
+        api_key=os.getenv("OPENAI_API_KEY")
     )
 
     results = extractor.extract_and_align(
@@ -58,6 +58,7 @@ def run_skill_extractor_smoke():
     # Minimal assertions — just make sure it runs end-to-end
     assert results is not None
     assert len(results) > 0
+    print(results)
 
 
 @pytest.mark.library

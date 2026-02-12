@@ -230,6 +230,7 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
 
     model_inputs = encodeds.to(device)
     
+    # Issue [GFI]: Redundant code
     with torch.no_grad():
         generated_ids = model.generate(**model_inputs, max_new_tokens=1000, do_sample=True, pad_token_id=tokenizer.eos_token_id)
 

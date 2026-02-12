@@ -120,6 +120,7 @@ class SkillExtractorRefactored:
         # Initialize based on configuration
         self._initialize_components()
     
+    ## ISSUE: Initialize these components into models module. Keep this class clean and light
     def _initialize_components(self):
         """Initialize required components based on configuration"""
         try:           
