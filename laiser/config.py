@@ -66,6 +66,7 @@ SIMILARITY_THRESHOLD = 0.85
 
 # ESCO Configuration
 ESCO_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
+OSN_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/osn_taxanomy_merged.csv"
 COMBINED_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv"
 FAISS_INDEX_URL = "https://raw.githubusercontent.com/LAiSER-Software/extract-module/main/laiser/input/esco_faiss_index.index"
 

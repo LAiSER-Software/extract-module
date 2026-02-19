@@ -122,10 +122,7 @@ class SkillExtractorRefactored:
     
     def _initialize_components(self):
         """Initialize required components based on configuration"""
-        try:
-            # Initialize SpaCy model
-            self._initialize_spacy()
-            
+        try:           
             # Initialize LLM components
             if self.model_id == 'gemini':
                 print("Using Gemini API for skill extraction...")
@@ -364,11 +361,10 @@ class SkillExtractorRefactored:
         """
         return standard_prompt
 
-    def extract_and_map_skills(self,input_data,text_columns):
-        # 1. Clean job description (build text from dict)
+    def extract_raw_llm_skills(self,input_data,text_columns):
+        
         text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
         cleaned_desc = self.strong_preprocessing_prompt(text_blob)
-        # print("Cleaned Desc:::::::",cleaned_desc)
         extraction_prompt = self.skill_extraction_prompt(cleaned_desc)
         response = llm_router(extraction_prompt, self.model_id, self.use_gpu, self.llm, 
                                 self.tokenizer, self.model, self.api_key)
@@ -438,7 +434,7 @@ class SkillExtractorRefactored:
                     # Prepare input data
                     input_data = {col: row.get(col, '') for col in text_columns}
                     input_data['id'] = row.get(id_column, str(idx))
-                    skills = self.extract_and_map_skills(input_data, text_columns)
+                    skills = self.extract_raw_llm_skills(input_data, text_columns)
                     full_description = ' '.join([str(input_data.get(col, '')) for col in text_columns])
                     aligned_df = self.align_skills(
                         skills, 
