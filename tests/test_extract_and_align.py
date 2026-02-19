@@ -43,9 +43,9 @@ def run_skill_extractor_smoke():
     ])
 
     extractor = SkillExtractorRefactored(
-        model_id="openai",
+        model_id="gemini",
         use_gpu=False,
-        api_key=os.getenv("OPENAI_API_KEY")
+        api_key=os.getenv("GEMINI_API_KEY")
     )
 
     results = extractor.extract_and_align(

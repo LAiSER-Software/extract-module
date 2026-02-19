@@ -48,6 +48,10 @@ Rev No.     Date            Author              Description
 [1.0.0]     6/30/2025      Anket Patil          Centralize LLM dispatch logic using router function
 """
 
+import torch
+import spacy
+
+
 # Import with error handling for optional dependencies
 try:
     from laiser.llm_models.gemini import gemini_generate
@@ -67,37 +71,77 @@ except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
+import torch
+import spacy
 
-def llm_router(prompt: str, model_id: str, use_gpu: bool, llm, tokenizer=None, model=None, api_key=None):
-    """
-    Route LLM requests to appropriate model implementation.
-    
-    Parameters
-    ----------
-    prompt : str
-        The prompt to send to the model
-    model_id : str
-        Model identifier ('gemini' or other)
-    use_gpu : bool
-        Whether to use GPU
-    llm : object
-        vLLM model instance
-    tokenizer : object, optional
-        Tokenizer for transformer models
-    model : object, optional
-        Model instance for transformer models
-    api_key : str, optional
-        API key for external services
-    
-    Returns
-    -------
-    str
-        Generated response from the model
-    """
-    if model_id == 'gemini':
-        return gemini_generate(prompt, api_key)
-    if model_id == 'openai':
-        return openai_generate(prompt, api_key)
+class LLMRouter:
 
-    # Fallback: Hugging Face LLM
-    return llm_generate_vllm(prompt, llm)
+    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None):
+        self.model_id = model_id
+        self.use_gpu = use_gpu
+        self.hf_token = hf_token
+        self.api_key = api_key
+
+        self.llm = None
+        self.model = None
+        self.tokenizer = None
+        self.nlp = None
+
+        self._initialize_components()
+
+    # ---------------- ROUTER ----------------
+    def generate(self, prompt: str):
+        if self.model_id == 'gemini':
+            return gemini_generate(prompt, self.api_key)
+
+        if self.model_id == 'openai':
+            return openai_generate(prompt, self.api_key)
+
+        return llm_generate_vllm(prompt, self.llm)
+
+    # ---------------- INIT ----------------
+    def _initialize_components(self):
+        try:
+            if self.model_id == 'gemini':
+                print("Using Gemini API for skill extraction...")
+                return
+
+            elif self.use_gpu and torch.cuda.is_available():
+                print("GPU available. Attempting to initialize vLLM model...")
+                try:
+                    self._initialize_vllm()
+                    if self.llm is not None:
+                        print("vLLM initialization successful!")
+                        return
+                except Exception as e:
+                    print(f"WARNING: vLLM initialization failed: {e}")
+                    print("Falling back to transformer model...")
+
+                try:
+                    self._initialize_transformer()
+                    if self.model is not None:
+                        print("Transformer model fallback successful!")
+                        return
+                except Exception as e:
+                    print(f"WARNING: Transformer model fallback also failed: {e}")
+
+            else:
+                print("Using CPU/transformer model...")
+                try:
+                    self._initialize_transformer()
+                    if self.model is not None:
+                        print("Transformer model initialization successful!")
+                        return
+                except Exception as e:
+                    print(f"WARNING: Transformer model initialization failed: {e}")
+
+            print("WARNING: No model successfully initialized.")
+
+        except Exception as e:
+            raise LAiSERError(f"Critical failure during component initialization: {e}")
+
+    def _initialize_vllm(self):
+        self.llm = load_model_from_vllm(self.model_id, self.hf_token)
+
+    def _initialize_transformer(self):
+        self.tokenizer, self.model = load_model_from_transformer(self.model_id, self.hf_token)

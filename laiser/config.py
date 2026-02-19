@@ -96,29 +96,47 @@ SCQF_LEVELS: Dict[int, str] = {
 
 # Prompt templates
 SKILL_EXTRACTION_PROMPT_JOB = """
-[INST]user
-Name all the skills present in the following description in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
-Below text is the Description:
+        task: "Skill Extraction from Job Descriptions"
 
-{query}
-[/INST]
-[INST]model
-"""
+        description: |
+        You are an expert AI system specialized in extracting technical and professional skills from job descriptions for workforce analytics.
+        Your goal is to analyze the following job description and output only the specific skill names that are required, mentioned, or strongly implied.
 
-SKILL_EXTRACTION_PROMPT_SYLLABUS = """
-[INST]user
-Name all the skills present in the following course details in a single list. Response should be in English and have only the skills, no other information or words. Skills should be keywords, each being no more than 3 words.
+        extraction_instructions:
+        - Extract only concrete, job-relevant skills (not soft traits, company values, or general workplace behaviors).
+        - Include a skill if it is clearly mentioned or strongly implied as necessary for the role.
+        - Exclude company policies, benefit programs, HR or legal statements, and generic terms (e.g., "communication," "leadership") unless used in a technical/professional context.
+        - Use only concise skill phrases (prefer noun phrases, avoid sentences).
+        - Do not invent new skills or make assumptions beyond the provided text.
 
-Course Description:
-{description}
+        examples:
+        Example 1 (Focus: Soft Skills & Communication) Input: "Strong verbal and written communication skills, with the ability to explain complex technical concepts clearly to both technical and non-technical audiences. Confident presenter, capable of articulating insights, results, and strategies to stakeholders." Output: ['Strong verbal and written communication skills', 'explain complex technical concepts', 'Confident presenter', 'capable of articulating insights']
 
-Learning Outcomes:
-{learning_outcomes}
+        Example 2 (Focus: Math & Technical Background) Input: "Qualified candidates will have a strong mathematical background (statistics, linear algebra, calculus, probability, and optimization). Experience with deep learning, natural language processing, or application of large language models is preferred." Output: ['Strong mathematical background', 'statistics, linear algebra, calculus, probability, and optimization', 'deep learning', 'natural language processing', 'application of large language models']
 
-[/INST]
-[INST]model
-"""
+        Example 3 (Focus: Core Responsibilities) Input: "Lead the research, design, implementation, and deployment of Machine Learning algorithms. Assist and enable C3 AI’s federal customers to build their own applications on the C3 AI Suite. Contribute to the design of new features." Output: ['Lead the research, design, implementation, and deployment of Machine Learning algorithms', 'Assist and enable C3 AI’s federal customers to build their own applications on the C3 AI Suite.', 'Contribute to the design and implementation of new features of the C3 AI Suite.']
 
+        formatting_rules:
+        - Return the output as valid JSON.
+        - The JSON must have a single key "skills" whose value is a list of skill strings.
+        - Each skill string must be between 1 and 5 words.
+        - Do not include explanations, metadata, or anything other than the JSON object.
+
+        job_description: |
+        {description}
+
+        ### OUTPUT FORMAT
+        {{
+        "skills": [
+            "skill1",
+            "skill2",
+            "skill3"
+        ]
+        }}
+      """
+
+## ISSUE: Prompt for course syllabi
+SKILL_EXTRACTION_PROMPT_SYLLABUS = """ Work in progress"""
 KSA_EXTRACTION_PROMPT = """[INST]user
 **Objective:** Given a {input_desc}, complete the following tasks with structured outputs.
 

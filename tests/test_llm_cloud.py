@@ -2,14 +2,13 @@ import os
 import pandas as pd
 import pytest
 
-from laiser.skill_extractor_refactored import SkillExtractorRefactored
-from laiser.llm_models.llm_router import llm_router
 import json
 import re
 from typing import List
 
 from dotenv import load_dotenv
 load_dotenv()
+from laiser.llm_models.llm_router import LLMRouter
 
 def _parse_skills_from_response( response: str) -> List[str]:
         if not response or not response.strip():
@@ -125,16 +124,13 @@ def run_skill_extractor_smoke():
         }}
         """
 
-    response = llm_router(standard_prompt, "openai", False, None, 
-                                None,os.getenv("OPENAI_API_KEY"))
-    print(response)
+    router = LLMRouter( model_id="gemini",
+        use_gpu=False,
+        api_key=os.getenv("GEMINI_API_KEY"))
+    response = router.generate(standard_prompt)
     skills = _parse_skills_from_response(response)
     print(skills)
     
-
-    
-
-
 @pytest.mark.llm_cloud
 def test_cloud_llm():
     # Skip cleanly if API key not present

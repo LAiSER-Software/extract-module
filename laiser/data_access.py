@@ -58,6 +58,8 @@ TODO:
 
 import os
 import requests
+import io
+import certifi
 import pandas as pd
 import faiss
 import numpy as np
@@ -94,24 +96,43 @@ class DataAccessLayer:
             self.embedding_model = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
         return self.embedding_model
     
+
+    # -------------------------
+    # Helper: fetch CSV via requests + certifi
+    # -------------------------
+    def _fetch_csv_via_requests(self, url: str, timeout: int = 30) -> pd.DataFrame:
+        """Fetch a CSV over HTTPS using requests + certifi and return a pandas DataFrame.
+
+        Honors LAISER_SKIP_ONLINE=1 for offline tests (returns empty DataFrame).
+        """
+        try:
+            resp = requests.get(url, timeout=timeout, verify=certifi.where())
+            resp.raise_for_status()
+            return pd.read_csv(io.StringIO(resp.text))
+        except requests.exceptions.RequestException as e:
+            # Keep same exception behavior as the rest of your codebase
+            raise LAiSERError(f"Failed to fetch CSV from {url}: {e}")
+
+    # -------------------------
+    # Taxonomy loaders (use helper)
+    # -------------------------
     def load_esco_skills(self) -> pd.DataFrame:
-        """Load ESCO skills taxonomy data"""
+        """Load ESCO skills taxonomy data (fetched with certifi-verified requests)."""
         if self._esco_df is None:
             try:
-                self._esco_df = pd.read_csv(ESCO_SKILLS_URL)
+                self._esco_df = self._fetch_csv_via_requests(ESCO_SKILLS_URL)
             except Exception as e:
                 raise LAiSERError(f"Failed to load ESCO skills data: {e}")
         return self._esco_df
-    
+
     def load_osn_skills(self) -> pd.DataFrame:
-        """Load OSN skills taxonomy data"""
+        """Load OSN skills taxonomy data (fetched with certifi-verified requests)."""
         if self._osn_df is None:
             try:
-                self._osn_df = pd.read_csv(OSN_SKILLS_URL)
+                self._osn_df = self._fetch_csv_via_requests(OSN_SKILLS_URL)
             except Exception as e:
                 raise LAiSERError(f"Failed to load OSN skills data: {e}")
         return self._osn_df
-    
     def load_skill_metadata(self,file_path: str) -> pd.DataFrame:
         """Load skills metadata JSON generated during FAISS index build"""
         if self._combined_df is None:
@@ -131,7 +152,6 @@ class DataAccessLayer:
 
         return self._combined_df
 
-
     def load_combined_skills(self) -> pd.DataFrame:
         """Load combined skills taxonomy data"""
         if self._combined_df is None:
@@ -141,38 +161,6 @@ class DataAccessLayer:
                 raise LAiSERError(f"Failed to load combined skills data: {e}")
         return self._combined_df
 
-    def get_skill_label_to_tag_mapping(self) -> Dict[str, str]:
-        """Create mapping from SkillLabel to SkillTag"""
-        combined_df = self.load_combined_skills()
-        if combined_df is None or combined_df.empty:
-            return {}
-
-        # Create mapping from SkillLabel to SkillTag
-        mapping = {}
-        for _, row in combined_df.iterrows():
-            skill_label = str(row.get('SkillLabel', '')).strip()
-            skill_tag = str(row.get('SkillTag', '')).strip()
-            if skill_label and skill_tag:
-                mapping[skill_label] = skill_tag
-
-        return mapping
-
-    def get_skill_tag_to_label_mapping(self) -> Dict[str, str]:
-        """Create mapping from SkillTag to SkillLabel"""
-        combined_df = self.load_combined_skills()
-        if combined_df is None or combined_df.empty:
-            return {}
-
-        # Create mapping from SkillTag to SkillLabel
-        mapping = {}
-        for _, row in combined_df.iterrows():
-            skill_label = str(row.get('SkillLabel', '')).strip()
-            skill_tag = str(row.get('SkillTag', '')).strip()
-            if skill_label and skill_tag:
-                mapping[skill_tag] = skill_label
-
-        return mapping
-    
     def build_faiss_index(self, text: List[str]) -> faiss.IndexFlatIP:
         """Build FAISS index for given skill names"""
         try:
@@ -247,7 +235,7 @@ class FAISSIndexManager:
     
     # Issue: Do we even need this? Can't this be done in init
     # Issue [GFI_OddEven]: Split these into two seperate modules load and build index
-    def initialize_index(self, force_rebuild: bool = False, debug: bool = True ) -> faiss.IndexFlatIP:
+    def initialize_index(self, force_rebuild: bool = False, debug: bool = False ) -> faiss.IndexFlatIP:
         """Initialize FAISS index (load or build)"""
 
         # Issue [GFI_HelloWorld]: config this not hardcode
@@ -255,7 +243,7 @@ class FAISSIndexManager:
         local_index_path = script_dir / "public" / "skills_v04.index"
         local_json_path = script_dir / "public" / "skills_df.json" 
         local_npy_path = script_dir / "public" / "skill_embeddings.npy"
-        local_combined_csv_path = script_dir / "public" / "combined.csv"
+        local_combined_csv_path = script_dir / "public" / "faiss_skills.csv"
         if not force_rebuild:
             
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
@@ -272,6 +260,8 @@ class FAISSIndexManager:
 
         esco_df = self.data_access.load_esco_skills()
         osn_df = self.data_access.load_osn_skills()
+
+        
         # === Standardize columns ===
         esco_df = esco_df[['preferredLabel','altLabels', 'description','conceptUri']].copy()
         esco_df = esco_df.rename(columns={'preferredLabel': 'skill', 'description': 'description', 'conceptUri': 'source_url','altLabels': 'addtional_notes' })
@@ -288,14 +278,105 @@ class FAISSIndexManager:
         combined['addtional_notes'] = combined['addtional_notes'].fillna('')
 
         combined = combined.dropna(subset=['skill'])
-        combined.to_csv(local_combined_csv_path,index=True,encoding="utf-8")
-        combined['text'] = (
-            combined['skill'].astype('string').str.strip() + ' | ' +
-            combined['description'].astype('string').str.strip() + ' | ' +
-            combined['addtional_notes'].astype('string').str.strip()
-        )
 
-        self.index, self.embeddings = (self.data_access.build_faiss_index(combined['text'].tolist()))
+        # --- Attempt to read a prebuilt combined CSV if it exists; otherwise use the combined built above.
+        single_df = None
+        try:
+            if Path(local_combined_csv_path).exists():
+                single_df = pd.read_csv(local_combined_csv_path, dtype=str)
+
+                # drop pandas-created 'Unnamed:*' index columns if present
+                single_df = single_df.loc[:, ~single_df.columns.str.match(r'^Unnamed')]
+
+                # check for raw or normalized headers
+                raw_cols = {'skill_name', 'aliases', 'description', 'original_id'}
+                normalized_cols = {'skill', 'addtional_notes', 'description', 'source_url'}
+                cols_set = set(single_df.columns)
+
+                if raw_cols.issubset(cols_set):
+                    # raw incoming CSV
+                    single_df = single_df[['skill_name', 'aliases', 'description', 'original_id']].copy()
+                    single_df = single_df.rename(
+                        columns={
+                            'skill_name': 'skill',
+                            'aliases': 'addtional_notes',
+                            'original_id': 'source_url'
+                        }
+                    )
+                elif normalized_cols.issubset(cols_set):
+                    # already-normalized CSV (from previous run)
+                    single_df = single_df[['skill', 'addtional_notes', 'description', 'source_url']].copy()
+                else:
+                    # conservative fallback: try to map by substrings (skill & description are required)
+                    def _find(col_substrs):
+                        for sub in col_substrs:
+                            for c in single_df.columns:
+                                if sub in c.lower():
+                                    return c
+                        return None
+
+                    cand_skill = _find(['skill', 'name', 'title'])
+                    cand_alias = _find(['alias', 'alt', 'keyword', 'keywords'])
+                    cand_desc = _find(['desc', 'description', 'statement'])
+                    cand_orig = _find(['original', 'orig', 'id', 'url', 'source'])
+
+                    mapped = {}
+                    if cand_skill:
+                        mapped[cand_skill] = 'skill'
+                    if cand_alias:
+                        mapped[cand_alias] = 'addtional_notes'
+                    if cand_desc:
+                        mapped[cand_desc] = 'description'
+                    if cand_orig:
+                        mapped[cand_orig] = 'source_url'
+
+                    if 'skill' in mapped.values() and 'description' in mapped.values():
+                        single_df = single_df[list(mapped.keys())].rename(columns=mapped).copy()
+                        # ensure missing expected columns exist so downstream code doesn't KeyError
+                        for col in ['addtional_notes', 'source_url']:
+                            if col not in single_df.columns:
+                                single_df[col] = pd.NA
+                    else:
+                        # couldn't map confidently — fall back to esco/osn combined
+                        single_df = None
+
+                if single_df is not None:
+                    single_df['source'] = 'ONet'
+                    # follow same cleaning logic as before
+                    for c in ['skill', 'description', 'source_url', 'addtional_notes']:
+                        single_df[c] = single_df[c].astype('string').str.strip()
+                    single_df = single_df.replace({'': pd.NA})
+                    single_df['addtional_notes'] = single_df['addtional_notes'].fillna('')
+                    single_df = single_df.dropna(subset=['skill']).reset_index(drop=True)
+                    combined = single_df.copy()
+        except Exception as e:
+            if debug:
+                logger.warning(f"[initialize_index] Could not use {local_combined_csv_path}: {e}")
+            # leave `combined` as the esco/osn combo
+
+        # Save/overwrite combined CSV (minimal change: avoid keeping old index column)
+        try:
+            combined.to_csv(local_combined_csv_path, index=False, encoding="utf-8")
+        except Exception:
+            # non-fatal: continue without failing initialization
+            if debug:
+                logger.warning(f"[initialize_index] Failed to write combined CSV to {local_combined_csv_path}")
+
+        # --- sanitize text column: replace pd.NA, trim, and drop rows with empty text ---
+        combined['description'] = combined['description'].fillna('').astype('string').str.strip()
+        combined['addtional_notes'] = combined['addtional_notes'].fillna('').astype('string').str.strip()
+        combined['skill'] = combined['skill'].fillna('').astype('string').str.strip()
+
+        combined['text'] = (
+            combined['skill'] + ' | ' +
+            combined['description'] + ' | ' +
+            combined['addtional_notes']
+        ).astype('string')
+        # Remove rows where text is empty after trimming
+        combined['text'] = combined['text'].fillna('').str.strip()
+        combined = combined[combined['text'] != ''].reset_index(drop=True)
+
+        self.index, self.embeddings = self.data_access.build_faiss_index(combined['text'].tolist())
         
         meta_df = combined[['skill', 'description', 'addtional_notes', 'source', 'source_url', 'text']].copy()
         self.metadata = meta_df
@@ -306,7 +387,7 @@ class FAISSIndexManager:
         # Issue [GFI_OOPS]: config this not hardcode
         np.save(local_npy_path, self.embeddings)
 
-        return self.index, self.metadata 
+        return self.index, self.metadata
 
     def get_metadata(self):
         """
