@@ -321,8 +321,9 @@ class SkillExtractorRefactored:
                                 self.tokenizer, self.model, self.api_key)
         cleaned = response.split("### CLEANED JOB DESCRIPTION:")[-1].strip()
         return cleaned
+        
     def skill_extraction_prompt(self, cleaned_description):
-        prompt = f"""
+        standard_prompt = f"""
         task: "Skill Extraction from Job Descriptions"
 
         description: |
@@ -335,6 +336,13 @@ class SkillExtractorRefactored:
         - Exclude company policies, benefit programs, HR or legal statements, and generic terms (e.g., "communication," "leadership") unless used in a technical/professional context.
         - Use only concise skill phrases (prefer noun phrases, avoid sentences).
         - Do not invent new skills or make assumptions beyond the provided text.
+
+        examples:
+        Example 1 (Focus: Soft Skills & Communication) Input: "Strong verbal and written communication skills, with the ability to explain complex technical concepts clearly to both technical and non-technical audiences. Confident presenter, capable of articulating insights, results, and strategies to stakeholders." Output: ['Strong verbal and written communication skills', 'explain complex technical concepts', 'Confident presenter', 'capable of articulating insights']
+
+        Example 2 (Focus: Math & Technical Background) Input: "Qualified candidates will have a strong mathematical background (statistics, linear algebra, calculus, probability, and optimization). Experience with deep learning, natural language processing, or application of large language models is preferred." Output: ['Strong mathematical background', 'statistics, linear algebra, calculus, probability, and optimization', 'deep learning', 'natural language processing', 'application of large language models']
+
+        Example 3 (Focus: Core Responsibilities) Input: "Lead the research, design, implementation, and deployment of Machine Learning algorithms. Assist and enable C3 AI’s federal customers to build their own applications on the C3 AI Suite. Contribute to the design of new features." Output: ['Lead the research, design, implementation, and deployment of Machine Learning algorithms', 'Assist and enable C3 AI’s federal customers to build their own applications on the C3 AI Suite.', 'Contribute to the design and implementation of new features of the C3 AI Suite.']
 
         formatting_rules:
         - Return the output as valid JSON.
@@ -354,7 +362,7 @@ class SkillExtractorRefactored:
         ]
         }}
         """
-        return prompt
+        return standard_prompt
 
     def extract_and_map_skills(self,input_data,text_columns):
         # 1. Clean job description (build text from dict)
