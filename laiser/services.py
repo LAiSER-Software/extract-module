@@ -18,6 +18,8 @@ from laiser.config import (
     KSA_EXTRACTION_PROMPT,
     KSA_DETAILS_PROMPT
 )
+from laiser.llm_models.llm_router import LLMRouter
+from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K
 from laiser.exceptions import SkillExtractionError, InvalidInputError
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
 
@@ -28,10 +30,11 @@ class PromptBuilder:
     """Builds prompts for different types of skill extraction tasks"""
     
     @staticmethod
-    def build_skill_extraction_prompt(input_text: Dict[str, str], input_type: str) -> str:
+    def build_skill_extraction_prompt(input_text: str, input_type: str) -> str:
         """Build prompt for basic skill extraction"""
         if input_type == "job_desc":
-            return SKILL_EXTRACTION_PROMPT_JOB.format(query=input_text.get("description", ""))
+            extraction_prompt = SKILL_EXTRACTION_PROMPT_JOB.format(description=input_text)
+            return extraction_prompt
         elif input_type == "syllabus":
             return SKILL_EXTRACTION_PROMPT_SYLLABUS.format(
                 description=input_text.get("description", ""),
@@ -83,11 +86,98 @@ class PromptBuilder:
             num_key_kr=num_key_kr,
             num_key_tas=num_key_tas
         )
+    
+    def strong_preprocessing_prompt(self,raw_description):
+        prompt = f"""
+    You are a data preprocessing assistant trained to clean job descriptions for skill extraction.
 
+    Your task is to remove the following from the text:
+    - Company names, slogans, branding language
+    - Locations, phone numbers, email addresses, URLs
+    - Salary information, job ID, dates, scheduling info (e.g. 9am-5pm, weekends required)
+    - HR/legal boilerplate (EEO, diversity statements, veteran status, disability policies)
+    - Culture fluff like "fun environment", "fast-paced", "initiative", "self-motivated", "join us", "own your tomorrow", "apply now"
+    - Internal team names or product names (e.g. ACE, THD, IMT)
+    - Benefits sections (e.g. health & wellness, sabbatical, 401k, maternity, vacation)
+
+    Your output must *only retain the task-related job duties, technical responsibilities, required skills, qualifications, and tools* without rephrasing.
+
+    Input:
+    \"\"\"
+    {raw_description}
+    \"\"\"
+
+    Return only the cleaned job description.
+    ### CLEANED JOB DESCRIPTION:
+    """
+
+    ## ISSUE: Fix llm router params
+        response = llm_router(prompt, self.model_id, self.use_gpu, self.llm, 
+                                self.tokenizer, self.model, self.api_key)
+        cleaned = response.split("### CLEANED JOB DESCRIPTION:")[-1].strip()
+        return cleaned
+      
 
 class ResponseParser:
     """Parses responses from LLM models"""
     
+    @staticmethod
+    def _parse_skills_from_response(response: str) -> List[str]:
+        if not response or not response.strip():
+            return []
+
+        fragments: List[str] = []
+        stripped = response.strip()
+
+        code_match = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL)
+        if code_match:
+            fragments.append(code_match.group(1).strip())
+
+        brace_match = re.search(r"\{.*?\}", stripped, re.DOTALL)
+        if brace_match:
+            fragments.append(brace_match.group(0).strip())
+
+        list_match = re.search(r"\[.*?\]", stripped, re.DOTALL)
+        if list_match:
+            fragments.append(list_match.group(0).strip())
+
+        fragments.append(stripped)
+
+        seen = set()
+        for fragment in fragments:
+            if not fragment or fragment in seen:
+                continue
+            seen.add(fragment)
+            for candidate in (fragment,):
+                try:
+                    loaded = json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
+                if isinstance(loaded, dict):
+                    skills = loaded.get("skills")
+                    if isinstance(skills, list):
+                        return [str(s).strip() for s in skills if str(s).strip()]
+                elif isinstance(loaded, list):
+                    return [str(s).strip() for s in loaded if str(s).strip()]
+
+        quoted_skills = re.findall(r"\"([^\"]{1,100})\"", stripped)
+        if quoted_skills:
+            cleaned = []
+            for skill in quoted_skills:
+                skill = skill.strip()
+                if not skill:
+                    continue
+                if not (1 <= len(skill.split()) <= 5):
+                    continue
+                if skill.lower().startswith("skills"):
+                    continue
+                cleaned.append(skill)
+            if cleaned:
+                return cleaned
+
+        return []
+
     @staticmethod
     def parse_skill_extraction_response(response: str) -> List[str]:
         """Parse basic skill extraction response"""
@@ -323,17 +413,127 @@ class SkillAlignmentService:
 class SkillExtractionService:
     """Main service for skill extraction operations"""
     
-    def __init__(self):
-        print("Initalisng skill extraction service")
+    def __init__(
+        self,
+        model_id: Optional[str] = None, 
+        hf_token: Optional[str] = None,
+        api_key: Optional[str] = None, 
+        use_gpu: Optional[bool] = None
+        ):
+
+        self.model_id = model_id
+        self.hf_token = hf_token
+        self.api_key = api_key
+        self.use_gpu = use_gpu if use_gpu is not None else torch.cuda.is_available()
+        self.llm = None
+        self.tokenizer = None
+        self.model = None
+        self.nlp = None
         self.data_access = DataAccessLayer()
         self.faiss_manager = FAISSIndexManager(self.data_access)
         self.alignment_service = SkillAlignmentService(self.data_access, self.faiss_manager)
         self.prompt_builder = PromptBuilder()
+        self.llm_parser = ResponseParser()
         self.response_parser = ResponseParser()
+        self.router = LLMRouter(self.model_id, self.use_gpu, self.hf_token, self.api_key)
+
         # Initialize FAISS index
         self.faiss_manager.initialize_index(force_rebuild=False)
-        print("done Initalisng skill extraction service")
     
+    def extract_and_align_core(
+        self,
+        data: pd.DataFrame,
+        id_column: str = 'Research ID',
+        text_columns: List[str] = None,
+        input_type: str = "job_desc",
+        top_k: Optional[int] = None,
+        similarity_threshold: Optional[float] = None,
+        levels: bool = False,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        warnings: bool = True
+    ) -> pd.DataFrame:
+        """
+        Extract and align skills from a dataset (main interface method).
+        
+        This method maintains backward compatibility with the original API.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        id_column : str
+            Column name for document IDs
+        text_columns : List[str]
+            Column names containing text data
+        input_type : str
+            Type of input data
+        top_k : int, optional
+            Maximum number of aligned skills to return per document (default: 25)
+        similarity_threshold : float, optional
+            Minimum similarity score for a match to be included (default: 0.20).
+            Higher values = stricter matching, fewer results.
+            Lower values = more lenient matching, more results.
+        levels : bool
+            Whether to extract skill levels
+        batch_size : int
+            Batch size for processing
+        warnings : bool
+            Whether to show warnings
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with extracted and aligned skills
+        """
+        if text_columns is None:
+            text_columns = ["description"]
+        
+        # Apply defaults for top_k and similarity_threshold
+        effective_top_k = top_k if top_k is not None else DEFAULT_TOP_K
+        effective_threshold = similarity_threshold if similarity_threshold is not None else 0.20
+        
+        try:
+            results = []
+            
+            for idx, row in data.iterrows():
+                try:
+                    # Prepare input data
+                    input_data = {col: row.get(col, '') for col in text_columns}
+                    input_data['id'] = row.get(id_column, str(idx))
+                    skills = self.extract_raw_llm_skills(input_data, text_columns)
+                    full_description = ' '.join([str(input_data.get(col, '')) for col in text_columns])
+                    aligned_df = self.align_extracted_skills(
+                        skills, 
+                        str(input_data['id']), 
+                        full_description,
+                        similarity_threshold=effective_threshold,
+                        top_k=effective_top_k
+                    )
+
+                    results.extend(aligned_df.to_dict('records'))
+        
+                except Exception as e:
+                    if warnings:
+                        print(f"Warning: Failed to process row {idx}: {e}")
+                    continue
+            df = pd.DataFrame(results)
+            df.to_csv("skills_alignment_results.csv", index=False, encoding="utf-8")
+            return pd.DataFrame(df)
+            
+        except Exception as e:
+            raise LAiSERError(f"Batch extraction failed: {e}")
+
+    def extract_raw_llm_skills(self,input_data,text_columns):
+        
+        text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
+        extraction_prompt = self.prompt_builder.build_skill_extraction_prompt(input_text=text_blob,input_type="job_desc")
+        response = self.router.generate(extraction_prompt)
+        skills = self.llm_parser._parse_skills_from_response(response)
+        if not skills:
+            preview = response.strip().replace("\n", " ")[:200]
+            print(f"Warning: failed to parse skills from response: {preview}")
+        return skills
+
     def align_extracted_skills(self, raw_skills: List[str], document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = DEFAULT_TOP_K) -> pd.DataFrame:
         """
         Align extracted skills to taxonomy.
@@ -368,69 +568,3 @@ class SkillExtractionService:
         return self.alignment_service.align_skills_to_taxonomy(
             raw_skills, document_id, description, similarity_threshold, top_k
         )
-       
-    def extract_skills_basic(
-        self, 
-        input_data: Union[str, Dict[str, str]], 
-        input_type: str = "job_desc"
-    ) -> List[str]:
-        """Extract basic skills from text using simple extraction"""
-        try:
-            if isinstance(input_data, str):
-                input_data = {"description": input_data}
-            
-            prompt = self.prompt_builder.build_skill_extraction_prompt(input_data, input_type)
-            # Note: This would need to be connected to the actual LLM inference
-            # For now, returning empty list as placeholder
-            result = []
-            
-            # Ensure we always return a list, never None
-            return result if result is not None else []
-        except Exception as e:
-            print(f"Warning: Skill extraction failed: {e}")
-            return []
-    
-    def extract_skills_with_ksa(
-        self,
-        input_data: Union[str, Dict[str, str]],
-        input_type: str = "job_desc",
-        num_skills: int = 5,
-        num_knowledge: str = "3-5",
-        num_abilities: str = "3-5"
-    ) -> List[Dict[str, Any]]:
-        """Extract skills with Knowledge, Skills, Abilities details"""
-        try:
-            if isinstance(input_data, str):
-                input_data = {"description": input_data}
-            
-            # Build prompt without ESCO skills context
-            prompt = self.prompt_builder.build_ksa_extraction_prompt(
-                input_data, input_type, num_skills, num_knowledge, num_abilities, None
-            )
-            
-            # Note: This would need to be connected to the actual LLM inference
-            # For now, returning empty list as placeholder
-            result = []
-            
-            # Ensure we always return a list, never None
-            return result if result is not None else []
-        except Exception as e:
-            print(f"Warning: KSA extraction failed: {e}")
-            return []
-    
-    def get_skill_details(
-        self, 
-        skill: str, 
-        context: str, 
-        num_knowledge: int = 3, 
-        num_abilities: int = 3
-    ) -> Tuple[List[str], List[str]]:
-        """Get detailed KSA information for a specific skill"""
-        prompt = self.prompt_builder.build_ksa_details_prompt(
-            skill, context, num_knowledge, num_abilities
-        )
-        
-        # Note: This would need to be connected to the actual LLM inference
-        # For now, returning empty lists as placeholder
-        return [], []
-    
