@@ -20,7 +20,7 @@ from laiser.config import (
 )
 from laiser.llm_models.llm_router import LLMRouter
 from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K
-from laiser.exceptions import SkillExtractionError, InvalidInputError
+from laiser.exceptions import SkillExtractionError, InvalidInputError, LAiSERError
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
 
 import logging
@@ -304,7 +304,8 @@ class SkillAlignmentService:
         description: str = '',
         similarity_threshold: float = 0.20,
         top_k: int = DEFAULT_TOP_K,
-        debug: bool = False
+        debug: bool = False,
+        allowed_sources: Optional[List[str]] = None
     ) -> pd.DataFrame:
         mapped_skills = []
         raw_skills_matched = []
@@ -332,7 +333,7 @@ class SkillAlignmentService:
             query_vec = model.encode([skill], normalize_embeddings=True)
 
             results = self.faiss_manager.search_similar_skills(
-                np.array(query_vec).astype("float32"), top_k=1
+                np.array(query_vec).astype("float32"), top_k=1,allowed_sources = allowed_sources
             )
             log_debug(f"[skill {i}] results={results}")
 
@@ -365,7 +366,7 @@ class SkillAlignmentService:
 
             # handle possible key casing differences
             taxonomy_description = meta.get("description", meta.get("Description", ""))
-            taxonomy_source = meta.get("source", meta.get("Source", ""))
+            taxonomy_source = meta.get("taxonomy", meta.get("taxonomy", ""))
 
             log_debug(
                 f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}"
@@ -450,7 +451,8 @@ class SkillExtractionService:
         similarity_threshold: Optional[float] = None,
         levels: bool = False,
         batch_size: int = DEFAULT_BATCH_SIZE,
-        warnings: bool = True
+        warnings: bool = True,
+        allowed_sources: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """
         Extract and align skills from a dataset (main interface method).
@@ -488,6 +490,13 @@ class SkillExtractionService:
         if text_columns is None:
             text_columns = ["description"]
         
+
+        # --- input validation: ensure `data` is a DataFrame and not None ---
+        if data is None:
+            raise InvalidInputError("extract_and_align_core: `data` is None. Please pass a pandas.DataFrame with rows to process.")
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame(data)
+
         # Apply defaults for top_k and similarity_threshold
         effective_top_k = top_k if top_k is not None else DEFAULT_TOP_K
         effective_threshold = similarity_threshold if similarity_threshold is not None else 0.20
@@ -507,7 +516,8 @@ class SkillExtractionService:
                         str(input_data['id']), 
                         full_description,
                         similarity_threshold=effective_threshold,
-                        top_k=effective_top_k
+                        top_k=effective_top_k,
+                        allowed_sources = allowed_sources
                     )
 
                     results.extend(aligned_df.to_dict('records'))
@@ -534,7 +544,7 @@ class SkillExtractionService:
             print(f"Warning: failed to parse skills from response: {preview}")
         return skills
 
-    def align_extracted_skills(self, raw_skills: List[str], document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = DEFAULT_TOP_K) -> pd.DataFrame:
+    def align_extracted_skills(self, raw_skills: List[str], document_id: str = '0',description: str = '',similarity_threshold: float = 0.20,top_k: int = DEFAULT_TOP_K,allowed_sources: Optional[List[str]] = None,) -> pd.DataFrame:
         """
         Align extracted skills to taxonomy.
         
@@ -566,5 +576,5 @@ class SkillExtractionService:
             raw_skills = [str(raw_skills)] if raw_skills else []
         
         return self.alignment_service.align_skills_to_taxonomy(
-            raw_skills, document_id, description, similarity_threshold, top_k
+            raw_skills, document_id, description, similarity_threshold, top_k,allowed_sources
         )
