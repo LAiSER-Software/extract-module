@@ -106,7 +106,8 @@ class SkillExtractorRefactored:
         similarity_threshold: Optional[float] = None,
         levels: bool = False,
         batch_size: int = DEFAULT_BATCH_SIZE,
-        warnings: bool = False
+        warnings: bool = False,
+        allowed_sources: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """
         Extract and align skills from a dataset (main interface method).
@@ -141,6 +142,7 @@ class SkillExtractorRefactored:
         pd.DataFrame
             DataFrame with extracted and aligned skills
         """
+        print("data is passed", data)
         return self.skill_service.extract_and_align_core(
         data=data,
         id_column=id_column,
@@ -151,6 +153,7 @@ class SkillExtractorRefactored:
         levels=levels,
         batch_size=batch_size,
         warnings=warnings,
+        allowed_sources = allowed_sources
     )
 
 Skill_Extractor = SkillExtractorRefactored

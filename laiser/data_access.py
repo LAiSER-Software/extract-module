@@ -235,15 +235,23 @@ class FAISSIndexManager:
     
     # Issue: Do we even need this? Can't this be done in init
     # Issue [GFI_OddEven]: Split these into two seperate modules load and build index
-    def initialize_index(self, force_rebuild: bool = False, debug: bool = False ) -> faiss.IndexFlatIP:
-        """Initialize FAISS index (load or build)"""
+    def initialize_index(self, force_rebuild: bool = False, debug: bool = False) -> faiss.IndexFlatIP:
+        """Initialize FAISS index (load or build).
 
-        # Issue [GFI_HelloWorld]: config this not hardcode
+        Behavior (minimal & strict):
+        - If index + metadata JSON exist and force_rebuild is False -> load & return.
+        - Else prefer a prebuilt CSV at public/faiss_skills.csv (must contain a 'taxonomy' column).
+        - If CSV missing, fallback to fetching ESCO + OSN and set taxonomy values accordingly.
+        - Do NOT infer taxonomy for CSV rows — if CSV is missing 'taxonomy' raise LAiSERError.
+        - Persist metadata JSON, FAISS index, and embeddings (npy) to public/.
+        """
         script_dir = Path(__file__).parent
         local_index_path = script_dir / "public" / "skills_v04.index"
-        local_json_path = script_dir / "public" / "skills_df.json" 
+        local_json_path = script_dir / "public" / "skills_df.json"
         local_npy_path = script_dir / "public" / "skill_embeddings.npy"
         local_combined_csv_path = script_dir / "public" / "faiss_skills.csv"
+
+        # 1) Try to load existing index + metadata unless force_rebuild requested
         if not force_rebuild:
             
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
@@ -252,140 +260,220 @@ class FAISSIndexManager:
                 self.metadata = self.data_access.load_skill_metadata(str(local_json_path))
             except Exception as e:
                 if debug:
-                    logger.warning(f"[initialize_index] Load failed, rebuilding: {e}")
-            
-            # Issue: Handle all casses where any file is missing and we can recreate those without force rebuild. Might also verify files available and then decide whether to rebuild or not.
+                    logger.warning(f"[initialize_index] load attempt failed: {e}")
+
             if self.index is not None and self.metadata is not None:
+                if debug:
+                    logger.debug("[initialize_index] loaded existing index + metadata")
                 return self.index, self.metadata
 
-        esco_df = self.data_access.load_esco_skills()
-        osn_df = self.data_access.load_osn_skills()
+        combined: Optional[pd.DataFrame] = None
 
-        
-        # === Standardize columns ===
-        esco_df = esco_df[['preferredLabel','altLabels', 'description','conceptUri']].copy()
-        esco_df = esco_df.rename(columns={'preferredLabel': 'skill', 'description': 'description', 'conceptUri': 'source_url','altLabels': 'addtional_notes' })
-        osn_df = osn_df[['RSD Name','Keywords','Skill Statement', 'Canonical URL']].copy()
-        osn_df = osn_df.rename(columns={'RSD Name': 'skill', 'Skill Statement': 'description', 'Canonical URL': 'source_url', 'Keywords': 'addtional_notes' })
-        esco_df['source'] = 'esco' 
-        osn_df['source'] = 'osn'    
-        combined = pd.concat([esco_df, osn_df], ignore_index=True)
+        # 2) Prefer a prebuilt combined CSV if present
+        if Path(local_combined_csv_path).exists():
+            single_df = pd.read_csv(local_combined_csv_path, dtype=str)
 
-        for c in ['skill', 'description', 'source_url', 'addtional_notes']:
-            combined[c] = combined[c].astype('string').str.strip()
-        combined = combined.replace({'': pd.NA})
+            # drop pandas-created 'Unnamed:*' index columns if present
+            single_df = single_df.loc[:, ~single_df.columns.str.match(r'^Unnamed')]
 
-        combined['addtional_notes'] = combined['addtional_notes'].fillna('')
+            cols_set = set(single_df.columns.str.lower())
 
-        combined = combined.dropna(subset=['skill'])
+            # CASE A: exact LAiSER export (skill_id, skill_name, aliases, description, taxonomy, original_id)
+            laiser_export_headers = {'skill_id', 'skill_name', 'aliases', 'description', 'taxonomy', 'original_id'}
+            if laiser_export_headers.issubset(cols_set):
+                # rename to canonical downstream names; DO NOT rename taxonomy
+                rename_map = {
+                    'skill_name': 'skill',
+                    'aliases': 'addtional_notes',
+                    'original_id': 'source_url'
+                }
+                # preserve existing 'taxonomy' column name (user requested)
+                # first lower-case incoming column names to find exact columns to rename
+                # build a mapping from actual column name -> canonical for present columns
+                actual_renames = {}
+                for k, v in rename_map.items():
+                    for col in single_df.columns:
+                        if col.lower() == k:
+                            actual_renames[col] = v
+                            break
+                single_df = single_df.rename(columns=actual_renames)
 
-        # --- Attempt to read a prebuilt combined CSV if it exists; otherwise use the combined built above.
-        single_df = None
-        try:
-            if Path(local_combined_csv_path).exists():
-                single_df = pd.read_csv(local_combined_csv_path, dtype=str)
+                # keep canonical set (if present)
+                keep_cols = []
+                for c in ['skill', 'addtional_notes', 'description', 'source_url', 'taxonomy']:
+                    # find actual column name (case-insensitive)
+                    found = next((col for col in single_df.columns if col.lower() == c), None)
+                    if found:
+                        keep_cols.append(found)
+                single_df = single_df[keep_cols].copy()
 
-                # drop pandas-created 'Unnamed:*' index columns if present
-                single_df = single_df.loc[:, ~single_df.columns.str.match(r'^Unnamed')]
+            # CASE B: already-normalized CSV (contains skill, addtional_notes, description, source_url) and optionally taxonomy
+            elif {'skill', 'addtional_notes', 'description', 'source_url'}.issubset(cols_set):
+                # select canonical columns and preserve taxonomy if present
+                cols = []
+                for c in ['skill', 'addtional_notes', 'description', 'source_url', 'taxonomy']:
+                    found = next((col for col in single_df.columns if col.lower() == c), None)
+                    if found:
+                        cols.append(found)
+                single_df = single_df[cols].copy()
 
-                # check for raw or normalized headers
-                raw_cols = {'skill_name', 'aliases', 'description', 'original_id'}
-                normalized_cols = {'skill', 'addtional_notes', 'description', 'source_url'}
-                cols_set = set(single_df.columns)
+            else:
+                # Heuristic mapping (best-effort) but require taxonomy column presence if we accept it.
+                def _find(cols_substr):
+                    for sub in cols_substr:
+                        for col in single_df.columns:
+                            if sub in col.lower():
+                                return col
+                    return None
 
-                if raw_cols.issubset(cols_set):
-                    # raw incoming CSV
-                    single_df = single_df[['skill_name', 'aliases', 'description', 'original_id']].copy()
-                    single_df = single_df.rename(
-                        columns={
-                            'skill_name': 'skill',
-                            'aliases': 'addtional_notes',
-                            'original_id': 'source_url'
-                        }
-                    )
-                elif normalized_cols.issubset(cols_set):
-                    # already-normalized CSV (from previous run)
-                    single_df = single_df[['skill', 'addtional_notes', 'description', 'source_url']].copy()
+                cand_skill = _find(['skill', 'name', 'title'])
+                cand_alias = _find(['alias', 'alt', 'keyword', 'keywords'])
+                cand_desc = _find(['desc', 'description', 'statement'])
+                cand_orig = _find(['original', 'orig', 'id', 'url'])
+                cand_tax = _find(['taxonomy', 'tax', 'source', 'provenance'])
+
+                mapped = {}
+                if cand_skill:
+                    mapped[cand_skill] = 'skill'
+                if cand_alias:
+                    mapped[cand_alias] = 'addtional_notes'
+                if cand_desc:
+                    mapped[cand_desc] = 'description'
+                if cand_orig:
+                    mapped[cand_orig] = 'source_url'
+                if cand_tax:
+                    # we will keep the original column name for taxonomy
+                    pass
+
+                if 'skill' in mapped.values() and 'description' in mapped.values():
+                    # include taxonomy if present in original CSV columns
+                    cols = list(mapped.keys())
+                    if cand_tax:
+                        cols.append(cand_tax)
+                    single_df = single_df[cols].rename(columns=mapped).copy()
+                    # ensure the optional expected cols exist
+                    for col in ['addtional_notes', 'source_url']:
+                        if col not in single_df.columns:
+                            single_df[col] = pd.NA
                 else:
-                    # conservative fallback: try to map by substrings (skill & description are required)
-                    def _find(col_substrs):
-                        for sub in col_substrs:
-                            for c in single_df.columns:
-                                if sub in c.lower():
-                                    return c
-                        return None
+                    # Can't confidently use the CSV
+                    single_df = None
 
-                    cand_skill = _find(['skill', 'name', 'title'])
-                    cand_alias = _find(['alias', 'alt', 'keyword', 'keywords'])
-                    cand_desc = _find(['desc', 'description', 'statement'])
-                    cand_orig = _find(['original', 'orig', 'id', 'url', 'source'])
+            if single_df is not None:
+                # Normalize string columns and require taxonomy exists
+                # Standardize column names to canonical lower-case keys where possible (but keep original taxonomy column name)
+                # First, find the actual taxonomy column name (case-insensitive)
+                taxonomy_col = next((col for col in single_df.columns if col.lower() == 'taxonomy'), None)
 
-                    mapped = {}
-                    if cand_skill:
-                        mapped[cand_skill] = 'skill'
-                    if cand_alias:
-                        mapped[cand_alias] = 'addtional_notes'
-                    if cand_desc:
-                        mapped[cand_desc] = 'description'
-                    if cand_orig:
-                        mapped[cand_orig] = 'source_url'
+                # If we couldn't find a taxonomy column, we must fail loudly (per your requirement)
+                if taxonomy_col is None:
+                    raise LAiSERError(
+                        f"Prebuilt CSV '{local_combined_csv_path}' must include a 'taxonomy' column (case-insensitive). "
+                        "Please add taxonomy values like 'ESCO' / 'OSN' / 'ONet'."
+                    )
 
-                    if 'skill' in mapped.values() and 'description' in mapped.values():
-                        single_df = single_df[list(mapped.keys())].rename(columns=mapped).copy()
-                        # ensure missing expected columns exist so downstream code doesn't KeyError
-                        for col in ['addtional_notes', 'source_url']:
-                            if col not in single_df.columns:
-                                single_df[col] = pd.NA
-                    else:
-                        # couldn't map confidently — fall back to esco/osn combined
-                        single_df = None
+                # Clean canonical fields (skill, addtional_notes, description, source_url) if present
+                for canonical in ['skill', 'addtional_notes', 'description', 'source_url']:
+                    col_found = next((col for col in single_df.columns if col.lower() == canonical), None)
+                    if col_found:
+                        single_df[col_found] = single_df[col_found].astype('string').str.strip()
 
-                if single_df is not None:
-                    single_df['source'] = 'ONet'
-                    # follow same cleaning logic as before
-                    for c in ['skill', 'description', 'source_url', 'addtional_notes']:
-                        single_df[c] = single_df[c].astype('string').str.strip()
-                    single_df = single_df.replace({'': pd.NA})
-                    single_df['addtional_notes'] = single_df['addtional_notes'].fillna('')
-                    single_df = single_df.dropna(subset=['skill']).reset_index(drop=True)
-                    combined = single_df.copy()
-        except Exception as e:
-            if debug:
-                logger.warning(f"[initialize_index] Could not use {local_combined_csv_path}: {e}")
-            # leave `combined` as the esco/osn combo
+                # Normalize taxonomy column values (trim only; preserve case choice but store lowercased variant later)
+                single_df[taxonomy_col] = single_df[taxonomy_col].astype('string').str.strip()
+                single_df = single_df.replace({'': pd.NA})
 
-        # Save/overwrite combined CSV (minimal change: avoid keeping old index column)
-        try:
-            combined.to_csv(local_combined_csv_path, index=False, encoding="utf-8")
-        except Exception:
-            # non-fatal: continue without failing initialization
-            if debug:
-                logger.warning(f"[initialize_index] Failed to write combined CSV to {local_combined_csv_path}")
+                # rename taxonomy column to exact canonical name 'taxonomy' (lowercase) for consistent downstream access
+                if taxonomy_col != 'taxonomy':
+                    single_df = single_df.rename(columns={taxonomy_col: 'taxonomy'})
 
-        # --- sanitize text column: replace pd.NA, trim, and drop rows with empty text ---
+                # Ensure addtional_notes exists
+                if 'addtional_notes' not in single_df.columns:
+                    single_df['addtional_notes'] = single_df.get('addtional_notes', pd.NA)
+
+                single_df['addtional_notes'] = single_df['addtional_notes'].fillna('')
+                single_df = single_df.dropna(subset=['skill']).reset_index(drop=True)
+
+                combined = single_df.copy()
+
+        # 3) If CSV not used or could not be used, fallback to fetching ESCO + OSN and combine
+        if combined is None:
+            esco_df = self.data_access.load_esco_skills()
+            osn_df = self.data_access.load_osn_skills()
+
+            # map and normalize ESCO
+            esco_df = esco_df[['preferredLabel', 'altLabels', 'description', 'conceptUri']].copy()
+            esco_df = esco_df.rename(columns={
+                'preferredLabel': 'skill',
+                'altLabels': 'addtional_notes',
+                'conceptUri': 'source_url',
+                'description': 'description'
+            })
+            esco_df['taxonomy'] = 'esco'
+
+            # map and normalize OSN
+            osn_df = osn_df[['RSD Name', 'Keywords', 'Skill Statement', 'Canonical URL']].copy()
+            osn_df = osn_df.rename(columns={
+                'RSD Name': 'skill',
+                'Keywords': 'addtional_notes',
+                'Skill Statement': 'description',
+                'Canonical URL': 'source_url'
+            })
+            osn_df['taxonomy'] = 'osn'
+
+            combined = pd.concat([esco_df, osn_df], ignore_index=True)
+
+            # Clean combined columns if present
+            for c in ['skill', 'description', 'source_url', 'addtional_notes', 'taxonomy']:
+                if c in combined.columns:
+                    combined[c] = combined[c].astype('string').str.strip()
+            combined = combined.replace({'': pd.NA})
+            combined['addtional_notes'] = combined['addtional_notes'].fillna('')
+            combined = combined.dropna(subset=['skill']).reset_index(drop=True)
+
+        # 4) Final sanitize and create text column
         combined['description'] = combined['description'].fillna('').astype('string').str.strip()
         combined['addtional_notes'] = combined['addtional_notes'].fillna('').astype('string').str.strip()
         combined['skill'] = combined['skill'].fillna('').astype('string').str.strip()
-
-        combined['text'] = (
-            combined['skill'] + ' | ' +
-            combined['description'] + ' | ' +
-            combined['addtional_notes']
-        ).astype('string')
-        # Remove rows where text is empty after trimming
+        combined['text'] = (combined['skill'] + ' | ' + combined['description'] + ' | ' + combined['addtional_notes']).astype('string')
         combined['text'] = combined['text'].fillna('').str.strip()
         combined = combined[combined['text'] != ''].reset_index(drop=True)
 
+        # 5) Build FAISS index
         self.index, self.embeddings = self.data_access.build_faiss_index(combined['text'].tolist())
-        
-        meta_df = combined[['skill', 'description', 'addtional_notes', 'source', 'source_url', 'text']].copy()
+
+        # Strict: require taxonomy column (do not infer)
+        if 'taxonomy' not in combined.columns:
+            raise LAiSERError(
+                "After building combined DataFrame, required 'taxonomy' column is missing. "
+                "Ensure input CSV or upstream source provides 'taxonomy'."
+            )
+
+        # Normalize taxonomy values to lowercase for consistent comparisons
+        combined['taxonomy'] = combined['taxonomy'].astype('string').str.strip().str.lower()
+
+        # Build metadata (canonical column order)
+        meta_df = combined[['skill', 'description', 'addtional_notes', 'taxonomy', 'source_url', 'text']].copy()
         self.metadata = meta_df
 
-        self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
-        self.data_access.save_faiss_index(self.index, str(local_index_path))
+        # Persist metadata JSON and FAISS index (best-effort with debug warnings)
+        try:
+            self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
+        except Exception as e:
+            if debug:
+                logger.warning(f"[initialize_index] Failed to write metadata JSON: {e}")
 
-        # Issue [GFI_OOPS]: config this not hardcode
-        np.save(local_npy_path, self.embeddings)
+        try:
+            self.data_access.save_faiss_index(self.index, str(local_index_path))
+        except Exception as e:
+            if debug:
+                logger.warning(f"[initialize_index] Failed to write FAISS index: {e}")
+
+        # Persist embeddings as npy (best-effort)
+        try:
+            np.save(local_npy_path, self.embeddings)
+        except Exception as e:
+            if debug:
+                logger.warning(f"[initialize_index] Failed to save embeddings npy: {e}")
 
         return self.index, self.metadata
 
@@ -398,21 +486,40 @@ class FAISSIndexManager:
                 "Metadata not initialized. Call initialize_index() first."
             )
         return self.metadata
+    
+    def search_similar_skills(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int = 25,
+        allowed_sources: Optional[List[str]] = None,
+        max_results: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Search for similar skills using FAISS index.
 
-    def search_similar_skills(self, query_embedding: np.ndarray, top_k: int = 25) -> List[Dict[str, Any]]:
-        """Search for similar skills using FAISS index"""
+        Behavior:
+        - If allowed_sources is None: return up to 'top_k' best matches (classic behavior).
+        - If allowed_sources is provided: return ALL matches whose metadata 'source' is in allowed_sources,
+          ordered by similarity. If you want a safety limit, pass `max_results` (int).
+        """
         if self.index is None:
             raise FAISSIndexError("FAISS index not initialized. Call initialize_index() first.")
 
+        if self.metadata is None:
+            raise FAISSIndexError("Metadata not initialized. Call initialize_index() first.")
+
+        # Ensure skill_names come from metadata
         if self.skill_names is None:
             try:
-                esco_df = self.data_access.load_esco_skills()
-                self.skill_names = esco_df["preferredLabel"].tolist()
+                if isinstance(self.metadata, pd.DataFrame):
+                    self.skill_names = self.metadata['skill'].astype(str).tolist()
+                elif isinstance(self.metadata, list):
+                    self.skill_names = [m.get('skill', '') for m in self.metadata]
+                else:
+                    self.skill_names = [str(r.get('skill','')) for r in list(self.metadata)]
             except Exception as e:
                 raise FAISSIndexError(f"Failed to load skill names for index: {e}")
 
         try:
-            # Ensure correct dtype/shape/layout
             q = np.asarray(query_embedding, dtype=np.float32)
             if q.ndim == 1:
                 q = q.reshape(1, -1)
@@ -428,29 +535,87 @@ class FAISSIndexManager:
                     f"Ensure DEFAULT_EMBEDDING_MODEL matches the model used to build the index."
                 )
 
-            # Normalize and cap top_k
             faiss.normalize_L2(q)
-            if getattr(self.index, "ntotal", 0) <= 0:
+
+            ntotal = int(getattr(self.index, "ntotal", 0))
+            if ntotal <= 0:
                 return []
-            top_k = max(1, min(int(top_k), int(self.index.ntotal)))
 
-            # Search
-            scores, indices = self.index.search(q, top_k)
-
-            results = []
-            for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
-                if idx == -1:
-                    continue  # FAISS may return -1 for padded results
-                if 0 <= idx < len(self.skill_names):
+            # ---------- No allowed_sources -> original behavior ----------
+            if not allowed_sources:
+                top_k = max(1, min(int(top_k), ntotal))
+                scores, indices = self.index.search(q, top_k)
+                results = []
+                for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
+                    if idx == -1:
+                        continue
                     results.append({
-                        "Skill": self.skill_names[idx],
+                        "Skill": self.skill_names[idx] if 0 <= idx < len(self.skill_names) else "",
                         "Similarity": float(score),
                         "Rank": rank,
                         "Index": int(idx)
                     })
+                return results
+
+            # ---------- Filtering by allowed_sources -> return ALL matches for those sources ----------
+            # Make allowed_sources case-insensitive set
+            allowed_lower = {s.lower() for s in allowed_sources}
+
+            # We'll request a candidate set large enough to cover the index.
+            # Practical choices:
+            #  - For guaranteed completeness: candidate_k = ntotal (get everything)
+            #  - Heuristic: candidate_k = min(ntotal, top_k * 10 + 500)
+            # Because user asked "don't block the number", we go for completeness by default.
+            candidate_k = ntotal
+
+            # If caller provided a max_results, we still fetch all candidates but will cap final returned list
+            scores, indices = self.index.search(q, candidate_k)
+
+            filtered = []
+            seen_idx = set()
+            for score, idx in zip(scores[0], indices[0]):
+                if idx == -1:
+                    continue
+                if idx in seen_idx:
+                    continue
+                seen_idx.add(int(idx))
+
+                # bounds check
+                if idx < 0 or idx >= len(self.skill_names):
+                    continue
+
+                # read source from metadata safely
+                try:
+                    if isinstance(self.metadata, pd.DataFrame):
+                        row = self.metadata.iloc[int(idx)]
+                        src = str(row.get('taxonomy', '')).strip()
+                    elif isinstance(self.metadata, list):
+                        src = str(self.metadata[int(idx)].get('taxonomy', '')).strip()
+                    else:
+                        src = str(self.metadata[int(idx)].get('taxonomy', '')).strip()
+                except Exception:
+                    src = ""
+
+                if src.lower() in allowed_lower:
+                    filtered.append((float(score), int(idx)))
+
+            # sort by similarity descending (FAISS returns best-first but after filtering order is preserved; still sort to be safe)
+            filtered.sort(key=lambda x: x[0], reverse=True)
+
+            # apply max_results cap if requested (optional safety)
+            if max_results is not None and isinstance(max_results, int):
+                filtered = filtered[:int(max_results)]
+
+            results = []
+            for rank, (score, idx) in enumerate(filtered, start=1):
+                results.append({
+                    "Skill": self.skill_names[idx],
+                    "Similarity": float(score),
+                    "Rank": rank,
+                    "Index": int(idx)
+                })
 
             return results
-        except Exception as e:
-            # Bubble up a helpful message
-            raise FAISSIndexError(f"Failed to search similar skills: {repr(e)}")
 
+        except Exception as e:
+            raise FAISSIndexError(f"Failed to search similar skills: {repr(e)}")

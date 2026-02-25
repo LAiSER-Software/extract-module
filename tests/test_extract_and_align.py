@@ -3,44 +3,13 @@ import pandas as pd
 import pytest
 
 from laiser.skill_extractor_refactored import SkillExtractorRefactored
+from tests.test_helpers import eda_on_results, sample_data
 
 from dotenv import load_dotenv
 load_dotenv()
 def run_skill_extractor_smoke():
-    data = pd.DataFrame([
-        {
-            "Research ID": "aetna_trainer_001",
-            "description": (
-                "POSITION SUMMARY: This position requires curriculum development, claim processing, "
-                "and provider data services experience.\n\n"
-                "RESPONSIBILITIES:\n"
-                "- Design and deliver training modules for new hires and existing staff.\n"
-                "- Collaborate with subject matter experts to create engaging learning materials.\n"
-                "- Review claims workflows and develop simulations for hands-on practice.\n"
-                "- Analyze provider data services to identify areas for process improvement.\n\n"
-                "QUALIFICATIONS:\n"
-                "- Bachelor's degree in Healthcare Administration, Education, or related field.\n"
-                "- 3+ years of experience in claims processing and curriculum development.\n"
-                "- Excellent communication and analytical skills."
-            )
-        },
-        {
-            "Research ID": "aetna_trainer_002",
-            "description": (
-                "Looking for someone with a strong technical training background and knowledge of "
-                "Medicaid state websites.\n\n"
-                "RESPONSIBILITIES:\n"
-                "- Conduct training sessions for teams navigating state Medicaid portals.\n"
-                "- Develop technical documentation and job aids for internal users.\n"
-                "- Troubleshoot common issues users face when accessing Medicaid websites.\n"
-                "- Coordinate with IT teams to ensure training content is up-to-date with policy changes.\n\n"
-                "QUALIFICATIONS:\n"
-                "- Experience in healthcare IT systems or state Medicaid platforms.\n"
-                "- Prior technical training or instructional design experience preferred.\n"
-                "- Strong problem-solving skills and ability to work with cross-functional teams."
-            )
-        },
-    ])
+    data = sample_data().iloc[[2]]
+    print(data)
 
     extractor = SkillExtractorRefactored(
         model_id="gemini",
@@ -59,7 +28,11 @@ def run_skill_extractor_smoke():
     assert results is not None
     assert len(results) > 0
     print(results)
+    summary, agg_df = eda_on_results(results, print_report=True)
+    print("\n--- Aggregated taxonomy stats ---")
+    print(agg_df)
 
+    
 
 @pytest.mark.library
 def test_skill_extractor_smoke():
