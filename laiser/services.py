@@ -440,6 +440,9 @@ class SkillExtractionService:
 
         # Initialize FAISS index
         self.faiss_manager.initialize_index(force_rebuild=False)
+
+        # Eager-load embedding model at service startup (instead of first align call)
+        self.data_access.get_embedding_model()
     
     def extract_and_align_core(
         self,
