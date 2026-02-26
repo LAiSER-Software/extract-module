@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 def run_skill_extractor_smoke():
     data = sample_data().iloc[[2]]
-    print(data)
 
     extractor = SkillExtractorRefactored(
         model_id="gemini",
