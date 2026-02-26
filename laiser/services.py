@@ -576,5 +576,10 @@ class SkillExtractionService:
             raw_skills = [str(raw_skills)] if raw_skills else []
         
         return self.alignment_service.align_skills_to_taxonomy(
-            raw_skills, document_id, description, similarity_threshold, top_k,allowed_sources
+            raw_skills,
+            document_id,
+            description,
+            similarity_threshold,
+            top_k,
+            allowed_sources=allowed_sources,
         )
