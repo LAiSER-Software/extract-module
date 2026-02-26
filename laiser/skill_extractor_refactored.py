@@ -77,7 +77,8 @@ class SkillExtractorRefactored:
         model_id: Optional[str] = None, 
         hf_token: Optional[str] = None,
         api_key: Optional[str] = None, 
-        use_gpu: Optional[bool] = None
+        use_gpu: Optional[bool] = None,
+        backend: Optional[str] = None
     ):
         """
         Initialize the skill extractor.
@@ -92,9 +93,11 @@ class SkillExtractorRefactored:
             API key for external services (e.g., Gemini)
         use_gpu : bool, optional
             Whether to use GPU for model inference
+        backend : str, optional
+            Backend to use for LLM inference (e.g., "llama_cpp", "huggingface", "openai", "gemini")
         """    
         # Initialize service layer
-        self.skill_service = SkillExtractionService(model_id = model_id,api_key=api_key,hf_token= hf_token,use_gpu=use_gpu  )
+        self.skill_service = SkillExtractionService(model_id = model_id,api_key=api_key,hf_token= hf_token,use_gpu=use_gpu, backend=backend)
         
     def extract_and_align(
         self,
@@ -142,6 +145,7 @@ class SkillExtractorRefactored:
         pd.DataFrame
             DataFrame with extracted and aligned skills
         """
+        print("data is passed", data)
         return self.skill_service.extract_and_align_core(
         data=data,
         id_column=id_column,
