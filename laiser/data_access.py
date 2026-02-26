@@ -501,8 +501,6 @@ class FAISSIndexManager:
         - If allowed_sources is provided: return ALL matches whose metadata 'source' is in allowed_sources,
           ordered by similarity. If you want a safety limit, pass `max_results` (int).
         """
-        # DEBUG: very small probe
-        print("DEBUG: search_similar_skills called. allowed_sources repr:", repr(allowed_sources), "type:", type(allowed_sources))
         if self.index is None:
             raise FAISSIndexError("FAISS index not initialized. Call initialize_index() first.")
 
