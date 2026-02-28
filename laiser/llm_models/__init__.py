@@ -10,6 +10,8 @@ try:
     from .llm_router import LLMRouter
     from .gemini import GeminiAPI
     from .hugging_face_llm import HuggingFaceLLM
+    from .llama_cpp_handler import LlamaCppBackend
+    
 except ImportError as e:
     # Handle missing dependencies gracefully
     import warnings
@@ -21,4 +23,6 @@ __all__ = [
     'LLMRouter',
     'GeminiAPI',
     'HuggingFaceLLM'
+    'LlamaCppBackend',
+
 ]
