@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dev-laiser"
+name = "laiser"
 dynamic = ["version"]
 description = "Leveraging Artificial Intelligence for Skills Extraction and Research"
 readme = "README.md"
