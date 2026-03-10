@@ -135,6 +135,69 @@ SKILL_EXTRACTION_PROMPT_JOB = """
         }}
       """
 
+COMBINED_EXTRACTION_PROMPT = """
+ You will receive a raw job description that may contain irrelevant content. Follow the two steps below internally, but ONLY output the result of Step 2.
+
+    ---
+
+    STEP 1 — INTERNAL FILTERING (do not include this in your output)
+    Mentally remove the following categories of content before extracting skills:
+    - Company names, slogans, mission statements, and branding language
+    - Locations, office addresses, phone numbers, email addresses, and URLs
+    - Salary ranges, compensation details, job IDs, and application deadlines
+    - Scheduling information (e.g. "9am-5pm", "weekends required")
+    - HR and legal boilerplate (EEO statements, diversity/inclusion statements, veteran status, disability disclosures, E-Verify notices)
+    - Culture and tone language ("fun environment", "fast-paced", "self-motivated", "join us", "own your tomorrow", "apply now")
+    - Internal team or product names used as proper nouns (e.g. ACE, THD, IMT)
+    - Benefits sections (health & wellness, 401k, parental leave, vacation, sabbatical, etc.)
+
+    Retain only: task-related job duties, technical responsibilities, required tools, qualifications, and domain knowledge.
+
+    ---
+
+    STEP 2 — SKILL EXTRACTION
+    From the filtered content identified in Step 1, extract only the concrete, job-relevant skills that are explicitly stated or strongly implied as required or preferred for the role.
+
+    Extraction rules:
+    - Include technical tools, programming languages, frameworks, methodologies, domain knowledge, and clearly-stated professional skills.
+    - Include a skill if it is clearly mentioned or strongly implied as necessary for the role.
+    - Exclude generic soft traits, company values, and general workplace behaviors unless used in a specific technical or professional context.
+    - Exclude generic terms (e.g. \"communication\", \"leadership\") unless applied in a concrete technical or domain-specific context.
+    - Use concise noun phrases only (1-5 words per skill). Do not use full sentences.
+    - Do not invent skills or make assumptions beyond what the text states.
+
+    Examples of correct extraction:
+    - Input: \"Experience with deep learning, natural language processing, or application of large language models is preferred.\"
+    Output skills: [\"deep learning\", \"natural language processing\", \"large language models\"]
+
+    - Input: \"Strong mathematical background (statistics, linear algebra, calculus, probability, and optimization).\"
+    Output skills: [\"statistics\", \"linear algebra\", \"calculus\", \"probability\", \"optimization\"]
+
+    - Input: \"Lead the research, design, implementation, and deployment of Machine Learning algorithms.\"
+    Output skills: [\"machine learning\", \"algorithm design\", \"model deployment\"]
+
+    ---
+
+    OUTPUT RULES:
+    - Return ONLY a valid JSON object. No explanation, no preamble, and do not include the cleaned text.
+    - The JSON must have exactly one key: \"skills\", whose value is a list of skill strings.
+    - Each skill string must be 1-5 words.
+
+    ### JOB DESCRIPTION:
+    \"\"\"
+    {description}
+    \"\"\"
+
+    ### OUTPUT:
+    {{
+    \"skills\": [
+        \"skill1\",
+        \"skill2\",
+        \"skill3\"
+    ]
+    }}
+"""
+
 ## ISSUE: Prompt for course syllabi
 SKILL_EXTRACTION_PROMPT_SYLLABUS = """ Work in progress"""
 KSA_EXTRACTION_PROMPT = """[INST]user
@@ -197,3 +260,8 @@ Respond strictly in valid JSON with the exact keys 'Knowledge Required' and 'Tas
 
 # File paths
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Llama CPP Configuration
+LLAMA_CPP_CTX = 8000
+LLAMA_CPP_THREADS = 40
+MODEL_PATH = "" # Update with actual model path
