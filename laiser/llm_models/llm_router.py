@@ -49,7 +49,6 @@ Rev No.     Date            Author              Description
 """
 
 import torch
-import spacy
 
 
 # Import with error handling for optional dependencies
@@ -71,9 +70,6 @@ except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
-import torch
-import spacy
-
 class LLMRouter:
 
     def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None):

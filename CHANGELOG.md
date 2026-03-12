@@ -56,7 +56,7 @@ This document outlines the changes between versions of the LAiSER (Leveraging Ar
 ## Version <0.2.0 (legacy)
 
 ### Core Functionality
-- Initial implementation of skill extraction using LLM or SkillNer
+- Initial implementation of skill extraction using LLM
 - Basic alignment of extracted skills with taxonomy using cosine similarity
 - Support for both job descriptions and syllabi data
 - GPU acceleration for LLM-based extraction
