@@ -66,7 +66,7 @@ The `Skill_Extractor` class in `skill_extractor.py` maintains backward compatibi
 #### Key Methods:
 
 - **__init__**: Initializes the extractor with model ID, token, and GPU settings. Loads necessary models and data.
-- **extract_raw**: Extracts raw skills from input text using LLM or SkillNer.
+- **extract_raw**: Extracts raw skills from input text using the configured LLM pipeline.
 - **align_skills**: Aligns extracted skills with the taxonomy using cosine similarity.
 - **extractor**: Main method that orchestrates the extraction and alignment process (NOW RETURNS 7-COLUMN FORMAT).
 - **get_top_esco_skills**: Retrieves top ESCO skills based on semantic similarity.

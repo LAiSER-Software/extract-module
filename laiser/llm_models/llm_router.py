@@ -50,8 +50,6 @@ Rev No.     Date            Author              Description
 
 import os
 import torch
-import spacy
-from laiser.config import LLAMA_CPP_CTX, LLAMA_CPP_THREADS, MODEL_PATH
 
 # Import with error handling for optional dependencies
 try:
@@ -72,22 +70,6 @@ except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
-
-try:
-    from laiser.llm_models.llama_cpp_handler import llama_cpp_chat
-except ImportError as e:
-    print(f"Warning: llama.cpp backend support not available: {e}")
-    def llama_cpp_chat(*args, **kwargs):
-        raise ImportError("llama.cpp backend support is not available. Please install llama-cpp-python package.")
-    
-try:
-    from llama_cpp import Llama
-    LLAMA_CPP_AVAILABLE = True
-except Exception as e:
-    LLAMA_CPP_AVAILABLE = False
-    Llama = None
-import torch
-import spacy
 
 class LLMRouter:
 

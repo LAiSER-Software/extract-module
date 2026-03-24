@@ -58,7 +58,6 @@ TODO:
 """
 
 import torch
-import spacy
 import pandas as pd
 from typing import List, Any, Optional
 from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K

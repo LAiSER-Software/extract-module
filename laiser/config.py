@@ -59,7 +59,6 @@ from typing import Dict, Any
 DEFAULT_TRANSFORMER_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-DEFAULT_SPACY_MODEL = "en_core_web_lg"
 
 # Similarity thresholds
 SIMILARITY_THRESHOLD = 0.85

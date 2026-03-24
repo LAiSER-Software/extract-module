@@ -141,7 +141,7 @@ def get_embedding(nlp, input_text):
 
     Parameters
     ----------
-    nlp : object of spacy nlp model
+    nlp : object with callable text vectorization behavior
     input_text : text
         Provide text to be vectorized, usually skill, extracted of referenced
 
