@@ -7,6 +7,7 @@ This module contains the core business logic for skill extraction.
 import re
 import json
 import numpy as np
+import torch
 from typing import List, Dict, Any, Tuple, Optional, Union
 import pandas as pd
 
@@ -16,7 +17,8 @@ from laiser.config import (
     SKILL_EXTRACTION_PROMPT_JOB,
     SKILL_EXTRACTION_PROMPT_SYLLABUS,
     KSA_EXTRACTION_PROMPT,
-    KSA_DETAILS_PROMPT
+    KSA_DETAILS_PROMPT,
+    COMBINED_EXTRACTION_PROMPT
 )
 from laiser.llm_models.llm_router import LLMRouter
 from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K
@@ -76,6 +78,7 @@ class PromptBuilder:
             esco_context_block=esco_context_block,
             scqf_levels=scqf_levels_text
         )
+    
     
     @staticmethod
     def build_ksa_details_prompt(skill: str, description: str, num_key_kr: int = 3, num_key_tas: int = 3) -> str:
@@ -419,13 +422,15 @@ class SkillExtractionService:
         model_id: Optional[str] = None, 
         hf_token: Optional[str] = None,
         api_key: Optional[str] = None, 
-        use_gpu: Optional[bool] = None
+        use_gpu: Optional[bool] = None,
+        backend: Optional[str] = None
         ):
 
         self.model_id = model_id
         self.hf_token = hf_token
         self.api_key = api_key
         self.use_gpu = use_gpu if use_gpu is not None else torch.cuda.is_available()
+        self.backend = backend
         self.llm = None
         self.tokenizer = None
         self.model = None
@@ -436,13 +441,16 @@ class SkillExtractionService:
         self.prompt_builder = PromptBuilder()
         self.llm_parser = ResponseParser()
         self.response_parser = ResponseParser()
-        self.router = LLMRouter(self.model_id, self.use_gpu, self.hf_token, self.api_key)
+        self.router = LLMRouter(self.model_id, self.use_gpu, self.hf_token, self.api_key, backend=self.backend)
 
         # Initialize FAISS index
         self.faiss_manager.initialize_index(force_rebuild=False)
+        # Log router initialization state for debugging
+        try:
+            print(f"SkillExtractionService: router.llama_llm present: {getattr(self.router, 'llama_llm', None) is not None}")
+        except Exception:
+            pass
 
-        # Eager-load embedding model at service startup (instead of first align call)
-        self.data_access.get_embedding_model()
     
     def extract_and_align_core(
         self,
@@ -537,7 +545,7 @@ class SkillExtractionService:
             raise LAiSERError(f"Batch extraction failed: {e}")
 
     def extract_raw_llm_skills(self,input_data,text_columns):
-        
+
         text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
         extraction_prompt = self.prompt_builder.build_skill_extraction_prompt(input_text=text_blob,input_type="job_desc")
         response = self.router.generate(extraction_prompt)
@@ -579,10 +587,5 @@ class SkillExtractionService:
             raw_skills = [str(raw_skills)] if raw_skills else []
         
         return self.alignment_service.align_skills_to_taxonomy(
-            raw_skills,
-            document_id,
-            description,
-            similarity_threshold,
-            top_k,
-            allowed_sources=allowed_sources,
+            raw_skills, document_id, description, similarity_threshold, top_k,allowed_sources
         )
