@@ -26,12 +26,7 @@ jobs:
         run: pip install google-generativeai requests
 
       - name: Get PR diff
-        id: diff
-        run: |
-          git diff origin/${{ github.base_ref }}...HEAD > pr.diff
-          echo "diff<<EOF" >> $GITHUB_OUTPUT
-          cat pr.diff >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+        run: git diff origin/${{ github.base_ref }}...HEAD > pr.diff
 
       - name: Generate and update PR description
         env:
@@ -39,7 +34,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_DIFF: ${{ steps.diff.outputs.diff }}
         run: python .github/scripts/pr_description.py
 
   # ── 2. REVIEW TIME LABEL ──────────────────────────────────────────────────

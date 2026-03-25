@@ -7,7 +7,10 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 REPO = os.environ["GITHUB_REPOSITORY"]
 PR_NUMBER = os.environ["PR_NUMBER"]
-PR_DIFF = os.environ["PR_DIFF"]
+
+# Read diff from file instead of env var to avoid "argument list too long" error
+with open("pr.diff", "r", encoding="utf-8") as f:
+    PR_DIFF = f.read()
 
 # ── Generate description via Gemini ────────────────────────────────────────
 genai.configure(api_key=GEMINI_API_KEY)
