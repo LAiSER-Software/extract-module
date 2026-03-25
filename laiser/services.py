@@ -36,9 +36,7 @@ class PromptBuilder:
     def build_skill_extraction_prompt(input_text: str, input_type: str) -> str:
         """Build prompt for basic skill extraction"""
         if input_type == "job_desc":
-            extraction_prompt = SKILL_EXTRACTION_PROMPT_JOB.format(
-                description=input_text
-            )
+            extraction_prompt = SKILL_EXTRACTION_PROMPT_JOB.format(description=input_text)
             return extraction_prompt
         elif input_type == "syllabus":
             return SKILL_EXTRACTION_PROMPT_SYLLABUS.format(
@@ -60,9 +58,7 @@ class PromptBuilder:
         """Build prompt for KSA (Knowledge, Skills, Abilities) extraction"""
 
         input_desc = (
-            "job description"
-            if input_type == "job_desc"
-            else "course syllabus description and its learning outcomes"
+            "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
         )
 
         if input_type == "syllabus":
@@ -71,16 +67,10 @@ class PromptBuilder:
             input_text = f"### Input:\\n{query.get('description', '')}"
 
         # Format SCQF levels
-        scqf_levels_text = "\\n".join(
-            [f"  - {level}: {desc}" for level, desc in SCQF_LEVELS.items()]
-        )
+        scqf_levels_text = "\\n".join([f"  - {level}: {desc}" for level, desc in SCQF_LEVELS.items()])
 
         # Prepare ESCO context
-        esco_context_block = (
-            ", ".join(esco_skills)
-            if esco_skills
-            else "No relevant skills found in taxonomy"
-        )
+        esco_context_block = ", ".join(esco_skills) if esco_skills else "No relevant skills found in taxonomy"
 
         return KSA_EXTRACTION_PROMPT.format(
             input_desc=input_desc,
@@ -93,9 +83,7 @@ class PromptBuilder:
         )
 
     @staticmethod
-    def build_ksa_details_prompt(
-        skill: str, description: str, num_key_kr: int = 3, num_key_tas: int = 3
-    ) -> str:
+    def build_ksa_details_prompt(skill: str, description: str, num_key_kr: int = 3, num_key_tas: int = 3) -> str:
         """Build prompt for getting detailed KSA information for a specific skill"""
         return KSA_DETAILS_PROMPT.format(
             skill=skill,
@@ -191,9 +179,7 @@ class ResponseParser:
             # Remove any unwanted prefixes and tags
             clean_lines = []
             for line in lines:
-                if line.startswith("<start_of_turn>") or line.startswith(
-                    "<end_of_turn>"
-                ):
+                if line.startswith("<start_of_turn>") or line.startswith("<end_of_turn>"):
                     continue
                 if "--" in line:  # Skip separator lines
                     continue
@@ -237,19 +223,13 @@ class ResponseParser:
                     )
                     if knowledge_match:
                         knowledge_raw = knowledge_match.group(1).strip()
-                        skill_data["Knowledge Required"] = [
-                            k.strip() for k in knowledge_raw.split(",") if k.strip()
-                        ]
+                        skill_data["Knowledge Required"] = [k.strip() for k in knowledge_raw.split(",") if k.strip()]
 
                     # Extract task abilities (multi-line support)
-                    task_match = re.search(
-                        r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL
-                    )
+                    task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
                     if task_match:
                         task_raw = task_match.group(1).strip()
-                        skill_data["Task Abilities"] = [
-                            t.strip() for t in task_raw.split(",") if t.strip()
-                        ]
+                        skill_data["Task Abilities"] = [t.strip() for t in task_raw.split(",") if t.strip()]
 
                     if skill_data:  # Only add if we found some data
                         out.append(skill_data)
@@ -319,17 +299,13 @@ class SkillAlignmentService:
             if debug:
                 logger.debug(msg)
 
-        log_debug(
-            f"[align] raw_skills={len(raw_skills)} threshold={similarity_threshold} top_k={top_k}"
-        )
+        log_debug(f"[align] raw_skills={len(raw_skills)} threshold={similarity_threshold} top_k={top_k}")
 
         model = self.data_access.get_embedding_model()
 
         # metadata loaded once
         metadata = self.faiss_manager.get_metadata()
-        log_debug(
-            f"[align] metadata type={type(metadata).__name__} len={len(metadata)}"
-        )
+        log_debug(f"[align] metadata type={type(metadata).__name__} len={len(metadata)}")
         if isinstance(metadata, pd.DataFrame) and not metadata.empty:
             log_debug(f"[align] metadata columns={list(metadata.columns)}")
 
@@ -354,9 +330,7 @@ class SkillAlignmentService:
             meta_idx = best.get("Index")
             canonical_skill = str(best.get("Skill", "")).strip()
 
-            log_debug(
-                f"[skill {i}] best='{canonical_skill}' sim={similarity:.4f} meta_idx={meta_idx}"
-            )
+            log_debug(f"[skill {i}] best='{canonical_skill}' sim={similarity:.4f} meta_idx={meta_idx}")
 
             if similarity < similarity_threshold:
                 log_debug(f"[skill {i}] below threshold -> skip")
@@ -366,13 +340,9 @@ class SkillAlignmentService:
                 log_debug(f"[skill {i}] empty canonical_skill -> skip")
                 continue
             if meta_idx is None:
-                log_debug(
-                    f"[skill {i}] meta_idx is None (search_similar_skills may not return Index)"
-                )
+                log_debug(f"[skill {i}] meta_idx is None (search_similar_skills may not return Index)")
             elif int(meta_idx) >= len(metadata) or int(meta_idx) < 0:
-                log_debug(
-                    f"[skill {i}] meta_idx out of range: {meta_idx} (metadata len={len(metadata)})"
-                )
+                log_debug(f"[skill {i}] meta_idx out of range: {meta_idx} (metadata len={len(metadata)})")
             else:
                 # ✅ DataFrame row by position
                 meta = metadata.iloc[int(meta_idx)].to_dict()
@@ -382,9 +352,7 @@ class SkillAlignmentService:
             taxonomy_description = meta.get("description", meta.get("Description", ""))
             taxonomy_source = meta.get("taxonomy", meta.get("taxonomy", ""))
 
-            log_debug(
-                f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}"
-            )
+            log_debug(f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}")
 
             mapped_skills.append(canonical_skill)
             raw_skills_matched.append(skill)
@@ -458,9 +426,7 @@ class SkillExtractionService:
         self.nlp = None
         self.data_access = DataAccessLayer()
         self.faiss_manager = FAISSIndexManager(self.data_access)
-        self.alignment_service = SkillAlignmentService(
-            self.data_access, self.faiss_manager
-        )
+        self.alignment_service = SkillAlignmentService(self.data_access, self.faiss_manager)
         self.prompt_builder = PromptBuilder()
         self.llm_parser = ResponseParser()
         self.response_parser = ResponseParser()
@@ -541,9 +507,7 @@ class SkillExtractionService:
 
         # Apply defaults for top_k and similarity_threshold
         effective_top_k = top_k if top_k is not None else DEFAULT_TOP_K
-        effective_threshold = (
-            similarity_threshold if similarity_threshold is not None else 0.20
-        )
+        effective_threshold = similarity_threshold if similarity_threshold is not None else 0.20
 
         try:
             results = []
@@ -554,9 +518,7 @@ class SkillExtractionService:
                     input_data = {col: row.get(col, "") for col in text_columns}
                     input_data["id"] = row.get(id_column, str(idx))
                     skills = self.extract_raw_llm_skills(input_data, text_columns)
-                    full_description = " ".join(
-                        [str(input_data.get(col, "")) for col in text_columns]
-                    )
+                    full_description = " ".join([str(input_data.get(col, "")) for col in text_columns])
                     aligned_df = self.align_extracted_skills(
                         skills,
                         str(input_data["id"]),
@@ -581,9 +543,7 @@ class SkillExtractionService:
 
     def extract_raw_llm_skills(self, input_data, text_columns):
 
-        text_blob = " ".join(
-            str(input_data.get(col, "")) for col in text_columns
-        ).strip()
+        text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
         extraction_prompt = self.prompt_builder.build_skill_extraction_prompt(
             input_text=text_blob, input_type="job_desc"
         )
@@ -639,9 +599,7 @@ class SkillExtractionService:
             )
 
         if not isinstance(raw_skills, list):
-            print(
-                f"Warning: raw_skills is not a list, converting from {type(raw_skills)}"
-            )
+            print(f"Warning: raw_skills is not a list, converting from {type(raw_skills)}")
             raw_skills = [str(raw_skills)] if raw_skills else []
 
         return self.alignment_service.align_skills_to_taxonomy(

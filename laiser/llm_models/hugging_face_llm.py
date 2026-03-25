@@ -83,9 +83,7 @@ def llm_generate(prompt: str, tokenizer, model, model_id: str, use_gpu: bool):
 
 def llm_generate_vllm(prompt, llm):
     if not VLLM_AVAILABLE:
-        raise ImportError(
-            "vLLM is not installed. Please install it to use this function."
-        )
+        raise ImportError("vLLM is not installed. Please install it to use this function.")
 
     sampling_params = SamplingParams(max_tokens=200, seed=42)
     result = llm.generate([prompt], sampling_params=sampling_params)

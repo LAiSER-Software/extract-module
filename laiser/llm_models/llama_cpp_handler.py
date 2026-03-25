@@ -31,15 +31,11 @@ class LlamaCppBackend:
         chat_format: str = "chatml",
     ):
         if Llama is None:
-            raise ImportError(
-                "llama-cpp-python is not installed. Install it to use the llama_cpp backend."
-            )
+            raise ImportError("llama-cpp-python is not installed. Install it to use the llama_cpp backend.")
 
         model_path = model_path or os.getenv("LAISER_LLAMA_CPP_MODEL_PATH")
         if not model_path:
-            raise ValueError(
-                "Set LAISER_LLAMA_CPP_MODEL_PATH or pass model_path to LlamaCppBackend."
-            )
+            raise ValueError("Set LAISER_LLAMA_CPP_MODEL_PATH or pass model_path to LlamaCppBackend.")
 
         model_path = str(Path(model_path))
         # model_path = str(Path(model_path).expanduser().resolve())
@@ -111,9 +107,7 @@ def llama_cpp_chat(
 ) -> str:
 
     if llama is None:
-        raise ValueError(
-            "llama is None; expected an initialized llama_cpp.Llama instance."
-        )
+        raise ValueError("llama is None; expected an initialized llama_cpp.Llama instance.")
 
     messages = [
         {"role": "system", "content": system},

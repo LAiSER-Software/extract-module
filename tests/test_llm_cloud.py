@@ -123,9 +123,7 @@ def run_skill_extractor_smoke():
         }}
         """
 
-    router = LLMRouter(
-        model_id="gemini", use_gpu=False, api_key=os.getenv("GEMINI_API_KEY")
-    )
+    router = LLMRouter(model_id="gemini", use_gpu=False, api_key=os.getenv("GEMINI_API_KEY"))
     response = router.generate(standard_prompt)
     skills = _parse_skills_from_response(response)
     print(skills)

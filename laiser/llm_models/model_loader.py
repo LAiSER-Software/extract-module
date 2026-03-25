@@ -79,9 +79,7 @@ def load_model_from_transformer(model_id: str = None, token: str = ""):
     except (RepositoryNotFoundError, EntryNotFoundError, OSError) as e:
         print(f"[WARN] Failed to load model '{model_id}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_TRANSFORMER_MODEL_ID}")
-        tokenizer = AutoTokenizer.from_pretrained(
-            DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token
-        )
+        tokenizer = AutoTokenizer.from_pretrained(DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token)
         model = AutoModelForCausalLM.from_pretrained(
             DEFAULT_TRANSFORMER_MODEL_ID,
             use_auth_token=token,
@@ -95,14 +93,10 @@ def load_model_from_transformer(model_id: str = None, token: str = ""):
 DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 
 
-def load_model_from_vllm(
-    model_id: str = None, token: str = None, dtype: str = None, quantization: str = None
-):
+def load_model_from_vllm(model_id: str = None, token: str = None, dtype: str = None, quantization: str = None):
 
     if not VLLM_AVAILABLE:
-        raise ImportError(
-            "vLLM is not installed. Cannot load model using vLLM backend."
-        )
+        raise ImportError("vLLM is not installed. Cannot load model using vLLM backend.")
 
     model_id = model_id or DEFAULT_VLLM_MODEL_ID
     dtype = dtype or "float16"
@@ -122,9 +116,7 @@ def load_model_from_vllm(
         llm = LLM(**llm_args)
 
         quant_info = f" with {quantization} quantization" if quantization else ""
-        print(
-            f"[INFO] Successfully loaded vLLM model: {model_id} with dtype: {dtype}{quant_info}"
-        )
+        print(f"[INFO] Successfully loaded vLLM model: {model_id} with dtype: {dtype}{quant_info}")
     except Exception as e:
         print(f"[WARN] Failed to load model '{model_id}' with dtype '{dtype}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_VLLM_MODEL_ID}")

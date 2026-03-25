@@ -19,9 +19,7 @@ from typing import Any, Dict, Optional
 def _safe_run(cmd, timeout: float = 5.0):
     """Run a command safely with a timeout; return (code, stdout, stderr)."""
     try:
-        p = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             out, err = p.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -242,9 +240,7 @@ def print_report(specs: Dict[str, Any]) -> None:
     print(f"Timestamp (UTC): {ts}")
     print(f"OS: {os_info.get('platform')} (machine={os_info.get('machine')})")
     print(f"CPU: {cpu.get('brand_raw') or cpu.get('processor') or 'unknown'}")
-    print(
-        f"  Arch: {cpu.get('architecture')} | Logical cores: {cpu.get('logical_cores')}"
-    )
+    print(f"  Arch: {cpu.get('architecture')} | Logical cores: {cpu.get('logical_cores')}")
     print(
         f"RAM: total={fmt(_bytes_to_gb(ram.get('total_bytes')), ' GB')}, "
         f"available={fmt(_bytes_to_gb(ram.get('available_bytes')), ' GB')}"

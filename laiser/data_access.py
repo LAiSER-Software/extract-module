@@ -140,8 +140,7 @@ class DataAccessLayer:
             try:
                 if not os.path.exists(file_path):
                     raise FileNotFoundError(
-                        f"Skills metadata file not found at {file_path}. "
-                        "Build or download the FAISS index first."
+                        f"Skills metadata file not found at {file_path}. " "Build or download the FAISS index first."
                     )
 
                 self._combined_df = pd.read_json(file_path, orient="records")
@@ -184,9 +183,7 @@ class DataAccessLayer:
         except Exception as e:
             raise FAISSIndexError(f"Failed to save FAISS index: {e}")
 
-    def save_skill_metadata_json(
-        self, metadata_df: pd.DataFrame, file_path: str
-    ) -> None:
+    def save_skill_metadata_json(self, metadata_df: pd.DataFrame, file_path: str) -> None:
         """
         Save skills metadata DataFrame to JSON file.
         Expects a pandas DataFrame and serializes it safely.
@@ -218,9 +215,7 @@ class DataAccessLayer:
             response.raise_for_status()
 
             if response.headers.get("Content-Type") != "application/octet-stream":
-                raise ValueError(
-                    f"Unexpected content type: {response.headers.get('Content-Type')}"
-                )
+                raise ValueError(f"Unexpected content type: {response.headers.get('Content-Type')}")
 
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             with open(local_path, "wb") as f:
@@ -243,9 +238,7 @@ class FAISSIndexManager:
 
     # Issue: Do we even need this? Can't this be done in init
     # Issue [GFI_OddEven]: Split these into two seperate modules load and build index
-    def initialize_index(
-        self, force_rebuild: bool = False, debug: bool = False
-    ) -> faiss.IndexFlatIP:
+    def initialize_index(self, force_rebuild: bool = False, debug: bool = False) -> faiss.IndexFlatIP:
         """Initialize FAISS index (load or build).
 
         Behavior (minimal & strict):
@@ -267,9 +260,7 @@ class FAISSIndexManager:
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
             try:
                 self.index = self.data_access.load_faiss_index(str(local_index_path))
-                self.metadata = self.data_access.load_skill_metadata(
-                    str(local_json_path)
-                )
+                self.metadata = self.data_access.load_skill_metadata(str(local_json_path))
             except Exception as e:
                 if debug:
                     logger.warning(f"[initialize_index] load attempt failed: {e}")
@@ -327,17 +318,13 @@ class FAISSIndexManager:
                     "taxonomy",
                 ]:
                     # find actual column name (case-insensitive)
-                    found = next(
-                        (col for col in single_df.columns if col.lower() == c), None
-                    )
+                    found = next((col for col in single_df.columns if col.lower() == c), None)
                     if found:
                         keep_cols.append(found)
                 single_df = single_df[keep_cols].copy()
 
             # CASE B: already-normalized CSV (contains skill, addtional_notes, description, source_url) and optionally taxonomy
-            elif {"skill", "addtional_notes", "description", "source_url"}.issubset(
-                cols_set
-            ):
+            elif {"skill", "addtional_notes", "description", "source_url"}.issubset(cols_set):
                 # select canonical columns and preserve taxonomy if present
                 cols = []
                 for c in [
@@ -347,9 +334,7 @@ class FAISSIndexManager:
                     "source_url",
                     "taxonomy",
                 ]:
-                    found = next(
-                        (col for col in single_df.columns if col.lower() == c), None
-                    )
+                    found = next((col for col in single_df.columns if col.lower() == c), None)
                     if found:
                         cols.append(found)
                 single_df = single_df[cols].copy()
@@ -424,14 +409,10 @@ class FAISSIndexManager:
                         None,
                     )
                     if col_found:
-                        single_df[col_found] = (
-                            single_df[col_found].astype("string").str.strip()
-                        )
+                        single_df[col_found] = single_df[col_found].astype("string").str.strip()
 
                 # Normalize taxonomy column values (trim only; preserve case choice but store lowercased variant later)
-                single_df[taxonomy_col] = (
-                    single_df[taxonomy_col].astype("string").str.strip()
-                )
+                single_df[taxonomy_col] = single_df[taxonomy_col].astype("string").str.strip()
                 single_df = single_df.replace({"": pd.NA})
 
                 # rename taxonomy column to exact canonical name 'taxonomy' (lowercase) for consistent downstream access
@@ -440,9 +421,7 @@ class FAISSIndexManager:
 
                 # Ensure addtional_notes exists
                 if "addtional_notes" not in single_df.columns:
-                    single_df["addtional_notes"] = single_df.get(
-                        "addtional_notes", pd.NA
-                    )
+                    single_df["addtional_notes"] = single_df.get("addtional_notes", pd.NA)
 
                 single_df["addtional_notes"] = single_df["addtional_notes"].fillna("")
                 single_df = single_df.dropna(subset=["skill"]).reset_index(drop=True)
@@ -455,9 +434,7 @@ class FAISSIndexManager:
             osn_df = self.data_access.load_osn_skills()
 
             # map and normalize ESCO
-            esco_df = esco_df[
-                ["preferredLabel", "altLabels", "description", "conceptUri"]
-            ].copy()
+            esco_df = esco_df[["preferredLabel", "altLabels", "description", "conceptUri"]].copy()
             esco_df = esco_df.rename(
                 columns={
                     "preferredLabel": "skill",
@@ -469,9 +446,7 @@ class FAISSIndexManager:
             esco_df["taxonomy"] = "esco"
 
             # map and normalize OSN
-            osn_df = osn_df[
-                ["RSD Name", "Keywords", "Skill Statement", "Canonical URL"]
-            ].copy()
+            osn_df = osn_df[["RSD Name", "Keywords", "Skill Statement", "Canonical URL"]].copy()
             osn_df = osn_df.rename(
                 columns={
                     "RSD Name": "skill",
@@ -499,27 +474,17 @@ class FAISSIndexManager:
             combined = combined.dropna(subset=["skill"]).reset_index(drop=True)
 
         # 4) Final sanitize and create text column
-        combined["description"] = (
-            combined["description"].fillna("").astype("string").str.strip()
-        )
-        combined["addtional_notes"] = (
-            combined["addtional_notes"].fillna("").astype("string").str.strip()
-        )
+        combined["description"] = combined["description"].fillna("").astype("string").str.strip()
+        combined["addtional_notes"] = combined["addtional_notes"].fillna("").astype("string").str.strip()
         combined["skill"] = combined["skill"].fillna("").astype("string").str.strip()
         combined["text"] = (
-            combined["skill"]
-            + " | "
-            + combined["description"]
-            + " | "
-            + combined["addtional_notes"]
+            combined["skill"] + " | " + combined["description"] + " | " + combined["addtional_notes"]
         ).astype("string")
         combined["text"] = combined["text"].fillna("").str.strip()
         combined = combined[combined["text"] != ""].reset_index(drop=True)
 
         # 5) Build FAISS index
-        self.index, self.embeddings = self.data_access.build_faiss_index(
-            combined["text"].tolist()
-        )
+        self.index, self.embeddings = self.data_access.build_faiss_index(combined["text"].tolist())
 
         # Strict: require taxonomy column (do not infer)
         if "taxonomy" not in combined.columns:
@@ -529,9 +494,7 @@ class FAISSIndexManager:
             )
 
         # Normalize taxonomy values to lowercase for consistent comparisons
-        combined["taxonomy"] = (
-            combined["taxonomy"].astype("string").str.strip().str.lower()
-        )
+        combined["taxonomy"] = combined["taxonomy"].astype("string").str.strip().str.lower()
 
         # Build metadata (canonical column order)
         meta_df = combined[
@@ -548,9 +511,7 @@ class FAISSIndexManager:
 
         # Persist metadata JSON and FAISS index (best-effort with debug warnings)
         try:
-            self.data_access.save_skill_metadata_json(
-                self.metadata, str(local_json_path)
-            )
+            self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
         except Exception as e:
             if debug:
                 logger.warning(f"[initialize_index] Failed to write metadata JSON: {e}")
@@ -575,9 +536,7 @@ class FAISSIndexManager:
         Return loaded skill metadata.
         """
         if self.metadata is None:
-            raise FAISSIndexError(
-                "Metadata not initialized. Call initialize_index() first."
-            )
+            raise FAISSIndexError("Metadata not initialized. Call initialize_index() first.")
         return self.metadata
 
     def search_similar_skills(
@@ -595,14 +554,10 @@ class FAISSIndexManager:
           ordered by similarity. If you want a safety limit, pass `max_results` (int).
         """
         if self.index is None:
-            raise FAISSIndexError(
-                "FAISS index not initialized. Call initialize_index() first."
-            )
+            raise FAISSIndexError("FAISS index not initialized. Call initialize_index() first.")
 
         if self.metadata is None:
-            raise FAISSIndexError(
-                "Metadata not initialized. Call initialize_index() first."
-            )
+            raise FAISSIndexError("Metadata not initialized. Call initialize_index() first.")
 
         # Ensure skill_names come from metadata
         if self.skill_names is None:
@@ -612,9 +567,7 @@ class FAISSIndexManager:
                 elif isinstance(self.metadata, list):
                     self.skill_names = [m.get("skill", "") for m in self.metadata]
                 else:
-                    self.skill_names = [
-                        str(r.get("skill", "")) for r in list(self.metadata)
-                    ]
+                    self.skill_names = [str(r.get("skill", "")) for r in list(self.metadata)]
             except Exception as e:
                 raise FAISSIndexError(f"Failed to load skill names for index: {e}")
 
@@ -645,18 +598,12 @@ class FAISSIndexManager:
                 top_k = max(1, min(int(top_k), ntotal))
                 scores, indices = self.index.search(q, top_k)
                 results = []
-                for rank, (score, idx) in enumerate(
-                    zip(scores[0], indices[0]), start=1
-                ):
+                for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
                     if idx == -1:
                         continue
                     results.append(
                         {
-                            "Skill": (
-                                self.skill_names[idx]
-                                if 0 <= idx < len(self.skill_names)
-                                else ""
-                            ),
+                            "Skill": (self.skill_names[idx] if 0 <= idx < len(self.skill_names) else ""),
                             "Similarity": float(score),
                             "Rank": rank,
                             "Index": int(idx),
