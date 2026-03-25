@@ -18,16 +18,16 @@ License:
 --------
 Copyright 2025 George Washington University Insitute of Public Policy
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files 
-(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, 
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is 
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files
+(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE 
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR 
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
@@ -53,7 +53,7 @@ TODO:
 """
 
 import os
-from typing import Dict, Any
+from typing import Dict
 
 # Model Configuration
 DEFAULT_TRANSFORMER_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
@@ -64,10 +64,18 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 SIMILARITY_THRESHOLD = 0.85
 
 # ESCO Configuration
-ESCO_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
-OSN_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/osn_taxanomy_merged.csv"
-COMBINED_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv"
-FAISS_INDEX_URL = "https://raw.githubusercontent.com/LAiSER-Software/extract-module/main/laiser/input/esco_faiss_index.index"
+ESCO_SKILLS_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
+)
+OSN_SKILLS_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/osn_taxanomy_merged.csv"
+)
+COMBINED_SKILLS_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv"
+)
+FAISS_INDEX_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/extract-module/main/laiser/input/esco_faiss_index.index"
+)
 
 # Batch processing
 DEFAULT_BATCH_SIZE = 32
@@ -90,7 +98,7 @@ SCQF_LEVELS: Dict[int, str] = {
     9: "Highly specialized expertise, contributing original thought.",
     10: "Sustained mastery, influential in areas of specialization.",
     11: "Groundbreaking innovation, professional or academic mastery.",
-    12: "Global expertise, leading advancements at the highest level."
+    12: "Global expertise, leading advancements at the highest level.",
 }
 
 # Prompt templates
@@ -263,4 +271,4 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Llama CPP Configuration
 LLAMA_CPP_CTX = 8000
 LLAMA_CPP_THREADS = 40
-MODEL_PATH = "" # Update with actual model path
+MODEL_PATH = ""  # Update with actual model path

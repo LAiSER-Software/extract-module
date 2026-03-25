@@ -1,9 +1,11 @@
 import os
 import re
-import requests
 from typing import Optional
 
+import requests
+
 _CODE_FENCE_RE = re.compile(r"```(?:json)?|```", re.IGNORECASE)
+
 
 def _clean_llm_text(text: str) -> str:
     if not text:

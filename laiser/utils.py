@@ -33,6 +33,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 
 """
+
 """
 Revision History:
 -----------------
@@ -44,12 +45,14 @@ Revision History:
 
 """
 
-import numpy as np
-import psutil
 import logging
-from sentence_transformers import SentenceTransformer, util
+
 import faiss
+import numpy as np
 import pandas as pd
+import psutil
+from sentence_transformers import SentenceTransformer
+
 
 def cosine_similarity(vec1, vec2):
     """
@@ -68,6 +71,7 @@ def cosine_similarity(vec1, vec2):
         return 0.0
     return np.dot(vec1, vec2) / product_of_magnitude
 
+
 def build_faiss_index_esco():
     """
     Builds a FAISS index for ESCO skills
@@ -76,13 +80,15 @@ def build_faiss_index_esco():
     -------
     faiss index object
     """
-    
+
     # Load ESCO skill data
-    esco_df = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")  # replace with your file if needed
+    esco_df = pd.read_csv(
+        "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
+    )  # replace with your file if needed
     skill_names = esco_df["preferredLabel"].tolist()
 
     # Embed ESCO skills using SentenceTransformer
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
     print("Embedding ESCO skills...")
     esco_embeddings = model.encode(skill_names, convert_to_numpy=True, show_progress_bar=True)
 
@@ -91,13 +97,14 @@ def build_faiss_index_esco():
     index = faiss.IndexFlatIP(dimension)
     faiss.normalize_L2(esco_embeddings)
     index.add(esco_embeddings)
-    
+
     # save the index to disk
     print("Saving FAISS index to disk...")
     faiss.write_index(index, "esco_faiss_index.index")
     print("FAISS index for ESCO skills built and saved for reusability.")
     return index
-    
+
+
 def load_faiss_index_esco():
     """
     Loads a FAISS index for ESCO skills
@@ -109,8 +116,9 @@ def load_faiss_index_esco():
     try:
         # set the path to your FAISS index file in the input directory
         print("Loading FAISS index for ESCO skills...")
-        
+
         import os
+
         index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
         if not os.path.exists(index_path):
             raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
@@ -121,19 +129,23 @@ def load_faiss_index_esco():
         print(f"Error loading FAISS index: {e}")
         return None
 
+
 def get_top_esco_skills(input_text, top_k=10):
     """
     Retrieves top ESCO skills based on cosine similarity with input text
     """
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
     index = load_faiss_index_esco()
     if index is None:
         raise ValueError("FAISS index for ESCO skills didn't load properly. Please check the index file.")
-    skill_names = pd.read_csv("https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv")["preferredLabel"].tolist()
+    skill_names = pd.read_csv(
+        "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
+    )["preferredLabel"].tolist()
     emb = model.encode(input_text, convert_to_numpy=True)
     faiss.normalize_L2(emb.reshape(1, -1))
     scores, indices = index.search(emb.reshape(1, -1), top_k)
     return [{"Skill": skill_names[i], "index": int(i), "score": float(scores[0][j])} for j, i in enumerate(indices[0])]
+
 
 def get_embedding(nlp, input_text):
     """
@@ -175,7 +187,7 @@ def log_performance(function_name, start_time, end_time):
     process = psutil.Process()
     cpu_percent = process.cpu_percent()
     memory_info = process.memory_info()
-    memory_usage = memory_info.rss / (1024 ** 2)  # Convert to MB
+    memory_usage = memory_info.rss / (1024**2)  # Convert to MB
 
     log_message = (
         f"Function: {function_name}\n"

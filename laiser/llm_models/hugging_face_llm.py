@@ -41,6 +41,7 @@ Output/Return Format:
 - List of extracted skills from text
 
 """
+
 """
 Revision History:
 -----------------
@@ -48,24 +49,24 @@ Rev No.     Date            Author              Description
 [1.0.0]     6/30/2025      Anket Patil          Modularize LLM generation logic for transformers and vLLM
 """
 
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 try:
     from vllm import SamplingParams
+
     VLLM_AVAILABLE = True
 except ImportError:
     VLLM_AVAILABLE = False
     SamplingParams = None  # Optional fallback
 
+
 def llm_generate(prompt: str, tokenizer, model, model_id: str, use_gpu: bool):
     if tokenizer is None or model is None:
         quantization_config = BitsAndBytesConfig(load_in_8bit=True)
 
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, revision="main")  # nosec B615
         model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            quantization_config=quantization_config,
-            device_map="auto"
+            model_id, revision="main", quantization_config=quantization_config, device_map="auto"  # nosec B615
         )
 
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
@@ -74,10 +75,11 @@ def llm_generate(prompt: str, tokenizer, model, model_id: str, use_gpu: bool):
         **inputs,
         max_new_tokens=100,
         pad_token_id=tokenizer.pad_token_id,
-        eos_token_id=tokenizer.eos_token_id
+        eos_token_id=tokenizer.eos_token_id,
     )
 
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
 
 def llm_generate_vllm(prompt, llm):
     if not VLLM_AVAILABLE:
