@@ -54,7 +54,8 @@ jobs:
         run: bandit -r laiser/ -ll
 
       - name: pip-audit (dependency CVEs)
-        run: pip-audit
+        # CVE-2026-4539 ignored - affects pygments 2.19.2, no fix available yet
+        run: pip-audit --ignore-vuln CVE-2026-4539
 
   # ── 4. BUILD ───────────────────────────────────────────────────────────────
   build:
