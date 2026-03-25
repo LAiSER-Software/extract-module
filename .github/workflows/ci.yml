@@ -57,11 +57,83 @@ jobs:
         # CVE-2026-4539 ignored - affects pygments 2.19.2, no fix available yet
         run: pip-audit --ignore-vuln CVE-2026-4539
 
-  # ── 4. BUILD ───────────────────────────────────────────────────────────────
+  # ── 3. TYPE CHECK ──────────────────────────────────────────────────────────
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install mypy
+        run: pip install mypy
+
+      - name: mypy
+        run: mypy laiser/ --ignore-missing-imports --no-strict-optional
+        continue-on-error: true
+
+  # ── 4. LICENSE CHECK ───────────────────────────────────────────────────────
+  license-check:
+    name: License Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-licenses
+        run: pip install pip-licenses -e ".[dev]"
+
+      - name: Check licenses
+        # Fail if any GPL licensed dependency is found
+        run: pip-licenses --fail-on="GNU General Public License v2 (GPLv2);GNU General Public License v3 (GPLv3);GNU Affero General Public License v3"
+
+  # ── 5. DEAD CODE ───────────────────────────────────────────────────────────
+  dead-code:
+    name: Dead Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install vulture
+        run: pip install vulture
+
+      - name: vulture
+        run: vulture laiser/ --min-confidence 80
+        continue-on-error: true
+
+  # ── 6. COMPLEXITY ──────────────────────────────────────────────────────────
+  complexity:
+    name: Complexity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install radon
+        run: pip install radon
+
+      - name: radon complexity
+        run: radon cc laiser/ --min B --show-complexity --average
+        continue-on-error: true
+
+  # ── 7. BUILD ───────────────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, security]
+    needs: [lint, security, type-check, license-check]
     steps:
       - uses: actions/checkout@v4
 
