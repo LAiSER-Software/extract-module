@@ -1,0 +1,70 @@
+name: PR Preview Package
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  deploy-preview:
+    name: Publish Preview to TestPyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/laiser
+
+    permissions:
+      id-token: write        # required for trusted publishing
+      pull-requests: write   # required for PR comment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set preview version
+        run: |
+          # Read current version from __init__.py
+          CURRENT_VERSION=$(python -c "
+          import re
+          with open('laiser/__init__.py') as f:
+              content = f.read()
+          match = re.search(r'__version__\s*=\s*[\"\'](.*?)[\"\']', content)
+          print(match.group(1))
+          ")
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          # Use timestamp to make version unique on every push (PEP 440 compliant)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          PREVIEW_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
+          echo "Preview version: $PREVIEW_VERSION"
+
+          # Update version in __init__.py
+          sed -i "s/__version__ = \".*\"/__version__ = \"${PREVIEW_VERSION}\"/" laiser/__init__.py
+          echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> $GITHUB_ENV
+
+      - name: Build preview package
+        run: |
+          pip install build twine
+          python -m build
+
+      - name: Validate package
+        run: twine check dist/*
+
+      - name: Publish preview to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+          skip-existing: true
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `📦 **Preview package published!**\n\nInstall and test this PR:\n\`\`\`bash\npip install --index-url https://test.pypi.org/simple/ laiser==${{ env.PREVIEW_VERSION }}\n\`\`\``
+            })
