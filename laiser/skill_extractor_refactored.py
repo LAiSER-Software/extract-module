@@ -118,6 +118,7 @@ class SkillExtractorRefactored:
         batch_size: int = DEFAULT_BATCH_SIZE,
         warnings: bool = False,
         allowed_sources: Optional[List[str]] = None,
+        extract: List[str] = None,
     ) -> pd.DataFrame:
         """
         Extract and align skills from a dataset (main interface method).
@@ -163,6 +164,7 @@ class SkillExtractorRefactored:
             batch_size=batch_size,
             warnings=warnings,
             allowed_sources=allowed_sources,
+            extract=extract,
         )
 
 

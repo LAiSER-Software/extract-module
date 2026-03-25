@@ -14,12 +14,13 @@ import pandas as pd
 import torch
 
 from laiser.config import (
+    COMBINED_EXTRACTION_PROMPT,
     DEFAULT_BATCH_SIZE,
     DEFAULT_TOP_K,
     KSA_DETAILS_PROMPT,
     KSA_EXTRACTION_PROMPT,
+    KT_FROM_SKILLS_PROMPT,
     SCQF_LEVELS,
-    SKILL_EXTRACTION_PROMPT_JOB,
     SKILL_EXTRACTION_PROMPT_SYLLABUS,
 )
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
@@ -36,7 +37,7 @@ class PromptBuilder:
     def build_skill_extraction_prompt(input_text: str, input_type: str) -> str:
         """Build prompt for basic skill extraction"""
         if input_type == "job_desc":
-            extraction_prompt = SKILL_EXTRACTION_PROMPT_JOB.format(description=input_text)
+            extraction_prompt = COMBINED_EXTRACTION_PROMPT.format(description=input_text)
             return extraction_prompt
         elif input_type == "syllabus":
             return SKILL_EXTRACTION_PROMPT_SYLLABUS.format(
@@ -90,6 +91,20 @@ class PromptBuilder:
             description=description,
             num_key_kr=num_key_kr,
             num_key_tas=num_key_tas,
+        )
+
+    @staticmethod
+    def build_knowledge_task_prompt(description: str, extracted_skills: List[str]) -> str:
+        """
+        Build prompt for extracting Knowledge and Tasks (Call 2 of v0.5 pipeline).
+
+        Uses the full job description as context alongside already-extracted skills
+        so that Knowledge and Task outputs are specific to this role, not generic.
+        """
+        skills_formatted = "\n".join(f"- {s}" for s in extracted_skills)
+        return KT_FROM_SKILLS_PROMPT.format(
+            description=description,
+            skills=skills_formatted,
         )
 
     def strong_preprocessing_prompt(self, raw_description):
@@ -245,6 +260,49 @@ class ResponseParser:
             return []
 
     @staticmethod
+    @staticmethod
+    def parse_knowledge_task_response(response: str) -> List[Dict[str, Any]]:
+        """
+        Parse the JSON response from KT_FROM_SKILLS_PROMPT.
+
+        Returns a list of dicts, each with keys:
+            skill     str
+            knowledge List[str]
+            tasks     List[str]
+        """
+        try:
+            # Strip markdown code fences if present
+            cleaned = re.sub(r"```(?:json)?", "", response).strip().rstrip("`").strip()
+            parsed = json.loads(cleaned)
+            results = parsed.get("results", [])
+
+            validated = []
+            for item in results:
+                if not isinstance(item, dict):
+                    continue
+                skill = str(item.get("skill", "")).strip()
+                knowledge = item.get("knowledge", [])
+                tasks = item.get("tasks", [])
+
+                if not isinstance(knowledge, list):
+                    knowledge = [str(knowledge)] if knowledge else []
+                if not isinstance(tasks, list):
+                    tasks = [str(tasks)] if tasks else []
+
+                if skill:
+                    validated.append(
+                        {
+                            "skill": skill,
+                            "knowledge": [k.strip() for k in knowledge if k.strip()],
+                            "tasks": [t.strip() for t in tasks if t.strip()],
+                        }
+                    )
+            return validated
+
+        except Exception as e:
+            logger.warning(f"Failed to parse knowledge/task response: {e}")
+            return []
+
     def parse_ksa_details_response(response: str) -> Tuple[List[str], List[str]]:
         """Parse KSA details response"""
         try:
@@ -460,6 +518,7 @@ class SkillExtractionService:
         batch_size: int = DEFAULT_BATCH_SIZE,
         warnings: bool = True,
         allowed_sources: Optional[List[str]] = None,
+        extract: List[str] = None,
     ) -> pd.DataFrame:
         """
         Extract and align skills from a dataset (main interface method).
@@ -489,13 +548,25 @@ class SkillExtractionService:
         warnings : bool
             Whether to show warnings
 
+        extract : list, optional
+            Types to extract. Options: "skills", "knowledge", "tasks".
+            Defaults to ["skills"] for backward compatibility.
+            Pass ["skills", "knowledge", "tasks"] or ["all"] for full v0.5 extraction.
+
         Returns
         -------
         pd.DataFrame
-            DataFrame with extracted and aligned skills
+            DataFrame with extracted and aligned items.
+            Includes a "Type" column when extracting more than skills.
         """
         if text_columns is None:
             text_columns = ["description"]
+
+        if extract is None:
+            extract = ["skills"]
+        if extract == ["all"] or extract == "all":
+            extract = ["skills", "knowledge", "tasks"]
+        extract = [e.lower().strip() for e in extract]
 
         # --- input validation: ensure `data` is a DataFrame and not None ---
         if data is None:
@@ -514,32 +585,105 @@ class SkillExtractionService:
 
             for idx, row in data.iterrows():
                 try:
-                    # Prepare input data
                     input_data = {col: row.get(col, "") for col in text_columns}
                     input_data["id"] = row.get(id_column, str(idx))
-                    skills = self.extract_raw_llm_skills(input_data, text_columns)
                     full_description = " ".join([str(input_data.get(col, "")) for col in text_columns])
-                    aligned_df = self.align_extracted_skills(
-                        skills,
-                        str(input_data["id"]),
-                        full_description,
-                        similarity_threshold=effective_threshold,
-                        top_k=effective_top_k,
-                        allowed_sources=allowed_sources,
-                    )
+                    doc_id = str(input_data["id"])
 
-                    results.extend(aligned_df.to_dict("records"))
+                    # --- Call 1: Skills extraction (always runs — required for Call 2) ---
+                    skills = self.extract_raw_llm_skills(input_data, text_columns)
+
+                    if "skills" in extract:
+                        aligned_skills = self.align_extracted_skills(
+                            skills,
+                            doc_id,
+                            full_description,
+                            similarity_threshold=effective_threshold,
+                            top_k=effective_top_k,
+                            allowed_sources=allowed_sources,
+                        )
+                        aligned_skills["Type"] = "skill"
+                        results.extend(aligned_skills.to_dict("records"))
+
+                    # --- Call 2: Knowledge + Tasks extraction (uses full description + skills) ---
+                    if "knowledge" in extract or "tasks" in extract:
+                        kt_results = self.extract_raw_llm_knowledge_tasks(input_data, text_columns, skills)
+
+                        raw_knowledge = self._deduplicate([k for item in kt_results for k in item.get("knowledge", [])])
+                        raw_tasks = self._deduplicate([t for item in kt_results for t in item.get("tasks", [])])
+
+                        if "knowledge" in extract and raw_knowledge:
+                            aligned_knowledge = self.align_extracted_knowledge(
+                                raw_knowledge,
+                                doc_id,
+                                full_description,
+                                similarity_threshold=effective_threshold,
+                                top_k=effective_top_k,
+                            )
+                            aligned_knowledge["Type"] = "knowledge"
+                            results.extend(aligned_knowledge.to_dict("records"))
+
+                        if "tasks" in extract and raw_tasks:
+                            aligned_tasks = self.align_extracted_tasks(
+                                raw_tasks,
+                                doc_id,
+                                full_description,
+                                similarity_threshold=effective_threshold,
+                                top_k=effective_top_k,
+                            )
+                            aligned_tasks["Type"] = "task"
+                            results.extend(aligned_tasks.to_dict("records"))
 
                 except Exception as e:
                     if warnings:
                         print(f"Warning: Failed to process row {idx}: {e}")
                     continue
+
             df = pd.DataFrame(results)
             df.to_csv("skills_alignment_results.csv", index=False, encoding="utf-8")
-            return pd.DataFrame(df)
+            return df
 
         except Exception as e:
             raise LAiSERError(f"Batch extraction failed: {e}")
+
+    def _deduplicate(self, items: List[str], semantic_threshold: float = 0.92) -> List[str]:
+        """
+        Two-pass deduplication before alignment.
+
+        Pass 1 — exact: lowercased string match, preserves first occurrence order.
+        Pass 2 — semantic: embedding cosine similarity, drops near-duplicates
+                           above threshold using the already-loaded embedding model.
+        """
+        if not items:
+            return items
+
+        # Pass 1 — exact
+        seen = set()
+        exact_deduped = []
+        for item in items:
+            key = item.lower().strip()
+            if key not in seen:
+                seen.add(key)
+                exact_deduped.append(item)
+
+        if len(exact_deduped) <= 1:
+            return exact_deduped
+
+        # Pass 2 — semantic
+        model = self.data_access.get_embedding_model()
+        embeddings = model.encode(exact_deduped, normalize_embeddings=True)
+        kept_indices = []
+        for i in range(len(exact_deduped)):
+            is_duplicate = False
+            for j in kept_indices:
+                score = float(np.dot(embeddings[i], embeddings[j]))
+                if score >= semantic_threshold:
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                kept_indices.append(i)
+
+        return [exact_deduped[i] for i in kept_indices]
 
     def extract_raw_llm_skills(self, input_data, text_columns):
 
@@ -553,6 +697,101 @@ class SkillExtractionService:
             preview = response.strip().replace("\n", " ")[:200]
             print(f"Warning: failed to parse skills from response: {preview}")
         return skills
+
+    def extract_raw_llm_knowledge_tasks(
+        self,
+        input_data: Dict,
+        text_columns: List[str],
+        extracted_skills: List[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Call 2 of the v0.5 pipeline.
+
+        Uses the full job description + already-extracted skills to derive
+        Knowledge and Tasks for each skill, keeping job-specific context intact.
+
+        Parameters
+        ----------
+        input_data : dict
+            Row data containing text columns
+        text_columns : list
+            Column names to use as job description text
+        extracted_skills : list
+            Skills extracted by Call 1 (extract_raw_llm_skills)
+
+        Returns
+        -------
+        list of dicts with keys: skill, knowledge, tasks
+        """
+        if not extracted_skills:
+            return []
+
+        text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
+        prompt = self.prompt_builder.build_knowledge_task_prompt(text_blob, extracted_skills)
+        response = self.router.generate(prompt)
+        results = self.llm_parser.parse_knowledge_task_response(response)
+
+        if not results:
+            preview = response.strip().replace("\n", " ")[:200]
+            logger.warning(f"Failed to parse knowledge/task response: {preview}")
+
+        return results
+
+    def align_extracted_knowledge(
+        self,
+        raw_knowledge: List[str],
+        document_id: str = "0",
+        description: str = "",
+        similarity_threshold: float = 0.20,
+        top_k: int = DEFAULT_TOP_K,
+    ) -> pd.DataFrame:
+        """
+        Align extracted knowledge items to the Knowledge taxonomy FAISS index.
+
+        Note: Knowledge FAISS index and taxonomy data pipeline are pending v0.5
+        data work. Returns empty DataFrame until index is ready.
+        """
+        # TODO(v0.5): replace with KnowledgeFAISSIndexManager once
+        # knowledge taxonomy data is downloaded, embedded and indexed.
+        logger.warning("Knowledge alignment index not yet available. Returning raw extracted knowledge.")
+        return pd.DataFrame(
+            {
+                "Research ID": document_id,
+                "Raw Knowledge": raw_knowledge,
+                "Taxonomy Knowledge": raw_knowledge,
+                "Taxonomy Description": [""] * len(raw_knowledge),
+                "Taxonomy Source": ["pending"] * len(raw_knowledge),
+                "Correlation Coefficient": [0.0] * len(raw_knowledge),
+            }
+        )
+
+    def align_extracted_tasks(
+        self,
+        raw_tasks: List[str],
+        document_id: str = "0",
+        description: str = "",
+        similarity_threshold: float = 0.20,
+        top_k: int = DEFAULT_TOP_K,
+    ) -> pd.DataFrame:
+        """
+        Align extracted tasks to the Task Abilities taxonomy FAISS index.
+
+        Note: Task FAISS index and taxonomy data pipeline are pending v0.5
+        data work. Returns empty DataFrame until index is ready.
+        """
+        # TODO(v0.5): replace with TaskFAISSIndexManager once
+        # task taxonomy data is downloaded, embedded and indexed.
+        logger.warning("Task alignment index not yet available. Returning raw extracted tasks.")
+        return pd.DataFrame(
+            {
+                "Research ID": document_id,
+                "Raw Task": raw_tasks,
+                "Taxonomy Task": raw_tasks,
+                "Taxonomy Description": [""] * len(raw_tasks),
+                "Taxonomy Source": ["pending"] * len(raw_tasks),
+                "Correlation Coefficient": [0.0] * len(raw_tasks),
+            }
+        )
 
     def align_extracted_skills(
         self,

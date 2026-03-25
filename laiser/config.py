@@ -163,15 +163,17 @@ COMBINED_EXTRACTION_PROMPT = """
     ---
 
     STEP 2 — SKILL EXTRACTION
-    From the filtered content identified in Step 1, extract only the concrete, job-relevant skills that are explicitly stated or strongly implied as required or preferred for the role.
+    From the filtered content identified in Step 1, extract the 8 to 10 most critical skills for this role.
 
     Extraction rules:
-    - Include technical tools, programming languages, frameworks, methodologies, domain knowledge, and clearly-stated professional skills.
-    - Include a skill if it is clearly mentioned or strongly implied as necessary for the role.
+    - Prioritize skills that are central to the role — tools, languages, methodologies, and domain expertise that define the job.
+    - If a skill is mentioned multiple times or listed as a core requirement, it ranks higher.
+    - Consolidate related skills into one — do not list "statistics", "probability", and "optimization" separately if they all point to the same core skill.
     - Exclude generic soft traits, company values, and general workplace behaviors unless used in a specific technical or professional context.
     - Exclude generic terms (e.g. \"communication\", \"leadership\") unless applied in a concrete technical or domain-specific context.
     - Use concise noun phrases only (1-5 words per skill). Do not use full sentences.
     - Do not invent skills or make assumptions beyond what the text states.
+    - Return a maximum of 10 skills. If fewer than 10 are clearly supported, return only those.
 
     Examples of correct extraction:
     - Input: \"Experience with deep learning, natural language processing, or application of large language models is preferred.\"
@@ -264,6 +266,51 @@ For the skill above produce:
 Respond strictly in valid JSON with the exact keys 'Knowledge Required' and 'Task Abilities'.
 [/INST]
 [INST]model"""
+
+KT_FROM_SKILLS_PROMPT = """
+You are an expert workforce analyst. A set of skills has already been extracted from the job description below.
+
+STEP 1 — FILTER (internal only, do not output)
+Before extracting anything, mentally remove the following from the job description:
+- Company names, slogans, branding, mission statements (e.g. "BCG X", "own your tomorrow")
+- Office locations, salaries, benefits, legal boilerplate, EEO statements
+- Culture language ("fast-paced", "self-motivated", "join us", "passionate")
+- Internal product names, team names, or proprietary systems
+- HR and scheduling information
+
+STEP 2 — EXTRACT
+For each extracted skill below, use only the filtered job content to identify:
+- Knowledge: academic concepts, scientific principles, technical theories, and domain expertise that underpin this skill — things you would study in a university course, textbook, or technical training. Must be specific and learnable (e.g. "statistical inference", "gradient descent", "linear algebra") NOT vague goals or outcomes (e.g. "business challenges", "AI principles", "real-world impact")
+- Tasks: specific, observable job activities directly related to this skill — concrete enough to appear as a resume bullet point. Must describe what someone literally does, not goals or outcomes.
+
+Rules:
+- Knowledge items: 2-5 words, specific academic/technical noun phrases only, transferable across companies
+- Knowledge must answer: "what would you study to learn this skill?" not "what is this skill used for?"
+- Task items: 3-8 words, must start with an action verb (e.g. Build, Train, Deploy, Analyze, Design)
+- Task must answer: "what do you actually do?" not "what do you achieve?" — Bad: "Drive business impact", "Apply data science methods". Good: "Train and evaluate machine learning models", "Deploy models to production"
+- Tasks must be specific — avoid generic phrases like "apply X methods" or "work with X tools"
+- Return 2-3 knowledge items per skill
+- Return 2-3 task items per skill
+- Only include what is clearly supported by the filtered job content
+- Do NOT include company-specific, culture, or branding content
+
+Job Description:
+{description}
+
+Extracted Skills:
+{skills}
+
+Return ONLY valid JSON in this exact format with no explanation:
+{{
+  "results": [
+    {{
+      "skill": "skill name exactly as provided",
+      "knowledge": ["knowledge item 1", "knowledge item 2"],
+      "tasks": ["Action verb phrase 1", "Action verb phrase 2"]
+    }}
+  ]
+}}
+"""
 
 # File paths
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
