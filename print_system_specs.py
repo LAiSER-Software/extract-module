@@ -8,10 +8,10 @@ Usage:
 """
 
 import os
-import sys
 import platform
 import shutil
 import subprocess
+import sys
 from typing import Any, Dict, Optional
 
 
@@ -19,7 +19,9 @@ from typing import Any, Dict, Optional
 def _safe_run(cmd, timeout: float = 5.0):
     """Run a command safely with a timeout; return (code, stdout, stderr)."""
     try:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        p = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         try:
             out, err = p.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -62,6 +64,7 @@ def get_cpu_info() -> Dict[str, Any]:
     info["processor"] = platform.processor() or platform.uname().processor
     try:
         import multiprocessing as mp
+
         info["logical_cores"] = mp.cpu_count()
     except Exception:
         info["logical_cores"] = None
@@ -166,36 +169,43 @@ def get_gpu_info() -> Dict[str, Any]:
                 devices = []
                 for i in range(torch.cuda.device_count()):
                     props = torch.cuda.get_device_properties(i)
-                    devices.append({
-                        "index": i,
-                        "name": torch.cuda.get_device_name(i),
-                        "total_memory_bytes": getattr(props, "total_memory", None),
-                        "capability": f"{getattr(props, 'major', '?')}.{getattr(props, 'minor', '?')}",
-                    })
+                    devices.append(
+                        {
+                            "index": i,
+                            "name": torch.cuda.get_device_name(i),
+                            "total_memory_bytes": getattr(props, "total_memory", None),
+                            "capability": f"{getattr(props, 'major', '?')}.{getattr(props, 'minor', '?')}",
+                        }
+                    )
                 info["devices"] = devices
         except Exception:
             pass
 
     # nvidia-smi (if present)
-    code, out, _ = _safe_run([
-        "nvidia-smi",
-        "--query-gpu=name,memory.total,driver_version,cuda_version",
-        "--format=csv,noheader,nounits"
-    ])
+    code, out, _ = _safe_run(
+        [
+            "nvidia-smi",
+            "--query-gpu=name,memory.total,driver_version,cuda_version",
+            "--format=csv,noheader,nounits",
+        ]
+    )
     if code == 0 and out:
         lines = [l.strip() for l in out.splitlines() if l.strip()]
         gpus = []
         for i, line in enumerate(lines):
             parts = [p.strip() for p in line.split(",")]
             g = {"index": i}
-            if len(parts) > 0: g["name"] = parts[0]
+            if len(parts) > 0:
+                g["name"] = parts[0]
             if len(parts) > 1:
                 try:
                     g["total_memory_mb"] = int(parts[1])
                 except Exception:
                     g["total_memory_mb"] = parts[1]
-            if len(parts) > 2: g["driver_version"] = parts[2]
-            if len(parts) > 3: g["cuda_version"] = parts[3]
+            if len(parts) > 2:
+                g["driver_version"] = parts[2]
+            if len(parts) > 3:
+                g["cuda_version"] = parts[3]
             gpus.append(g)
         info["nvidia_smi"] = gpus
         info["has_cuda"] = True if gpus else info.get("has_cuda", False)
@@ -216,6 +226,7 @@ def collect_specs() -> Dict[str, Any]:
 
 def print_report(specs: Dict[str, Any]) -> None:
     from datetime import datetime, timezone
+
     ts = datetime.now(timezone.utc).isoformat()
     os_info = specs.get("os", {})
     cpu = specs.get("cpu", {})
@@ -231,12 +242,18 @@ def print_report(specs: Dict[str, Any]) -> None:
     print(f"Timestamp (UTC): {ts}")
     print(f"OS: {os_info.get('platform')} (machine={os_info.get('machine')})")
     print(f"CPU: {cpu.get('brand_raw') or cpu.get('processor') or 'unknown'}")
-    print(f"  Arch: {cpu.get('architecture')} | Logical cores: {cpu.get('logical_cores')}")
-    print(f"RAM: total={fmt(_bytes_to_gb(ram.get('total_bytes')), ' GB')}, "
-          f"available={fmt(_bytes_to_gb(ram.get('available_bytes')), ' GB')}")
-    print(f"Disk: total={fmt(_bytes_to_gb(disk.get('total_bytes')), ' GB')}, "
-          f"used={fmt(_bytes_to_gb(disk.get('used_bytes')), ' GB')}, "
-          f"free={fmt(_bytes_to_gb(disk.get('free_bytes')), ' GB')}")
+    print(
+        f"  Arch: {cpu.get('architecture')} | Logical cores: {cpu.get('logical_cores')}"
+    )
+    print(
+        f"RAM: total={fmt(_bytes_to_gb(ram.get('total_bytes')), ' GB')}, "
+        f"available={fmt(_bytes_to_gb(ram.get('available_bytes')), ' GB')}"
+    )
+    print(
+        f"Disk: total={fmt(_bytes_to_gb(disk.get('total_bytes')), ' GB')}, "
+        f"used={fmt(_bytes_to_gb(disk.get('used_bytes')), ' GB')}, "
+        f"free={fmt(_bytes_to_gb(disk.get('free_bytes')), ' GB')}"
+    )
     print(f"Python: {py.get('version')} @ {py.get('executable')}")
     print(f"Virtual env: {py.get('venv') or 'None'}")
     if py.get("packages"):
@@ -247,14 +264,18 @@ def print_report(specs: Dict[str, Any]) -> None:
     if gpu.get("has_cuda"):
         if gpu.get("devices"):
             for d in gpu["devices"]:
-                print(f"  - Torch device {d['index']}: {d.get('name')} | "
-                      f"VRAM={fmt(_bytes_to_gb(d.get('total_memory_bytes')), ' GB')} | "
-                      f"CC={d.get('capability')}")
+                print(
+                    f"  - Torch device {d['index']}: {d.get('name')} | "
+                    f"VRAM={fmt(_bytes_to_gb(d.get('total_memory_bytes')), ' GB')} | "
+                    f"CC={d.get('capability')}"
+                )
         if gpu.get("nvidia_smi"):
             for gdev in gpu["nvidia_smi"]:
-                print(f"  - nvidia-smi {gdev.get('index')}: {gdev.get('name')} | "
-                      f"VRAM={gdev.get('total_memory_mb')} MB | "
-                      f"driver={gdev.get('driver_version')} | CUDA={gdev.get('cuda_version')}")
+                print(
+                    f"  - nvidia-smi {gdev.get('index')}: {gdev.get('name')} | "
+                    f"VRAM={gdev.get('total_memory_mb')} MB | "
+                    f"driver={gdev.get('driver_version')} | CUDA={gdev.get('cuda_version')}"
+                )
     else:
         print("  - No CUDA-capable GPU detected (or drivers not available).")
 

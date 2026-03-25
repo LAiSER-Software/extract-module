@@ -1,4 +1,3 @@
-
 """
 Module Description:
 -------------------
@@ -33,6 +32,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER I
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 """
 Revision History
 -----------------
@@ -52,7 +52,9 @@ import os
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-SKILL_DB_PATH = os.path.join('https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv')
+SKILL_DB_PATH = os.path.join(
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv"
+)
 
 
 SIMILARITY_THRESHOLD = 0.85

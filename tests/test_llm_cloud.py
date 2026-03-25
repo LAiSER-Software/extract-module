@@ -1,89 +1,89 @@
-import os
-import pandas as pd
-import pytest
-
 import json
+import os
 import re
 from typing import List
 
+import pandas as pd
+import pytest
 from dotenv import load_dotenv
+
 load_dotenv()
 from laiser.llm_models.llm_router import LLMRouter
 
-def _parse_skills_from_response( response: str) -> List[str]:
-        if not response or not response.strip():
-            return []
 
-        fragments: List[str] = []
-        stripped = response.strip()
-
-        code_match = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL)
-        if code_match:
-            fragments.append(code_match.group(1).strip())
-
-        brace_match = re.search(r"\{.*?\}", stripped, re.DOTALL)
-        if brace_match:
-            fragments.append(brace_match.group(0).strip())
-
-        list_match = re.search(r"\[.*?\]", stripped, re.DOTALL)
-        if list_match:
-            fragments.append(list_match.group(0).strip())
-
-        fragments.append(stripped)
-
-        seen = set()
-        for fragment in fragments:
-            if not fragment or fragment in seen:
-                continue
-            seen.add(fragment)
-            for candidate in (fragment,):
-                try:
-                    loaded = json.loads(candidate)
-                except json.JSONDecodeError:
-                    continue
-
-                if isinstance(loaded, dict):
-                    skills = loaded.get("skills")
-                    if isinstance(skills, list):
-                        return [str(s).strip() for s in skills if str(s).strip()]
-                elif isinstance(loaded, list):
-                    return [str(s).strip() for s in loaded if str(s).strip()]
-
-        quoted_skills = re.findall(r"\"([^\"]{1,100})\"", stripped)
-        if quoted_skills:
-            cleaned = []
-            for skill in quoted_skills:
-                skill = skill.strip()
-                if not skill:
-                    continue
-                if not (1 <= len(skill.split()) <= 5):
-                    continue
-                if skill.lower().startswith("skills"):
-                    continue
-                cleaned.append(skill)
-            if cleaned:
-                return cleaned
-
+def _parse_skills_from_response(response: str) -> List[str]:
+    if not response or not response.strip():
         return []
-    
+
+    fragments: List[str] = []
+    stripped = response.strip()
+
+    code_match = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL)
+    if code_match:
+        fragments.append(code_match.group(1).strip())
+
+    brace_match = re.search(r"\{.*?\}", stripped, re.DOTALL)
+    if brace_match:
+        fragments.append(brace_match.group(0).strip())
+
+    list_match = re.search(r"\[.*?\]", stripped, re.DOTALL)
+    if list_match:
+        fragments.append(list_match.group(0).strip())
+
+    fragments.append(stripped)
+
+    seen = set()
+    for fragment in fragments:
+        if not fragment or fragment in seen:
+            continue
+        seen.add(fragment)
+        for candidate in (fragment,):
+            try:
+                loaded = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+
+            if isinstance(loaded, dict):
+                skills = loaded.get("skills")
+                if isinstance(skills, list):
+                    return [str(s).strip() for s in skills if str(s).strip()]
+            elif isinstance(loaded, list):
+                return [str(s).strip() for s in loaded if str(s).strip()]
+
+    quoted_skills = re.findall(r"\"([^\"]{1,100})\"", stripped)
+    if quoted_skills:
+        cleaned = []
+        for skill in quoted_skills:
+            skill = skill.strip()
+            if not skill:
+                continue
+            if not (1 <= len(skill.split()) <= 5):
+                continue
+            if skill.lower().startswith("skills"):
+                continue
+            cleaned.append(skill)
+        if cleaned:
+            return cleaned
+
+    return []
+
 
 def run_skill_extractor_smoke():
-   
-    raw_description = (
-    "POSITION SUMMARY: This position requires curriculum development, claim processing, "
-    "and provider data services experience.\n\n"
-    "RESPONSIBILITIES:\n"
-    "- Design and deliver training modules for new hires and existing staff.\n"
-    "- Collaborate with subject matter experts to create engaging learning materials.\n"
-    "- Review claims workflows and develop simulations for hands-on practice.\n"
-    "- Analyze provider data services to identify areas for process improvement.\n\n"
-    "QUALIFICATIONS:\n"
-    "- Bachelor's degree in Healthcare Administration, Education, or related field.\n"
-    "- 3+ years of experience in claims processing and curriculum development.\n"
-    "- Excellent communication and analytical skills."
-)
 
-    
+    raw_description = (
+        "POSITION SUMMARY: This position requires curriculum development, claim processing, "
+        "and provider data services experience.\n\n"
+        "RESPONSIBILITIES:\n"
+        "- Design and deliver training modules for new hires and existing staff.\n"
+        "- Collaborate with subject matter experts to create engaging learning materials.\n"
+        "- Review claims workflows and develop simulations for hands-on practice.\n"
+        "- Analyze provider data services to identify areas for process improvement.\n\n"
+        "QUALIFICATIONS:\n"
+        "- Bachelor's degree in Healthcare Administration, Education, or related field.\n"
+        "- 3+ years of experience in claims processing and curriculum development.\n"
+        "- Excellent communication and analytical skills."
+    )
+
     standard_prompt = f"""
         task: "Skill Extraction from Job Descriptions"
 
@@ -124,13 +124,14 @@ def run_skill_extractor_smoke():
         }}
         """
 
-    router = LLMRouter( model_id="gemini",
-        use_gpu=False,
-        api_key=os.getenv("GEMINI_API_KEY"))
+    router = LLMRouter(
+        model_id="gemini", use_gpu=False, api_key=os.getenv("GEMINI_API_KEY")
+    )
     response = router.generate(standard_prompt)
     skills = _parse_skills_from_response(response)
     print(skills)
-    
+
+
 @pytest.mark.llm_cloud
 def test_cloud_llm():
     # Skip cleanly if API key not present
