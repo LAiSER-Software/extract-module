@@ -53,7 +53,7 @@ TODO:
 """
 
 import os
-from typing import Any, Dict
+from typing import Dict
 
 # Model Configuration
 DEFAULT_TRANSFORMER_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"

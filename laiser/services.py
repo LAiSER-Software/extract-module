@@ -7,14 +7,13 @@ This module contains the core business logic for skill extraction.
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
 
 from laiser.config import (
-    COMBINED_EXTRACTION_PROMPT,
     DEFAULT_BATCH_SIZE,
     DEFAULT_TOP_K,
     KSA_DETAILS_PROMPT,
@@ -24,7 +23,7 @@ from laiser.config import (
     SKILL_EXTRACTION_PROMPT_SYLLABUS,
 )
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
-from laiser.exceptions import InvalidInputError, LAiSERError, SkillExtractionError
+from laiser.exceptions import InvalidInputError, LAiSERError
 from laiser.llm_models.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
@@ -106,41 +105,7 @@ class PromptBuilder:
         )
 
     def strong_preprocessing_prompt(self, raw_description):
-        prompt = f"""
-    You are a data preprocessing assistant trained to clean job descriptions for skill extraction.
-
-    Your task is to remove the following from the text:
-    - Company names, slogans, branding language
-    - Locations, phone numbers, email addresses, URLs
-    - Salary information, job ID, dates, scheduling info (e.g. 9am-5pm, weekends required)
-    - HR/legal boilerplate (EEO, diversity statements, veteran status, disability policies)
-    - Culture fluff like "fun environment", "fast-paced", "initiative", "self-motivated", "join us", "own your tomorrow", "apply now"
-    - Internal team names or product names (e.g. ACE, THD, IMT)
-    - Benefits sections (e.g. health & wellness, sabbatical, 401k, maternity, vacation)
-
-    Your output must *only retain the task-related job duties, technical responsibilities, required skills, qualifications, and tools* without rephrasing.
-
-    Input:
-    \"\"\"
-    {raw_description}
-    \"\"\"
-
-    Return only the cleaned job description.
-    ### CLEANED JOB DESCRIPTION:
-    """
-
-        ## ISSUE: Fix llm router params
-        response = llm_router(
-            prompt,
-            self.model_id,
-            self.use_gpu,
-            self.llm,
-            self.tokenizer,
-            self.model,
-            self.api_key,
-        )
-        cleaned = response.split("### CLEANED JOB DESCRIPTION:")[-1].strip()
-        return cleaned
+        raise NotImplementedError("strong_preprocessing_prompt is not yet implemented. Fix llm router params.")
 
 
 class ResponseParser:

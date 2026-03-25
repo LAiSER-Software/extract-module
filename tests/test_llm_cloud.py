@@ -3,7 +3,6 @@ import os
 import re
 from typing import List
 
-import pandas as pd
 import pytest
 from dotenv import load_dotenv
 

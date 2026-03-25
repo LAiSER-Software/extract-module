@@ -74,7 +74,6 @@ from laiser.config import (
     COMBINED_SKILLS_URL,
     DEFAULT_EMBEDDING_MODEL,
     ESCO_SKILLS_URL,
-    FAISS_INDEX_URL,
     OSN_SKILLS_URL,
 )
 from laiser.exceptions import FAISSIndexError, LAiSERError

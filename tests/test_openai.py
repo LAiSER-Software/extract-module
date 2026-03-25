@@ -1,5 +1,4 @@
 import os
-import time
 
 import pytest
 
@@ -66,8 +65,6 @@ standard_prompt = f"""
 @pytest.mark.openai
 def test_openai_generate_once():
     # 1) explicit opt-in so it doesn’t run accidentally
-    prompt = 'Return ONLY this JSON: {"skills": ["Python"]}'
-
     # 3) small retry to survive 429 bursts
     resp_text = ""
     resp_text = openai_generate(

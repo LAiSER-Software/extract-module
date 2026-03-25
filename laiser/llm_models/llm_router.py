@@ -53,6 +53,14 @@ import os
 
 import torch
 
+from laiser.exceptions import LAiSERError
+from laiser.llm_models.llama_cpp_handler import llama_cpp_chat
+from laiser.llm_models.model_loader import load_model_from_transformer, load_model_from_vllm
+
+MODEL_PATH = os.getenv("LAISER_LLAMA_CPP_MODEL_PATH", "")
+LLAMA_CPP_CTX = int(os.getenv("LLAMA_CPP_CTX", "4096"))
+LLAMA_CPP_THREADS = os.getenv("LLAMA_CPP_THREADS")
+
 # Import with error handling for optional dependencies
 try:
     from laiser.llm_models.gemini import gemini_generate

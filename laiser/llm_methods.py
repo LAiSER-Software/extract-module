@@ -64,7 +64,6 @@ TODO:
 import json
 import re
 
-import numpy as np
 import torch
 
 # Add missing imports
@@ -328,7 +327,7 @@ def parse_output_vllm(response):
                 ]
 
             out.append(skill_data)
-        except:
+        except Exception:
             continue
 
     return out

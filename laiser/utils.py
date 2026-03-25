@@ -51,7 +51,7 @@ import faiss
 import numpy as np
 import pandas as pd
 import psutil
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import SentenceTransformer
 
 
 def cosine_similarity(vec1, vec2):
