@@ -210,13 +210,17 @@ jobs:
             const label = gradeLabel[grade] || 'N/A';
 
             const blockLines = lines.filter(l => /^\s+(M|F|C)\s/.test(l));
-            const rows = blockLines.map(l => {
+            const parsed = blockLines.map(l => {
               const m = l.trim().match(/^([MCF])\s+\d+:\d+\s+(.+?)\s+-\s+([A-F])\s+\((\d+)\)$/);
               if (!m) return null;
               const [, type, name, g, n] = m;
               const typeLabel = type === 'M' ? 'Method' : type === 'F' ? 'Function' : 'Class';
-              return `| ${g} | \`${name}\` | ${typeLabel} | ${n} |`;
-            }).filter(Boolean).join('\n');
+              return { g, name, typeLabel, n: parseInt(n, 10) };
+            }).filter(Boolean);
+            parsed.sort((a, b) => b.n - a.n);
+            const rows = parsed.map(({ g, name, typeLabel, n }) =>
+              `| ${g} | \`${name}\` | ${typeLabel} | ${n} |`
+            ).join('\n');
 
             const body = [
               '**Complexity Analysis**',

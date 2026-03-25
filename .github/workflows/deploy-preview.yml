@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/laiser
+      url: https://test.pypi.org/p/laiser-preview
 
     permissions:
       id-token: write        # required for trusted publishing
@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set preview version
+      - name: Set preview version and name
         run: |
           # Read current version from __init__.py
           CURRENT_VERSION=$(python -c "
@@ -33,14 +33,17 @@ jobs:
           match = re.search(r'__version__\s*=\s*[\"\'](.*?)[\"\']', content)
           print(match.group(1))
           ")
-          PR_NUMBER=${{ github.event.pull_request.number }}
           # Use timestamp to make version unique on every push (PEP 440 compliant)
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           PREVIEW_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
           echo "Preview version: $PREVIEW_VERSION"
 
-          # Update version in __init__.py
+          # Patch version in __init__.py (runner only, never committed)
           sed -i "s/__version__ = \".*\"/__version__ = \"${PREVIEW_VERSION}\"/" laiser/__init__.py
+
+          # Patch package name to laiser-preview in pyproject.toml (runner only, never committed)
+          sed -i 's/^name = "laiser"/name = "laiser-preview"/' pyproject.toml
+
           echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> $GITHUB_ENV
 
       - name: Build preview package
@@ -66,5 +69,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `📦 **Preview package published!**\n\nInstall and test this PR:\n\`\`\`bash\npip install --index-url https://test.pypi.org/simple/ laiser==${{ env.PREVIEW_VERSION }}\n\`\`\``
+              body: `📦 **Preview package published!**\n\nInstall and test this PR:\n\`\`\`bash\npip install --index-url https://test.pypi.org/simple/ laiser-preview==${{ env.PREVIEW_VERSION }}\n\`\`\``
             })
