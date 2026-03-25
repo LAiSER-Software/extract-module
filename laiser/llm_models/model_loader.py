@@ -80,7 +80,9 @@ def load_model_from_transformer(model_id: str = None, token: str = ""):
     except (RepositoryNotFoundError, EntryNotFoundError, OSError) as e:
         print(f"[WARN] Failed to load model '{model_id}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_TRANSFORMER_MODEL_ID}")
-        tokenizer = AutoTokenizer.from_pretrained(DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token, revision="main")  # nosec B615
+        tokenizer = AutoTokenizer.from_pretrained(
+            DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token, revision="main"
+        )  # nosec B615
         model = AutoModelForCausalLM.from_pretrained(
             DEFAULT_TRANSFORMER_MODEL_ID,
             use_auth_token=token,
