@@ -48,9 +48,8 @@ Rev No.     Date            Author              Description
 [1.0.0]     6/30/2025      Anket Patil          Centralize LLM dispatch logic using router function
 """
 
+import os
 import torch
-import spacy
-
 
 # Import with error handling for optional dependencies
 try:
@@ -71,16 +70,15 @@ except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
-import torch
-import spacy
 
 class LLMRouter:
 
-    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None):
+    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None):
         self.model_id = model_id
         self.use_gpu = use_gpu
         self.hf_token = hf_token
         self.api_key = api_key
+        self.backend = backend
 
         self.llm = None
         self.model = None
@@ -97,11 +95,38 @@ class LLMRouter:
         if self.model_id == 'openai':
             return openai_generate(prompt, self.api_key)
 
+        # If a local GGUF model was loaded with llama-cpp-python, use it
+        if self.backend == "llama_cpp":
+              print("LLMRouter: routing request to llama_cpp backend")
+              return llama_cpp_chat(prompt, self.llm)
+
+        print("LLMRouter: routing request to vLLM/transformer backend")
         return llm_generate_vllm(prompt, self.llm)
 
     # ---------------- INIT ----------------
     def _initialize_components(self):
         try:
+            if self.backend == "llama_cpp":
+                print("Using llama-cpp for skill extraction...")
+                try:
+                    from llama_cpp import Llama
+                except ImportError as e:
+                    raise LAiSERError(
+                        "llama-cpp-python is not installed. Install it to use backend='llama_cpp'."
+                    ) from e
+
+                self.llm = Llama(
+                    model_path=str(MODEL_PATH),
+                    n_ctx=LLAMA_CPP_CTX,
+                    n_threads=LLAMA_CPP_THREADS or None,
+                    n_gpu_layers=-1,  # Use GPU if available, else CPU
+                    # logits_all=False,
+                    # chat_format="chatml",
+                )
+                print("Initialized llama.cpp CPU backend.")
+                return
+
+
             if self.model_id == 'gemini':
                 print("Using Gemini API for skill extraction...")
                 return
