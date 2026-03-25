@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  # ── 1. LINT ────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lint tools
+        run: pip install black flake8 isort
+
+      - name: black
+        run: black --check .
+
+      - name: flake8
+        run: flake8 laiser/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+
+      - name: isort
+        run: isort --check-only .
+
+
+  # ── 3. SECURITY ────────────────────────────────────────────────────────────
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-security-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-security-
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" bandit pip-audit
+
+      - name: bandit (code scan)
+        run: bandit -r laiser/ -ll
+
+      - name: pip-audit (dependency CVEs)
+        run: pip-audit
+
+  # ── 4. BUILD ───────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, security]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build package
+        run: |
+          pip install build twine
+          python -m build
+
+      - name: Validate package
+        run: twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

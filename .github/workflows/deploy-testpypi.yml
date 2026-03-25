@@ -1,0 +1,38 @@
+name: Deploy to TestPyPI
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  deploy-testpypi:
+    name: Build & Publish to TestPyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/laiser
+
+    permissions:
+      id-token: write  # required for trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build package
+        run: |
+          pip install build twine
+          python -m build
+
+      - name: Validate package
+        run: twine check dist/*
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
