@@ -1,6 +1,7 @@
 import os
-import requests
+
 import google.generativeai as genai
+import requests
 
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]

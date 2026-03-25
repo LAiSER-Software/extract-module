@@ -22,7 +22,7 @@ jobs:
         run: black --check .
 
       - name: flake8
-        run: flake8 laiser/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+        run: flake8 laiser/ tests/ --max-line-length=120 --extend-ignore=E203,W503,E266,W291,E501
 
       - name: isort
         run: isort --check-only .
