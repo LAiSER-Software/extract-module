@@ -31,9 +31,7 @@ class LlamaCppBackend:
         chat_format: str = "chatml",
     ):
         if Llama is None:
-            raise ImportError(
-                "llama-cpp-python is not installed. Install it to use the llama_cpp backend."
-            )
+            raise ImportError("llama-cpp-python is not installed. Install it to use the llama_cpp backend.")
 
         model_path = model_path or os.getenv("LAISER_LLAMA_CPP_MODEL_PATH")
         if not model_path:

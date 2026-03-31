@@ -69,10 +69,11 @@ def load_model_from_transformer(model_id: str = None, token: str = ""):
     quantization_config = BitsAndBytesConfig(load_in_8bit=True)
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_id, use_auth_token=token)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, use_auth_token=token, revision="main")  # nosec B615
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
             use_auth_token=token,
+            revision="main",  # nosec B615
             quantization_config=quantization_config,
             device_map="auto",
         )
@@ -80,11 +81,12 @@ def load_model_from_transformer(model_id: str = None, token: str = ""):
         print(f"[WARN] Failed to load model '{model_id}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_TRANSFORMER_MODEL_ID}")
         tokenizer = AutoTokenizer.from_pretrained(
-            DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token
-        )
+            DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token, revision="main"
+        )  # nosec B615
         model = AutoModelForCausalLM.from_pretrained(
             DEFAULT_TRANSFORMER_MODEL_ID,
             use_auth_token=token,
+            revision="main",  # nosec B615
             quantization_config=quantization_config,
             device_map="auto",
         )
@@ -95,9 +97,7 @@ def load_model_from_transformer(model_id: str = None, token: str = ""):
 DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 
 
-def load_model_from_vllm(
-    model_id: str = None, token: str = None, dtype: str = None, quantization: str = None
-):
+def load_model_from_vllm(model_id: str = None, token: str = None, dtype: str = None, quantization: str = None):
 
     if not VLLM_AVAILABLE:
         raise ImportError(

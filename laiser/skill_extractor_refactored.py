@@ -57,12 +57,11 @@ TODO:
 
 """
 
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import pandas as pd
-import torch
 
-from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K
+from laiser.config import DEFAULT_BATCH_SIZE
 from laiser.services import SkillExtractionService
 
 

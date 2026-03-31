@@ -242,9 +242,7 @@ def print_report(specs: Dict[str, Any]) -> None:
     print(f"Timestamp (UTC): {ts}")
     print(f"OS: {os_info.get('platform')} (machine={os_info.get('machine')})")
     print(f"CPU: {cpu.get('brand_raw') or cpu.get('processor') or 'unknown'}")
-    print(
-        f"  Arch: {cpu.get('architecture')} | Logical cores: {cpu.get('logical_cores')}"
-    )
+    print(f"  Arch: {cpu.get('architecture')} | Logical cores: {cpu.get('logical_cores')}")
     print(
         f"RAM: total={fmt(_bytes_to_gb(ram.get('total_bytes')), ' GB')}, "
         f"available={fmt(_bytes_to_gb(ram.get('available_bytes')), ' GB')}"

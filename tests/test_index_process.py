@@ -64,6 +64,4 @@ def test_initialize_index_full_flow_subtests():
     check.is_not_none(index4, "step5: index4 should not be None")
     check.is_true(index4.ntotal > 0, "step5: index4.ntotal should be > 0")
     for p in artifacts:
-        check.is_true(
-            p.exists(), f"step5: artifact should exist after rebuild: {p.name}"
-        )
+        check.is_true(p.exists(), f"step5: artifact should exist after rebuild: {p.name}")

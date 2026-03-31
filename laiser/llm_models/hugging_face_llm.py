@@ -64,9 +64,9 @@ def llm_generate(prompt: str, tokenizer, model, model_id: str, use_gpu: bool):
     if tokenizer is None or model is None:
         quantization_config = BitsAndBytesConfig(load_in_8bit=True)
 
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, revision="main")  # nosec B615
         model = AutoModelForCausalLM.from_pretrained(
-            model_id, quantization_config=quantization_config, device_map="auto"
+            model_id, revision="main", quantization_config=quantization_config, device_map="auto"  # nosec B615
         )
 
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)

@@ -1,6 +1,5 @@
 import os
 
-import pandas as pd
 import pytest
 from dotenv import load_dotenv
 
@@ -13,9 +12,7 @@ load_dotenv()
 def run_skill_extractor_smoke():
     data = sample_data().iloc[[2]]
 
-    extractor = SkillExtractorRefactored(
-        model_id="gemini", use_gpu=False, api_key=os.getenv("GEMINI_API_KEY")
-    )
+    extractor = SkillExtractorRefactored(model_id="gemini", use_gpu=False, api_key=os.getenv("GEMINI_API_KEY"))
 
     results = extractor.extract_and_align(
         data=data, id_column="Research ID", text_columns=["description"], warnings=True

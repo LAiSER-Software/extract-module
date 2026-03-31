@@ -3,9 +3,7 @@ from typing import Any, Dict, Tuple
 import pandas as pd
 
 
-def eda_on_results(
-    results: pd.DataFrame, *, print_report: bool = True
-) -> Tuple[Dict[str, Any], pd.DataFrame]:
+def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """
     Perform EDA on an extract-and-align `results` DataFrame.
 
@@ -39,9 +37,7 @@ def eda_on_results(
         [df.columns[1] if df.shape[1] > 1 else None]
     )
     tax_skill_col = _pick(["Taxonomy Skill", "taxonomy skill", "taxonomy_skill"])
-    taxonomy_col = _pick(
-        ["Taxonomy Source", "taxonomy", "Taxonomy Source", "taxonomy_source", "source"]
-    )
+    taxonomy_col = _pick(["Taxonomy Source", "taxonomy", "Taxonomy Source", "taxonomy_source", "source"])
     corr_col = _pick(
         [
             "Correlation Coefficient",
@@ -228,24 +224,14 @@ def eda_on_results(
     # --- summary dict for programmatic use ---
     summary = {
         "n_rows": int(df.shape[0]),
-        "n_unique_research_ids": (
-            int(df["Research ID"].nunique()) if "Research ID" in df.columns else None
-        ),
-        "n_unique_taxonomies": (
-            int(df["taxonomy"].nunique()) if "taxonomy" in df.columns else 0
-        ),
-        "taxonomy_counts": (
-            taxonomy_counts.to_dict() if taxonomy_counts is not None else {}
-        ),
+        "n_unique_research_ids": (int(df["Research ID"].nunique()) if "Research ID" in df.columns else None),
+        "n_unique_taxonomies": (int(df["taxonomy"].nunique()) if "taxonomy" in df.columns else 0),
+        "taxonomy_counts": (taxonomy_counts.to_dict() if taxonomy_counts is not None else {}),
         "corr_stats": corr_stats,
         "top_matches": top_matches,
         "bottom_matches": bottom_matches,
-        "bucket_counts": (
-            bucket_counts if bucket_counts is not None else pd.Series(dtype=int)
-        ),
-        "duplicate_taxonomy_skills": (
-            dup_counts if dup_counts is not None else pd.Series(dtype=int)
-        ),
+        "bucket_counts": (bucket_counts if bucket_counts is not None else pd.Series(dtype=int)),
+        "duplicate_taxonomy_skills": (dup_counts if dup_counts is not None else pd.Series(dtype=int)),
         "coverage_per_doc": coverage,
     }
 

@@ -51,7 +51,7 @@ import faiss
 import numpy as np
 import pandas as pd
 import psutil
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import SentenceTransformer
 
 
 def cosine_similarity(vec1, vec2):
@@ -121,9 +121,7 @@ def load_faiss_index_esco():
 
         import os
 
-        index_path = os.path.join(
-            os.path.dirname(__file__), "input/esco_faiss_index.index"
-        )
+        index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
         if not os.path.exists(index_path):
             raise FileNotFoundError(
                 f"FAISS index file not found at {index_path}. Please ensure the file exists."
@@ -143,9 +141,7 @@ def get_top_esco_skills(input_text, top_k=10):
     model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
     index = load_faiss_index_esco()
     if index is None:
-        raise ValueError(
-            "FAISS index for ESCO skills didn't load properly. Please check the index file."
-        )
+        raise ValueError("FAISS index for ESCO skills didn't load properly. Please check the index file.")
     skill_names = pd.read_csv(
         "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
     )["preferredLabel"].tolist()
@@ -156,6 +152,7 @@ def get_top_esco_skills(input_text, top_k=10):
         {"Skill": skill_names[i], "index": int(i), "score": float(scores[0][j])}
         for j, i in enumerate(indices[0])
     ]
+
 
 
 def get_embedding(nlp, input_text):

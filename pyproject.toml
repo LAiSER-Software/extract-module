@@ -69,3 +69,11 @@ version = {attr = "laiser.__version__"}
 
 [tool.setuptools.package-data]
 laiser = ["public/*"]
+
+[tool.black]
+target-version = ["py311"]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120

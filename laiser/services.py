@@ -7,14 +7,13 @@ This module contains the core business logic for skill extraction.
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
 
 from laiser.config import (
-    COMBINED_EXTRACTION_PROMPT,
     DEFAULT_BATCH_SIZE,
     DEFAULT_TOP_K,
     KSA_DETAILS_PROMPT,
@@ -24,7 +23,7 @@ from laiser.config import (
     SKILL_EXTRACTION_PROMPT_SYLLABUS,
 )
 from laiser.data_access import DataAccessLayer, FAISSIndexManager
-from laiser.exceptions import InvalidInputError, LAiSERError, SkillExtractionError
+from laiser.exceptions import InvalidInputError, LAiSERError
 from laiser.llm_models.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
@@ -61,9 +60,7 @@ class PromptBuilder:
         """Build prompt for KSA (Knowledge, Skills, Abilities) extraction"""
 
         input_desc = (
-            "job description"
-            if input_type == "job_desc"
-            else "course syllabus description and its learning outcomes"
+            "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
         )
 
         if input_type == "syllabus":
@@ -72,16 +69,10 @@ class PromptBuilder:
             input_text = f"### Input:\\n{query.get('description', '')}"
 
         # Format SCQF levels
-        scqf_levels_text = "\\n".join(
-            [f"  - {level}: {desc}" for level, desc in SCQF_LEVELS.items()]
-        )
+        scqf_levels_text = "\\n".join([f"  - {level}: {desc}" for level, desc in SCQF_LEVELS.items()])
 
         # Prepare ESCO context
-        esco_context_block = (
-            ", ".join(esco_skills)
-            if esco_skills
-            else "No relevant skills found in taxonomy"
-        )
+        esco_context_block = ", ".join(esco_skills) if esco_skills else "No relevant skills found in taxonomy"
 
         return KSA_EXTRACTION_PROMPT.format(
             input_desc=input_desc,
@@ -106,41 +97,7 @@ class PromptBuilder:
         )
 
     def strong_preprocessing_prompt(self, raw_description):
-        prompt = f"""
-    You are a data preprocessing assistant trained to clean job descriptions for skill extraction.
-
-    Your task is to remove the following from the text:
-    - Company names, slogans, branding language
-    - Locations, phone numbers, email addresses, URLs
-    - Salary information, job ID, dates, scheduling info (e.g. 9am-5pm, weekends required)
-    - HR/legal boilerplate (EEO, diversity statements, veteran status, disability policies)
-    - Culture fluff like "fun environment", "fast-paced", "initiative", "self-motivated", "join us", "own your tomorrow", "apply now"
-    - Internal team names or product names (e.g. ACE, THD, IMT)
-    - Benefits sections (e.g. health & wellness, sabbatical, 401k, maternity, vacation)
-
-    Your output must *only retain the task-related job duties, technical responsibilities, required skills, qualifications, and tools* without rephrasing.
-
-    Input:
-    \"\"\"
-    {raw_description}
-    \"\"\"
-
-    Return only the cleaned job description.
-    ### CLEANED JOB DESCRIPTION:
-    """
-
-        ## ISSUE: Fix llm router params
-        response = llm_router(
-            prompt,
-            self.model_id,
-            self.use_gpu,
-            self.llm,
-            self.tokenizer,
-            self.model,
-            self.api_key,
-        )
-        cleaned = response.split("### CLEANED JOB DESCRIPTION:")[-1].strip()
-        return cleaned
+        raise NotImplementedError("strong_preprocessing_prompt is not yet implemented. Fix llm router params.")
 
 
 class ResponseParser:
@@ -226,9 +183,7 @@ class ResponseParser:
             # Remove any unwanted prefixes and tags
             clean_lines = []
             for line in lines:
-                if line.startswith("<start_of_turn>") or line.startswith(
-                    "<end_of_turn>"
-                ):
+                if line.startswith("<start_of_turn>") or line.startswith("<end_of_turn>"):
                     continue
                 if "--" in line:  # Skip separator lines
                     continue
@@ -272,9 +227,7 @@ class ResponseParser:
                     )
                     if knowledge_match:
                         knowledge_raw = knowledge_match.group(1).strip()
-                        skill_data["Knowledge Required"] = [
-                            k.strip() for k in knowledge_raw.split(",") if k.strip()
-                        ]
+                        skill_data["Knowledge Required"] = [k.strip() for k in knowledge_raw.split(",") if k.strip()]
 
                     # Extract task abilities (multi-line support)
                     task_match = re.search(
@@ -282,9 +235,7 @@ class ResponseParser:
                     )
                     if task_match:
                         task_raw = task_match.group(1).strip()
-                        skill_data["Task Abilities"] = [
-                            t.strip() for t in task_raw.split(",") if t.strip()
-                        ]
+                        skill_data["Task Abilities"] = [t.strip() for t in task_raw.split(",") if t.strip()]
 
                     if skill_data:  # Only add if we found some data
                         out.append(skill_data)
@@ -418,9 +369,7 @@ class SkillAlignmentService:
             taxonomy_description = meta.get("description", meta.get("Description", ""))
             taxonomy_source = meta.get("taxonomy", meta.get("taxonomy", ""))
 
-            log_debug(
-                f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}"
-            )
+            log_debug(f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}")
 
             mapped_skills.append(canonical_skill)
             raw_skills_matched.append(skill)
@@ -442,7 +391,6 @@ class SkillAlignmentService:
                     mapped_skills,
                     taxonomy_descriptions,
                     taxonomy_sources,
-                    source_urls,
                 )
             )
             combined.sort(key=lambda x: x[0], reverse=True)
@@ -454,7 +402,6 @@ class SkillAlignmentService:
                 mapped_skills,
                 taxonomy_descriptions,
                 taxonomy_sources,
-                source_urls,
             ) = map(
                 list, zip(*combined)
             )  # ✅ FIX #2: keep lists aligned
@@ -466,7 +413,6 @@ class SkillAlignmentService:
                 "Taxonomy Skill": mapped_skills,
                 "Taxonomy Description": taxonomy_descriptions,
                 "Taxonomy Source": taxonomy_sources,
-                "Source URL": source_urls,
                 "Correlation Coefficient": correlations,
             }
         )
@@ -581,9 +527,7 @@ class SkillExtractionService:
 
         # Apply defaults for top_k and similarity_threshold
         effective_top_k = top_k if top_k is not None else DEFAULT_TOP_K
-        effective_threshold = (
-            similarity_threshold if similarity_threshold is not None else 0.20
-        )
+        effective_threshold = similarity_threshold if similarity_threshold is not None else 0.20
 
         try:
             results = []
@@ -594,9 +538,7 @@ class SkillExtractionService:
                     input_data = {col: row.get(col, "") for col in text_columns}
                     input_data["id"] = row.get(id_column, str(idx))
                     skills = self.extract_raw_llm_skills(input_data, text_columns)
-                    full_description = " ".join(
-                        [str(input_data.get(col, "")) for col in text_columns]
-                    )
+                    full_description = " ".join([str(input_data.get(col, "")) for col in text_columns])
                     aligned_df = self.align_extracted_skills(
                         skills,
                         str(input_data["id"]),
@@ -621,9 +563,7 @@ class SkillExtractionService:
 
     def extract_raw_llm_skills(self, input_data, text_columns):
 
-        text_blob = " ".join(
-            str(input_data.get(col, "")) for col in text_columns
-        ).strip()
+        text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
         extraction_prompt = self.prompt_builder.build_skill_extraction_prompt(
             input_text=text_blob, input_type="job_desc"
         )

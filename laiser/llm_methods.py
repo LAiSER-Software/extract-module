@@ -64,7 +64,6 @@ TODO:
 import json
 import re
 
-import numpy as np
 import torch
 
 # Add missing imports
@@ -89,6 +88,7 @@ except ImportError as e:
         raise ImportError(
             "llm_router is not available. Please check your installation."
         )
+
 
 
 torch.cuda.empty_cache()
@@ -315,20 +315,16 @@ def parse_output_vllm(response):
             )
             if knowledge_match:
                 knowledge_raw = knowledge_match.group(1).strip()
-                skill_data["Knowledge Required"] = [
-                    k.strip() for k in knowledge_raw.split(",") if k.strip()
-                ]
+                skill_data["Knowledge Required"] = [k.strip() for k in knowledge_raw.split(",") if k.strip()]
 
             # Extract task abilities (multi-line support with re.DOTALL)
             task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
             if task_match:
                 task_raw = task_match.group(1).strip()
-                skill_data["Task Abilities"] = [
-                    t.strip() for t in task_raw.split(",") if t.strip()
-                ]
+                skill_data["Task Abilities"] = [t.strip() for t in task_raw.split(",") if t.strip()]
 
             out.append(skill_data)
-        except:
+        except Exception:
             continue
 
     return out
@@ -411,9 +407,7 @@ model
 """
 
     input_desc = (
-        "job description"
-        if input_type == "job_desc"
-        else "course syllabus description and its learning outcomes"
+        "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
     )
 
     # Convert pandas Series to dict if needed
@@ -478,9 +472,7 @@ def vllm_generate(
     """
 
     if not VLLM_AVAILABLE:
-        raise ImportError(
-            "vLLM is not installed. Please install it to use this function."
-        )
+        raise ImportError("vLLM is not installed. Please install it to use this function.")
 
     result = []
 
@@ -488,9 +480,7 @@ def vllm_generate(
 
     for i in range(0, len(queries), batch_size):
         prompts = [
-            create_ksa_prompt(
-                queries.iloc[j], input_type, num_key_skills, num_key_kr, num_key_tas
-            )
+            create_ksa_prompt(queries.iloc[j], input_type, num_key_skills, num_key_kr, num_key_tas)
             for j in range(i, min(i + batch_size, len(queries)))
         ]
 
@@ -505,9 +495,7 @@ def vllm_generate(
     return result
 
 
-def get_completion_vllm(
-    input_text, text_columns, id_column, input_type, llm, batch_size
-) -> list:
+def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, batch_size) -> list:
     """
     Get completions for whole input data and parse the required KSAs from the model responses. The input data can be a job description or syllabi data.
 

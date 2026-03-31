@@ -8,24 +8,16 @@ from laiser.skill_extractor import Skill_Extractor
 # TODO: Check with and without GPU availablility
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(
-    description="Run Skill Extractor on jobs and syllabi data."
-)
-parser.add_argument(
-    "--HF_TOKEN", type=str, default=None, help="Hugging Face token for authentication"
-)
-parser.add_argument(
-    "--AI_MODEL_ID", type=str, default=None, help="Model name for Skill Extractor"
-)
+parser = argparse.ArgumentParser(description="Run Skill Extractor on jobs and syllabi data.")
+parser.add_argument("--HF_TOKEN", type=str, default=None, help="Hugging Face token for authentication")
+parser.add_argument("--AI_MODEL_ID", type=str, default=None, help="Model name for Skill Extractor")
 parser.add_argument(
     "--use_gpu",
     type=str,
     default=str(torch.cuda.is_available()),
     help="Enable or disable GPU use.",
 )
-parser.add_argument(
-    "--batch_size", type=int, default=32, help="Batch size for skills extraction"
-)
+parser.add_argument("--batch_size", type=int, default=32, help="Batch size for skills extraction")
 args = parser.parse_args()
 
 
@@ -35,9 +27,7 @@ use_gpu = True if args.use_gpu == "True" else False
 # python main.py --HF_TOKEN <your_hf_token> --AI_MODEL_ID <your_model_id> --use_gpu True --batch_size 32
 
 print("\n\nInitializing the Skill Extractor...")
-se = Skill_Extractor(
-    AI_MODEL_ID=args.AI_MODEL_ID, HF_TOKEN=args.HF_TOKEN, use_gpu=use_gpu
-)
+se = Skill_Extractor(AI_MODEL_ID=args.AI_MODEL_ID, HF_TOKEN=args.HF_TOKEN, use_gpu=use_gpu)
 print("The Skill Extractor has been initialized successfully!\n")
 
 # Skill extraction from jobs data
@@ -52,9 +42,7 @@ job_sample = job_sample[1:3]
 print("The sample dataset has been filtered successfully!\n")
 print("Head of the sample:\n", job_sample.head())
 
-output = se.extractor(
-    job_sample, "job_id", text_columns=["description"], batch_size=args.batch_size
-)
+output = se.extractor(job_sample, "job_id", text_columns=["description"], batch_size=args.batch_size)
 print("The skills have been extracted from jobs data successfully...\n")
 
 # Save the extracted skills to a CSV file

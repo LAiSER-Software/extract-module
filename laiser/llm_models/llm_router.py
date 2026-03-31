@@ -53,6 +53,14 @@ import os
 
 import torch
 
+from laiser.exceptions import LAiSERError
+from laiser.llm_models.llama_cpp_handler import llama_cpp_chat
+from laiser.llm_models.model_loader import load_model_from_transformer, load_model_from_vllm
+
+MODEL_PATH = os.getenv("LAISER_LLAMA_CPP_MODEL_PATH", "")
+LLAMA_CPP_CTX = int(os.getenv("LLAMA_CPP_CTX", "4096"))
+LLAMA_CPP_THREADS = os.getenv("LLAMA_CPP_THREADS")
+
 # Import with error handling for optional dependencies
 try:
     from laiser.llm_models.gemini import gemini_generate
@@ -60,9 +68,7 @@ except ImportError as e:
     print(f"Warning: Gemini support not available: {e}")
 
     def gemini_generate(*args, **kwargs):
-        raise ImportError(
-            "Gemini support is not available. Please install google-generativeai package."
-        )
+        raise ImportError("Gemini support is not available. Please install google-generativeai package.")
 
 
 # Import with error handling for optional dependencies
@@ -80,6 +86,7 @@ except ImportError as e:
         raise ImportError(
             "HuggingFace LLM support is not available. Please install required packages."
         )
+
 
 
 class LLMRouter:
@@ -181,6 +188,4 @@ class LLMRouter:
         self.llm = load_model_from_vllm(self.model_id, self.hf_token)
 
     def _initialize_transformer(self):
-        self.tokenizer, self.model = load_model_from_transformer(
-            self.model_id, self.hf_token
-        )
+        self.tokenizer, self.model = load_model_from_transformer(self.model_id, self.hf_token)

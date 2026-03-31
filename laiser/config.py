@@ -53,7 +53,7 @@ TODO:
 """
 
 import os
-from typing import Any, Dict
+from typing import Dict
 
 # Model Configuration
 DEFAULT_TRANSFORMER_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
@@ -64,10 +64,18 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 SIMILARITY_THRESHOLD = 0.85
 
 # ESCO Configuration
-ESCO_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
-OSN_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/osn_taxanomy_merged.csv"
-COMBINED_SKILLS_URL = "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv"
-FAISS_INDEX_URL = "https://raw.githubusercontent.com/LAiSER-Software/extract-module/main/laiser/input/esco_faiss_index.index"
+ESCO_SKILLS_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
+)
+OSN_SKILLS_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/osn_taxanomy_merged.csv"
+)
+COMBINED_SKILLS_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/combined.csv"
+)
+FAISS_INDEX_URL = (
+    "https://raw.githubusercontent.com/LAiSER-Software/extract-module/main/laiser/input/esco_faiss_index.index"
+)
 
 # Batch processing
 DEFAULT_BATCH_SIZE = 32
