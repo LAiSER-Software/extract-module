@@ -238,7 +238,9 @@ class FAISSIndexManager:
 
     # Issue: Do we even need this? Can't this be done in init
     # Issue [GFI_OddEven]: Split these into two seperate modules load and build index
-    def initialize_index(self, force_rebuild: bool = False, debug: bool = False) -> faiss.IndexFlatIP:
+    def initialize_index(
+        self, force_rebuild: bool = False, debug: bool = False
+    ) -> faiss.IndexFlatIP:
         """Initialize FAISS index (load or build).
 
         Behavior (minimal & strict):
@@ -260,7 +262,9 @@ class FAISSIndexManager:
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
             try:
                 self.index = self.data_access.load_faiss_index(str(local_index_path))
-                self.metadata = self.data_access.load_skill_metadata(str(local_json_path))
+                self.metadata = self.data_access.load_skill_metadata(
+                    str(local_json_path)
+                )
             except Exception as e:
                 if debug:
                     logger.warning(f"[initialize_index] load attempt failed: {e}")
@@ -318,7 +322,9 @@ class FAISSIndexManager:
                     "taxonomy",
                 ]:
                     # find actual column name (case-insensitive)
-                    found = next((col for col in single_df.columns if col.lower() == c), None)
+                    found = next(
+                        (col for col in single_df.columns if col.lower() == c), None
+                    )
                     if found:
                         keep_cols.append(found)
                 single_df = single_df[keep_cols].copy()
@@ -511,7 +517,9 @@ class FAISSIndexManager:
 
         # Persist metadata JSON and FAISS index (best-effort with debug warnings)
         try:
-            self.data_access.save_skill_metadata_json(self.metadata, str(local_json_path))
+            self.data_access.save_skill_metadata_json(
+                self.metadata, str(local_json_path)
+            )
         except Exception as e:
             if debug:
                 logger.warning(f"[initialize_index] Failed to write metadata JSON: {e}")
@@ -554,10 +562,14 @@ class FAISSIndexManager:
           ordered by similarity. If you want a safety limit, pass `max_results` (int).
         """
         if self.index is None:
-            raise FAISSIndexError("FAISS index not initialized. Call initialize_index() first.")
+            raise FAISSIndexError(
+                "FAISS index not initialized. Call initialize_index() first."
+            )
 
         if self.metadata is None:
-            raise FAISSIndexError("Metadata not initialized. Call initialize_index() first.")
+            raise FAISSIndexError(
+                "Metadata not initialized. Call initialize_index() first."
+            )
 
         # Ensure skill_names come from metadata
         if self.skill_names is None:
@@ -598,7 +610,9 @@ class FAISSIndexManager:
                 top_k = max(1, min(int(top_k), ntotal))
                 scores, indices = self.index.search(q, top_k)
                 results = []
-                for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
+                for rank, (score, idx) in enumerate(
+                    zip(scores[0], indices[0]), start=1
+                ):
                     if idx == -1:
                         continue
                     results.append(

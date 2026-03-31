@@ -66,7 +66,9 @@ def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple
 
     # Make sure correlation is numeric
     if "Correlation Coefficient" in df.columns:
-        df["Correlation Coefficient"] = pd.to_numeric(df["Correlation Coefficient"], errors="coerce")
+        df["Correlation Coefficient"] = pd.to_numeric(
+            df["Correlation Coefficient"], errors="coerce"
+        )
 
     # --- core view (small table) ---
     core_cols = ["Research ID", "Raw Skill"]
@@ -76,16 +78,26 @@ def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple
         core_cols.append("taxonomy")
     if "Taxonomy Description" in df.columns:
         core_cols.append("Taxonomy Description")
+    if "Source URL" in df.columns:
+        core_cols.append("Source URL")
     if "Correlation Coefficient" in df.columns:
         core_cols.append("Correlation Coefficient")
 
     core_view = df.loc[:, [c for c in core_cols if c in df.columns]]
 
     # --- taxonomy summary ---
-    taxonomy_counts = df["taxonomy"].value_counts() if "taxonomy" in df.columns else pd.Series(dtype=int)
+    taxonomy_counts = (
+        df["taxonomy"].value_counts()
+        if "taxonomy" in df.columns
+        else pd.Series(dtype=int)
+    )
 
     # --- correlation stats ---
-    corr_series = df["Correlation Coefficient"] if "Correlation Coefficient" in df.columns else pd.Series(dtype=float)
+    corr_series = (
+        df["Correlation Coefficient"]
+        if "Correlation Coefficient" in df.columns
+        else pd.Series(dtype=float)
+    )
     corr_stats = {}
     if not corr_series.dropna().empty:
         corr_stats = {
@@ -116,8 +128,12 @@ def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple
     if "Correlation Coefficient" in df.columns:
         bins = [0.0, 0.4, 0.5, 0.6, 0.7, 1.0]
         labels = ["<0.4", "0.4–0.5", "0.5–0.6", "0.6–0.7", "0.7+"]
-        df["Corr Bucket"] = pd.cut(df["Correlation Coefficient"], bins=bins, labels=labels, include_lowest=True)
-        bucket_counts = df["Corr Bucket"].value_counts().reindex(labels).fillna(0).astype(int)
+        df["Corr Bucket"] = pd.cut(
+            df["Correlation Coefficient"], bins=bins, labels=labels, include_lowest=True
+        )
+        bucket_counts = (
+            df["Corr Bucket"].value_counts().reindex(labels).fillna(0).astype(int)
+        )
 
     # --- duplicate taxonomy mapping (taxonomy skill duplicated) ---
     dup_counts = None
