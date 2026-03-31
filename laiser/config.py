@@ -63,6 +63,13 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 # Similarity thresholds
 SIMILARITY_THRESHOLD = 0.85
 
+# Per-type similarity thresholds for v0.5 KST extraction
+DEFAULT_SIMILARITY_THRESHOLDS = {
+    "skill": 0.20,
+    "knowledge": 0.45,
+    "task": 0.55,
+}
+
 # ESCO Configuration
 ESCO_SKILLS_URL = (
     "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
@@ -279,20 +286,59 @@ Before extracting anything, mentally remove the following from the job descripti
 - HR and scheduling information
 
 STEP 2 — EXTRACT
-For each extracted skill below, use only the filtered job content to identify:
-- Knowledge: academic concepts, scientific principles, technical theories, and domain expertise that underpin this skill — things you would study in a university course, textbook, or technical training. Must be specific and learnable (e.g. "statistical inference", "gradient descent", "linear algebra") NOT vague goals or outcomes (e.g. "business challenges", "AI principles", "real-world impact")
-- Tasks: specific, observable job activities directly related to this skill — concrete enough to appear as a resume bullet point. Must describe what someone literally does, not goals or outcomes.
+For each extracted skill below, use only the filtered job content to identify Knowledge and Tasks.
 
-Rules:
-- Knowledge items: 2-5 words, specific academic/technical noun phrases only, transferable across companies
-- Knowledge must answer: "what would you study to learn this skill?" not "what is this skill used for?"
-- Task items: 3-8 words, must start with an action verb (e.g. Build, Train, Deploy, Analyze, Design)
-- Task must answer: "what do you actually do?" not "what do you achieve?" — Bad: "Drive business impact", "Apply data science methods". Good: "Train and evaluate machine learning models", "Deploy models to production"
-- Tasks must be specific — avoid generic phrases like "apply X methods" or "work with X tools"
-- Return 2-3 knowledge items per skill
-- Return 2-3 task items per skill
+━━━ KNOWLEDGE ━━━
+Named academic fields, scientific theories, or technical subjects that a person must study to develop this skill.
+Think: what is the course title or textbook chapter that teaches this?
+
+RULES:
+- Exactly 2 items per skill
+- 2-4 words, named concept only — no adjectives like "advanced", "modern", "complex"
+- Must be a proper named field: "Bayesian inference", "linear algebra", "graph theory", "stochastic processes"
+- Do NOT repeat a knowledge item already listed for another skill in this response
+- REJECT: anything ending in "principles", "methods", "techniques", "practices", "concepts", "approaches"
+- REJECT: "X methodologies", "X strategies", "X theory" where X is vague (e.g. "data science theory")
+
+  GOOD: "statistical inference", "gradient descent", "linear algebra", "transformer architecture",
+        "dynamic programming", "Bayesian statistics", "queueing theory", "convex optimization"
+  BAD:  "data science methodologies", "ML techniques", "software development principles",
+        "analytical modeling principles", "quantitative analysis techniques"
+
+━━━ TASKS ━━━
+Full-sentence job activities written in the style of an O*NET task statement or resume bullet.
+Must describe a specific, observable action with a direct object — not a goal, outcome, or capability.
+
+RULES:
+- Exactly 2 items per skill
+- 8-15 words per task — full sentence, not a phrase
+- Format: [Action verb] + [specific object] + [method/tool/context]
+- The direct object must be specific — "neural network models", "SQL queries", "regression models", not "solutions" or "results"
+- BANNED verbs/patterns: "Apply X", "Use X", "Work with X", "Enable X", "Understand X",
+  "Build X solutions", "Implement X solutions", "Deploy X solutions", "Solve X challenges",
+  "Frame X", "Distill X", "Explain sophisticated X"
+- REJECT any task under 7 words
+- REJECT any task where the object is generic: "solutions", "results", "insights", "challenges", "impact"
+
+  GOOD: "Train and evaluate gradient boosting models using scikit-learn and cross-validation"
+        "Write optimized SQL queries to extract and aggregate large-scale datasets"
+        "Debug and profile Python scripts to identify performance bottlenecks"
+        "Formulate linear programming models to minimize operational costs"
+        "Design A/B experiments and compute statistical significance of results"
+        "Build interactive dashboards in Tableau to visualize KPI trends"
+
+  BAD:  "Apply data science methods"  ← too short, no object
+        "Design innovative algorithms"  ← "innovative" is filler, object is vague
+        "Implement scalable solutions"  ← "solutions" is not a direct object
+        "Deploy AI solutions"  ← 3 words, no context
+        "Understand machine learning underpinnings"  ← cognitive state, not an action
+        "Work with development tools"  ← banned pattern
+
+QUANTITY RULES:
+- Return exactly 2 knowledge items per skill
+- Return exactly 2 task items per skill
 - Only include what is clearly supported by the filtered job content
-- Do NOT include company-specific, culture, or branding content
+- Do NOT invent knowledge or tasks not implied by the job description
 
 Job Description:
 {description}
@@ -305,8 +351,8 @@ Return ONLY valid JSON in this exact format with no explanation:
   "results": [
     {{
       "skill": "skill name exactly as provided",
-      "knowledge": ["knowledge item 1", "knowledge item 2"],
-      "tasks": ["Action verb phrase 1", "Action verb phrase 2"]
+      "knowledge": ["named field 1", "named field 2"],
+      "tasks": ["Full sentence task with specific object and method", "Full sentence task with specific object and method"]
     }}
   ]
 }}
