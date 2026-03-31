@@ -36,9 +36,7 @@ class PromptBuilder:
     def build_skill_extraction_prompt(input_text: str, input_type: str) -> str:
         """Build prompt for basic skill extraction"""
         if input_type == "job_desc":
-            extraction_prompt = SKILL_EXTRACTION_PROMPT_JOB.format(
-                description=input_text
-            )
+            extraction_prompt = SKILL_EXTRACTION_PROMPT_JOB.format(description=input_text)
             return extraction_prompt
         elif input_type == "syllabus":
             return SKILL_EXTRACTION_PROMPT_SYLLABUS.format(
@@ -64,7 +62,10 @@ class PromptBuilder:
         )
 
         if input_type == "syllabus":
-            input_text = f"### Input:\\n**Course Description:** {query.get('description', '')}\\n**Learning Outcomes:** {query.get('learning_outcomes', '')}"
+            input_text = (
+                f"### Input:\\n**Course Description:** {query.get('description', '')}"
+                f"\\n**Learning Outcomes:** {query.get('learning_outcomes', '')}"
+            )
         else:
             input_text = f"### Input:\\n{query.get('description', '')}"
 
@@ -85,9 +86,7 @@ class PromptBuilder:
         )
 
     @staticmethod
-    def build_ksa_details_prompt(
-        skill: str, description: str, num_key_kr: int = 3, num_key_tas: int = 3
-    ) -> str:
+    def build_ksa_details_prompt(skill: str, description: str, num_key_kr: int = 3, num_key_tas: int = 3) -> str:
         """Build prompt for getting detailed KSA information for a specific skill"""
         return KSA_DETAILS_PROMPT.format(
             skill=skill,
@@ -230,9 +229,7 @@ class ResponseParser:
                         skill_data["Knowledge Required"] = [k.strip() for k in knowledge_raw.split(",") if k.strip()]
 
                     # Extract task abilities (multi-line support)
-                    task_match = re.search(
-                        r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL
-                    )
+                    task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
                     if task_match:
                         task_raw = task_match.group(1).strip()
                         skill_data["Task Abilities"] = [t.strip() for t in task_raw.split(",") if t.strip()]
@@ -306,17 +303,13 @@ class SkillAlignmentService:
             if debug:
                 logger.debug(msg)
 
-        log_debug(
-            f"[align] raw_skills={len(raw_skills)} threshold={similarity_threshold} top_k={top_k}"
-        )
+        log_debug(f"[align] raw_skills={len(raw_skills)} threshold={similarity_threshold} top_k={top_k}")
 
         model = self.data_access.get_embedding_model()
 
         # metadata loaded once
         metadata = self.faiss_manager.get_metadata()
-        log_debug(
-            f"[align] metadata type={type(metadata).__name__} len={len(metadata)}"
-        )
+        log_debug(f"[align] metadata type={type(metadata).__name__} len={len(metadata)}")
         if isinstance(metadata, pd.DataFrame) and not metadata.empty:
             log_debug(f"[align] metadata columns={list(metadata.columns)}")
 
@@ -341,9 +334,7 @@ class SkillAlignmentService:
             meta_idx = best.get("Index")
             canonical_skill = str(best.get("Skill", "")).strip()
 
-            log_debug(
-                f"[skill {i}] best='{canonical_skill}' sim={similarity:.4f} meta_idx={meta_idx}"
-            )
+            log_debug(f"[skill {i}] best='{canonical_skill}' sim={similarity:.4f} meta_idx={meta_idx}")
 
             if similarity < similarity_threshold:
                 log_debug(f"[skill {i}] below threshold -> skip")
@@ -353,13 +344,9 @@ class SkillAlignmentService:
                 log_debug(f"[skill {i}] empty canonical_skill -> skip")
                 continue
             if meta_idx is None:
-                log_debug(
-                    f"[skill {i}] meta_idx is None (search_similar_skills may not return Index)"
-                )
+                log_debug(f"[skill {i}] meta_idx is None (search_similar_skills may not return Index)")
             elif int(meta_idx) >= len(metadata) or int(meta_idx) < 0:
-                log_debug(
-                    f"[skill {i}] meta_idx out of range: {meta_idx} (metadata len={len(metadata)})"
-                )
+                log_debug(f"[skill {i}] meta_idx out of range: {meta_idx} (metadata len={len(metadata)})")
             else:
                 # ✅ DataFrame row by position
                 meta = metadata.iloc[int(meta_idx)].to_dict()
@@ -391,6 +378,7 @@ class SkillAlignmentService:
                     mapped_skills,
                     taxonomy_descriptions,
                     taxonomy_sources,
+                    source_urls,
                 )
             )
             combined.sort(key=lambda x: x[0], reverse=True)
@@ -402,6 +390,7 @@ class SkillAlignmentService:
                 mapped_skills,
                 taxonomy_descriptions,
                 taxonomy_sources,
+                source_urls,
             ) = map(
                 list, zip(*combined)
             )  # ✅ FIX #2: keep lists aligned
@@ -413,6 +402,7 @@ class SkillAlignmentService:
                 "Taxonomy Skill": mapped_skills,
                 "Taxonomy Description": taxonomy_descriptions,
                 "Taxonomy Source": taxonomy_sources,
+                "Source URL": source_urls,
                 "Correlation Coefficient": correlations,
             }
         )
@@ -444,9 +434,7 @@ class SkillExtractionService:
         self.nlp = None
         self.data_access = DataAccessLayer()
         self.faiss_manager = FAISSIndexManager(self.data_access)
-        self.alignment_service = SkillAlignmentService(
-            self.data_access, self.faiss_manager
-        )
+        self.alignment_service = SkillAlignmentService(self.data_access, self.faiss_manager)
         self.prompt_builder = PromptBuilder()
         self.llm_parser = ResponseParser()
         self.response_parser = ResponseParser()
@@ -462,9 +450,8 @@ class SkillExtractionService:
         self.faiss_manager.initialize_index(force_rebuild=False)
         # Log router initialization state for debugging
         try:
-            print(
-                f"SkillExtractionService: router.llama_llm present: {getattr(self.router, 'llama_llm', None) is not None}"
-            )
+            llama_present = getattr(self.router, "llama_llm", None) is not None
+            print(f"SkillExtractionService: router.llama_llm present: {llama_present}")
         except Exception:
             pass
 
@@ -619,9 +606,7 @@ class SkillExtractionService:
             )
 
         if not isinstance(raw_skills, list):
-            print(
-                f"Warning: raw_skills is not a list, converting from {type(raw_skills)}"
-            )
+            print(f"Warning: raw_skills is not a list, converting from {type(raw_skills)}")
             raw_skills = [str(raw_skills)] if raw_skills else []
 
         return self.alignment_service.align_skills_to_taxonomy(
