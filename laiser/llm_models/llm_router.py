@@ -83,12 +83,17 @@ except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
 
     def llm_generate_vllm(*args, **kwargs):
-        raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
+        raise ImportError(
+            "HuggingFace LLM support is not available. Please install required packages."
+        )
+
 
 
 class LLMRouter:
 
-    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None):
+    def __init__(
+        self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None
+    ):
         self.model_id = model_id
         self.use_gpu = use_gpu
         self.hf_token = hf_token

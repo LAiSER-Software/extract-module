@@ -32,7 +32,9 @@ def test_initialize_index_full_flow_subtests():
     # ---- Step 1: init using existing files (or build if missing) ----
     index1, metadata = manager.initialize_index(force_rebuild=False)
     check.is_not_none(index1, "step1: index1 should not be None")
-    check.is_true(isinstance(index1, faiss.Index), "step1: index1 should be a FAISS Index")
+    check.is_true(
+        isinstance(index1, faiss.Index), "step1: index1 should be a FAISS Index"
+    )
     for p in artifacts:
         check.is_true(p.exists(), f"step1: artifact should exist: {p.name}")
 
@@ -46,7 +48,9 @@ def test_initialize_index_full_flow_subtests():
     check.is_not_none(index3, "step3: index3 should not be None")
     check.is_true(index3.ntotal > 0, "step3: index3.ntotal should be > 0")
     for p in artifacts:
-        check.is_true(p.exists(), f"step3: artifact should exist after rebuild: {p.name}")
+        check.is_true(
+            p.exists(), f"step3: artifact should exist after rebuild: {p.name}"
+        )
 
     # ---- Step 4: delete artifacts ----
     for p in artifacts:

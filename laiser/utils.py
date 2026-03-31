@@ -90,7 +90,9 @@ def build_faiss_index_esco():
     # Embed ESCO skills using SentenceTransformer
     model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
     print("Embedding ESCO skills...")
-    esco_embeddings = model.encode(skill_names, convert_to_numpy=True, show_progress_bar=True)
+    esco_embeddings = model.encode(
+        skill_names, convert_to_numpy=True, show_progress_bar=True
+    )
 
     # ⚡ Normalize & Index using FAISS (cosine sim = L2 norm + dot product)
     dimension = esco_embeddings.shape[1]
@@ -121,7 +123,9 @@ def load_faiss_index_esco():
 
         index_path = os.path.join(os.path.dirname(__file__), "input/esco_faiss_index.index")
         if not os.path.exists(index_path):
-            raise FileNotFoundError(f"FAISS index file not found at {index_path}. Please ensure the file exists.")
+            raise FileNotFoundError(
+                f"FAISS index file not found at {index_path}. Please ensure the file exists."
+            )
         index = faiss.read_index(index_path)
         print("FAISS index for ESCO skills loaded successfully.")
         return index
@@ -144,7 +148,11 @@ def get_top_esco_skills(input_text, top_k=10):
     emb = model.encode(input_text, convert_to_numpy=True)
     faiss.normalize_L2(emb.reshape(1, -1))
     scores, indices = index.search(emb.reshape(1, -1), top_k)
-    return [{"Skill": skill_names[i], "index": int(i), "score": float(scores[0][j])} for j, i in enumerate(indices[0])]
+    return [
+        {"Skill": skill_names[i], "index": int(i), "score": float(scores[0][j])}
+        for j, i in enumerate(indices[0])
+    ]
+
 
 
 def get_embedding(nlp, input_text):
