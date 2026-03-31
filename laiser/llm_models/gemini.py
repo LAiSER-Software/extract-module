@@ -41,6 +41,7 @@ Output/Return Format:
 - List of extracted skills from text
 
 """
+
 """
 Revision History:
 -----------------
@@ -53,11 +54,12 @@ TODO:
 
 """
 
-import torch
-import google.generativeai as genai
 import re
 
-def gemini_generate(prompt: str,api_key: str) -> str:
+import google.generativeai as genai
+
+
+def gemini_generate(prompt: str, api_key: str) -> str:
     """
     Send `prompt` to Gemini and return the generated text.
     """

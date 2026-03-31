@@ -18,16 +18,16 @@ License:
 --------
 Copyright 2025 George Washington University Insitute of Public Policy
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files 
-(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, 
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is 
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files
+(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE 
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR 
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
@@ -57,31 +57,33 @@ TODO:
 
 """
 
-import torch
+from typing import List, Optional
+
 import pandas as pd
-from typing import List, Any, Optional
-from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TOP_K
+
+from laiser.config import DEFAULT_BATCH_SIZE
 from laiser.services import SkillExtractionService
+
 
 class SkillExtractorRefactored:
     """
     Refactored skill extractor with improved separation of concerns.
-    
+
     This class provides a clean interface while delegating specific responsibilities
     to appropriate service classes.
     """
-    
+
     def __init__(
-        self, 
-        model_id: Optional[str] = None, 
+        self,
+        model_id: Optional[str] = None,
         hf_token: Optional[str] = None,
-        api_key: Optional[str] = None, 
+        api_key: Optional[str] = None,
         use_gpu: Optional[bool] = None,
-        backend: Optional[str] = None
+        backend: Optional[str] = None,
     ):
         """
         Initialize the skill extractor.
-        
+
         Parameters
         ----------
         model_id : str, optional
@@ -94,14 +96,20 @@ class SkillExtractorRefactored:
             Whether to use GPU for model inference
         backend : str, optional
             Backend to use for LLM inference (e.g., "llama_cpp", "huggingface", "openai", "gemini")
-        """    
+        """
         # Initialize service layer
-        self.skill_service = SkillExtractionService(model_id = model_id,api_key=api_key,hf_token= hf_token,use_gpu=use_gpu, backend=backend)
-        
+        self.skill_service = SkillExtractionService(
+            model_id=model_id,
+            api_key=api_key,
+            hf_token=hf_token,
+            use_gpu=use_gpu,
+            backend=backend,
+        )
+
     def extract_and_align(
         self,
         data: pd.DataFrame,
-        id_column: str = 'Research ID',
+        id_column: str = "Research ID",
         text_columns: List[str] = None,
         input_type: str = "job_desc",
         top_k: Optional[int] = None,
@@ -113,9 +121,9 @@ class SkillExtractorRefactored:
     ) -> pd.DataFrame:
         """
         Extract and align skills from a dataset (main interface method).
-        
+
         This method maintains backward compatibility with the original API.
-        
+
         Parameters
         ----------
         data : pd.DataFrame
@@ -138,23 +146,24 @@ class SkillExtractorRefactored:
             Batch size for processing
         warnings : bool
             Whether to show warnings
-        
+
         Returns
         -------
         pd.DataFrame
             DataFrame with extracted and aligned skills
         """
         return self.skill_service.extract_and_align_core(
-        data=data,
-        id_column=id_column,
-        text_columns=text_columns,
-        input_type=input_type,
-        top_k=top_k,
-        similarity_threshold=similarity_threshold,
-        levels=levels,
-        batch_size=batch_size,
-        warnings=warnings,
-        allowed_sources = allowed_sources
-    )
+            data=data,
+            id_column=id_column,
+            text_columns=text_columns,
+            input_type=input_type,
+            top_k=top_k,
+            similarity_threshold=similarity_threshold,
+            levels=levels,
+            batch_size=batch_size,
+            warnings=warnings,
+            allowed_sources=allowed_sources,
+        )
+
 
 Skill_Extractor = SkillExtractorRefactored

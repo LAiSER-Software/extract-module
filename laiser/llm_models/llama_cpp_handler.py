@@ -1,8 +1,8 @@
+import gc
 import os
 import re
 from pathlib import Path
-from typing import Optional, List, Any
-import gc
+from typing import Any, List, Optional
 
 try:
     from llama_cpp import Llama  # type: ignore
@@ -21,7 +21,6 @@ def _strip_fences(text: str) -> str:
 
 class LlamaCppBackend:
 
-
     def __init__(
         self,
         model_path: Optional[str] = None,
@@ -32,9 +31,7 @@ class LlamaCppBackend:
         chat_format: str = "chatml",
     ):
         if Llama is None:
-            raise ImportError(
-                "llama-cpp-python is not installed. Install it to use the llama_cpp backend."
-            )
+            raise ImportError("llama-cpp-python is not installed. Install it to use the llama_cpp backend.")
 
         model_path = model_path or os.getenv("LAISER_LLAMA_CPP_MODEL_PATH")
         if not model_path:
@@ -55,6 +52,7 @@ class LlamaCppBackend:
             # logits_all=False,
             # chat_format=chat_format,
         )
+
     def close(self) -> None:
         """Free llama.cpp resources early (avoid interpreter-shutdown __del__ errors)."""
         llm = getattr(self, "llm", None)

@@ -18,16 +18,16 @@ License:
 --------
 Copyright 2025 George Washington University Insitute of Public Policy
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files 
-(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, 
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is 
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files
+(the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE 
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR 
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
@@ -56,46 +56,46 @@ TODO:
 - 2: Implement caching for remote data sources.
 """
 
-import os
-import requests
 import io
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import certifi
-import pandas as pd
 import faiss
 import numpy as np
-from pathlib import Path
-import json
-from typing import Optional, List, Dict, Any
+import pandas as pd
+import requests
 from sentence_transformers import SentenceTransformer
 
 from laiser.config import (
-    ESCO_SKILLS_URL, 
+    COMBINED_SKILLS_URL,
+    DEFAULT_EMBEDDING_MODEL,
+    ESCO_SKILLS_URL,
     OSN_SKILLS_URL,
-    COMBINED_SKILLS_URL, 
-    FAISS_INDEX_URL, 
-    DEFAULT_EMBEDDING_MODEL
 )
 from laiser.exceptions import FAISSIndexError, LAiSERError
 
-import logging
 logger = logging.getLogger(__name__)
+
 
 class DataAccessLayer:
     """Handles data loading and external API calls"""
-    
+
     def __init__(self):
         self.embedding_model = None
         self._esco_df = None
         self._osn_df = None
 
         self._combined_df = None
-    
+
     def get_embedding_model(self) -> SentenceTransformer:
         """Get or initialize the embedding model"""
         if self.embedding_model is None:
             self.embedding_model = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
         return self.embedding_model
-    
 
     # -------------------------
     # Helper: fetch CSV via requests + certifi
@@ -133,20 +133,17 @@ class DataAccessLayer:
             except Exception as e:
                 raise LAiSERError(f"Failed to load OSN skills data: {e}")
         return self._osn_df
-    def load_skill_metadata(self,file_path: str) -> pd.DataFrame:
+
+    def load_skill_metadata(self, file_path: str) -> pd.DataFrame:
         """Load skills metadata JSON generated during FAISS index build"""
         if self._combined_df is None:
             try:
                 if not os.path.exists(file_path):
                     raise FileNotFoundError(
-                        f"Skills metadata file not found at {file_path}. "
-                        "Build or download the FAISS index first."
+                        f"Skills metadata file not found at {file_path}. " "Build or download the FAISS index first."
                     )
 
-                self._combined_df = pd.read_json(
-                    file_path,
-                    orient="records"
-                )
+                self._combined_df = pd.read_json(file_path, orient="records")
             except Exception as e:
                 raise LAiSERError(f"Failed to load skills metadata: {e}")
 
@@ -165,14 +162,19 @@ class DataAccessLayer:
         """Build FAISS index for given skill names"""
         try:
             model = self.get_embedding_model()
-            embeddings = model.encode(text,normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=True)
+            embeddings = model.encode(
+                text,
+                normalize_embeddings=True,
+                convert_to_numpy=True,
+                show_progress_bar=True,
+            )
             dimension = embeddings.shape[1]
             index = faiss.IndexFlatIP(dimension)
-            index.add(np.asarray(embeddings, dtype='float32'))
-            return index, embeddings 
+            index.add(np.asarray(embeddings, dtype="float32"))
+            return index, embeddings
         except Exception as e:
             raise FAISSIndexError(f"Failed to build FAISS index: {e}")
-    
+
     def save_faiss_index(self, index: faiss.IndexFlatIP, file_path: str) -> None:
         """Save FAISS index to file"""
         try:
@@ -180,7 +182,7 @@ class DataAccessLayer:
             faiss.write_index(index, file_path)
         except Exception as e:
             raise FAISSIndexError(f"Failed to save FAISS index: {e}")
-    
+
     def save_skill_metadata_json(self, metadata_df: pd.DataFrame, file_path: str) -> None:
         """
         Save skills metadata DataFrame to JSON file.
@@ -196,6 +198,7 @@ class DataAccessLayer:
 
         except Exception as e:
             raise RuntimeError(f"Failed to save skill metadata JSON: {e}")
+
     def load_faiss_index(self, file_path: str) -> Optional[faiss.IndexFlatIP]:
         """Load FAISS index from file"""
         try:
@@ -204,16 +207,16 @@ class DataAccessLayer:
             return None
         except Exception as e:
             raise FAISSIndexError(f"Failed to load FAISS index: {e}")
-    
+
     def download_faiss_index(self, url: str, local_path: str) -> bool:
         """Download FAISS index from URL"""
         try:
             response = requests.get(url, timeout=30)
             response.raise_for_status()
-            
+
             if response.headers.get("Content-Type") != "application/octet-stream":
                 raise ValueError(f"Unexpected content type: {response.headers.get('Content-Type')}")
-            
+
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             with open(local_path, "wb") as f:
                 f.write(response.content)
@@ -225,14 +228,14 @@ class DataAccessLayer:
 
 class FAISSIndexManager:
     """Manages FAISS index operations"""
-    
+
     def __init__(self, data_access: DataAccessLayer):
         self.data_access = data_access
         self.index = None
         self.skill_names = None
         self.embeddings = None
         self.metadata = None
-    
+
     # Issue: Do we even need this? Can't this be done in init
     # Issue [GFI_OddEven]: Split these into two seperate modules load and build index
     def initialize_index(self, force_rebuild: bool = False, debug: bool = False) -> faiss.IndexFlatIP:
@@ -253,7 +256,7 @@ class FAISSIndexManager:
 
         # 1) Try to load existing index + metadata unless force_rebuild requested
         if not force_rebuild:
-            
+
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
             try:
                 self.index = self.data_access.load_faiss_index(str(local_index_path))
@@ -274,18 +277,25 @@ class FAISSIndexManager:
             single_df = pd.read_csv(local_combined_csv_path, dtype=str)
 
             # drop pandas-created 'Unnamed:*' index columns if present
-            single_df = single_df.loc[:, ~single_df.columns.str.match(r'^Unnamed')]
+            single_df = single_df.loc[:, ~single_df.columns.str.match(r"^Unnamed")]
 
             cols_set = set(single_df.columns.str.lower())
 
             # CASE A: exact LAiSER export (skill_id, skill_name, aliases, description, taxonomy, original_id)
-            laiser_export_headers = {'skill_id', 'skill_name', 'aliases', 'description', 'taxonomy', 'original_id'}
+            laiser_export_headers = {
+                "skill_id",
+                "skill_name",
+                "aliases",
+                "description",
+                "taxonomy",
+                "original_id",
+            }
             if laiser_export_headers.issubset(cols_set):
                 # rename to canonical downstream names; DO NOT rename taxonomy
                 rename_map = {
-                    'skill_name': 'skill',
-                    'aliases': 'addtional_notes',
-                    'original_id': 'source_url'
+                    "skill_name": "skill",
+                    "aliases": "addtional_notes",
+                    "original_id": "source_url",
                 }
                 # preserve existing 'taxonomy' column name (user requested)
                 # first lower-case incoming column names to find exact columns to rename
@@ -300,7 +310,13 @@ class FAISSIndexManager:
 
                 # keep canonical set (if present)
                 keep_cols = []
-                for c in ['skill', 'addtional_notes', 'description', 'source_url', 'taxonomy']:
+                for c in [
+                    "skill",
+                    "addtional_notes",
+                    "description",
+                    "source_url",
+                    "taxonomy",
+                ]:
                     # find actual column name (case-insensitive)
                     found = next((col for col in single_df.columns if col.lower() == c), None)
                     if found:
@@ -308,10 +324,16 @@ class FAISSIndexManager:
                 single_df = single_df[keep_cols].copy()
 
             # CASE B: already-normalized CSV (contains skill, addtional_notes, description, source_url) and optionally taxonomy
-            elif {'skill', 'addtional_notes', 'description', 'source_url'}.issubset(cols_set):
+            elif {"skill", "addtional_notes", "description", "source_url"}.issubset(cols_set):
                 # select canonical columns and preserve taxonomy if present
                 cols = []
-                for c in ['skill', 'addtional_notes', 'description', 'source_url', 'taxonomy']:
+                for c in [
+                    "skill",
+                    "addtional_notes",
+                    "description",
+                    "source_url",
+                    "taxonomy",
+                ]:
                     found = next((col for col in single_df.columns if col.lower() == c), None)
                     if found:
                         cols.append(found)
@@ -326,33 +348,33 @@ class FAISSIndexManager:
                                 return col
                     return None
 
-                cand_skill = _find(['skill', 'name', 'title'])
-                cand_alias = _find(['alias', 'alt', 'keyword', 'keywords'])
-                cand_desc = _find(['desc', 'description', 'statement'])
-                cand_orig = _find(['original', 'orig', 'id', 'url'])
-                cand_tax = _find(['taxonomy', 'tax', 'source', 'provenance'])
+                cand_skill = _find(["skill", "name", "title"])
+                cand_alias = _find(["alias", "alt", "keyword", "keywords"])
+                cand_desc = _find(["desc", "description", "statement"])
+                cand_orig = _find(["original", "orig", "id", "url"])
+                cand_tax = _find(["taxonomy", "tax", "source", "provenance"])
 
                 mapped = {}
                 if cand_skill:
-                    mapped[cand_skill] = 'skill'
+                    mapped[cand_skill] = "skill"
                 if cand_alias:
-                    mapped[cand_alias] = 'addtional_notes'
+                    mapped[cand_alias] = "addtional_notes"
                 if cand_desc:
-                    mapped[cand_desc] = 'description'
+                    mapped[cand_desc] = "description"
                 if cand_orig:
-                    mapped[cand_orig] = 'source_url'
+                    mapped[cand_orig] = "source_url"
                 if cand_tax:
                     # we will keep the original column name for taxonomy
                     pass
 
-                if 'skill' in mapped.values() and 'description' in mapped.values():
+                if "skill" in mapped.values() and "description" in mapped.values():
                     # include taxonomy if present in original CSV columns
                     cols = list(mapped.keys())
                     if cand_tax:
                         cols.append(cand_tax)
                     single_df = single_df[cols].rename(columns=mapped).copy()
                     # ensure the optional expected cols exist
-                    for col in ['addtional_notes', 'source_url']:
+                    for col in ["addtional_notes", "source_url"]:
                         if col not in single_df.columns:
                             single_df[col] = pd.NA
                 else:
@@ -363,7 +385,10 @@ class FAISSIndexManager:
                 # Normalize string columns and require taxonomy exists
                 # Standardize column names to canonical lower-case keys where possible (but keep original taxonomy column name)
                 # First, find the actual taxonomy column name (case-insensitive)
-                taxonomy_col = next((col for col in single_df.columns if col.lower() == 'taxonomy'), None)
+                taxonomy_col = next(
+                    (col for col in single_df.columns if col.lower() == "taxonomy"),
+                    None,
+                )
 
                 # If we couldn't find a taxonomy column, we must fail loudly (per your requirement)
                 if taxonomy_col is None:
@@ -373,25 +398,33 @@ class FAISSIndexManager:
                     )
 
                 # Clean canonical fields (skill, addtional_notes, description, source_url) if present
-                for canonical in ['skill', 'addtional_notes', 'description', 'source_url']:
-                    col_found = next((col for col in single_df.columns if col.lower() == canonical), None)
+                for canonical in [
+                    "skill",
+                    "addtional_notes",
+                    "description",
+                    "source_url",
+                ]:
+                    col_found = next(
+                        (col for col in single_df.columns if col.lower() == canonical),
+                        None,
+                    )
                     if col_found:
-                        single_df[col_found] = single_df[col_found].astype('string').str.strip()
+                        single_df[col_found] = single_df[col_found].astype("string").str.strip()
 
                 # Normalize taxonomy column values (trim only; preserve case choice but store lowercased variant later)
-                single_df[taxonomy_col] = single_df[taxonomy_col].astype('string').str.strip()
-                single_df = single_df.replace({'': pd.NA})
+                single_df[taxonomy_col] = single_df[taxonomy_col].astype("string").str.strip()
+                single_df = single_df.replace({"": pd.NA})
 
                 # rename taxonomy column to exact canonical name 'taxonomy' (lowercase) for consistent downstream access
-                if taxonomy_col != 'taxonomy':
-                    single_df = single_df.rename(columns={taxonomy_col: 'taxonomy'})
+                if taxonomy_col != "taxonomy":
+                    single_df = single_df.rename(columns={taxonomy_col: "taxonomy"})
 
                 # Ensure addtional_notes exists
-                if 'addtional_notes' not in single_df.columns:
-                    single_df['addtional_notes'] = single_df.get('addtional_notes', pd.NA)
+                if "addtional_notes" not in single_df.columns:
+                    single_df["addtional_notes"] = single_df.get("addtional_notes", pd.NA)
 
-                single_df['addtional_notes'] = single_df['addtional_notes'].fillna('')
-                single_df = single_df.dropna(subset=['skill']).reset_index(drop=True)
+                single_df["addtional_notes"] = single_df["addtional_notes"].fillna("")
+                single_df = single_df.dropna(subset=["skill"]).reset_index(drop=True)
 
                 combined = single_df.copy()
 
@@ -401,58 +434,79 @@ class FAISSIndexManager:
             osn_df = self.data_access.load_osn_skills()
 
             # map and normalize ESCO
-            esco_df = esco_df[['preferredLabel', 'altLabels', 'description', 'conceptUri']].copy()
-            esco_df = esco_df.rename(columns={
-                'preferredLabel': 'skill',
-                'altLabels': 'addtional_notes',
-                'conceptUri': 'source_url',
-                'description': 'description'
-            })
-            esco_df['taxonomy'] = 'esco'
+            esco_df = esco_df[["preferredLabel", "altLabels", "description", "conceptUri"]].copy()
+            esco_df = esco_df.rename(
+                columns={
+                    "preferredLabel": "skill",
+                    "altLabels": "addtional_notes",
+                    "conceptUri": "source_url",
+                    "description": "description",
+                }
+            )
+            esco_df["taxonomy"] = "esco"
 
             # map and normalize OSN
-            osn_df = osn_df[['RSD Name', 'Keywords', 'Skill Statement', 'Canonical URL']].copy()
-            osn_df = osn_df.rename(columns={
-                'RSD Name': 'skill',
-                'Keywords': 'addtional_notes',
-                'Skill Statement': 'description',
-                'Canonical URL': 'source_url'
-            })
-            osn_df['taxonomy'] = 'osn'
+            osn_df = osn_df[["RSD Name", "Keywords", "Skill Statement", "Canonical URL"]].copy()
+            osn_df = osn_df.rename(
+                columns={
+                    "RSD Name": "skill",
+                    "Keywords": "addtional_notes",
+                    "Skill Statement": "description",
+                    "Canonical URL": "source_url",
+                }
+            )
+            osn_df["taxonomy"] = "osn"
 
             combined = pd.concat([esco_df, osn_df], ignore_index=True)
 
             # Clean combined columns if present
-            for c in ['skill', 'description', 'source_url', 'addtional_notes', 'taxonomy']:
+            for c in [
+                "skill",
+                "description",
+                "source_url",
+                "addtional_notes",
+                "taxonomy",
+            ]:
                 if c in combined.columns:
-                    combined[c] = combined[c].astype('string').str.strip()
-            combined = combined.replace({'': pd.NA})
-            combined['addtional_notes'] = combined['addtional_notes'].fillna('')
-            combined = combined.dropna(subset=['skill']).reset_index(drop=True)
+                    combined[c] = combined[c].astype("string").str.strip()
+            combined = combined.replace({"": pd.NA})
+            combined["addtional_notes"] = combined["addtional_notes"].fillna("")
+            combined = combined.dropna(subset=["skill"]).reset_index(drop=True)
 
         # 4) Final sanitize and create text column
-        combined['description'] = combined['description'].fillna('').astype('string').str.strip()
-        combined['addtional_notes'] = combined['addtional_notes'].fillna('').astype('string').str.strip()
-        combined['skill'] = combined['skill'].fillna('').astype('string').str.strip()
-        combined['text'] = (combined['skill'] + ' | ' + combined['description'] + ' | ' + combined['addtional_notes']).astype('string')
-        combined['text'] = combined['text'].fillna('').str.strip()
-        combined = combined[combined['text'] != ''].reset_index(drop=True)
+        combined["description"] = combined["description"].fillna("").astype("string").str.strip()
+        combined["addtional_notes"] = combined["addtional_notes"].fillna("").astype("string").str.strip()
+        combined["skill"] = combined["skill"].fillna("").astype("string").str.strip()
+        combined["text"] = (
+            combined["skill"] + " | " + combined["description"] + " | " + combined["addtional_notes"]
+        ).astype("string")
+        combined["text"] = combined["text"].fillna("").str.strip()
+        combined = combined[combined["text"] != ""].reset_index(drop=True)
 
         # 5) Build FAISS index
-        self.index, self.embeddings = self.data_access.build_faiss_index(combined['text'].tolist())
+        self.index, self.embeddings = self.data_access.build_faiss_index(combined["text"].tolist())
 
         # Strict: require taxonomy column (do not infer)
-        if 'taxonomy' not in combined.columns:
+        if "taxonomy" not in combined.columns:
             raise LAiSERError(
                 "After building combined DataFrame, required 'taxonomy' column is missing. "
                 "Ensure input CSV or upstream source provides 'taxonomy'."
             )
 
         # Normalize taxonomy values to lowercase for consistent comparisons
-        combined['taxonomy'] = combined['taxonomy'].astype('string').str.strip().str.lower()
+        combined["taxonomy"] = combined["taxonomy"].astype("string").str.strip().str.lower()
 
         # Build metadata (canonical column order)
-        meta_df = combined[['skill', 'description', 'addtional_notes', 'taxonomy', 'source_url', 'text']].copy()
+        meta_df = combined[
+            [
+                "skill",
+                "description",
+                "addtional_notes",
+                "taxonomy",
+                "source_url",
+                "text",
+            ]
+        ].copy()
         self.metadata = meta_df
 
         # Persist metadata JSON and FAISS index (best-effort with debug warnings)
@@ -482,17 +536,15 @@ class FAISSIndexManager:
         Return loaded skill metadata.
         """
         if self.metadata is None:
-            raise FAISSIndexError(
-                "Metadata not initialized. Call initialize_index() first."
-            )
+            raise FAISSIndexError("Metadata not initialized. Call initialize_index() first.")
         return self.metadata
-    
+
     def search_similar_skills(
         self,
         query_embedding: np.ndarray,
         top_k: int = 25,
         allowed_sources: Optional[List[str]] = None,
-        max_results: Optional[int] = None
+        max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Search for similar skills using FAISS index.
 
@@ -511,11 +563,11 @@ class FAISSIndexManager:
         if self.skill_names is None:
             try:
                 if isinstance(self.metadata, pd.DataFrame):
-                    self.skill_names = self.metadata['skill'].astype(str).tolist()
+                    self.skill_names = self.metadata["skill"].astype(str).tolist()
                 elif isinstance(self.metadata, list):
-                    self.skill_names = [m.get('skill', '') for m in self.metadata]
+                    self.skill_names = [m.get("skill", "") for m in self.metadata]
                 else:
-                    self.skill_names = [str(r.get('skill','')) for r in list(self.metadata)]
+                    self.skill_names = [str(r.get("skill", "")) for r in list(self.metadata)]
             except Exception as e:
                 raise FAISSIndexError(f"Failed to load skill names for index: {e}")
 
@@ -549,12 +601,14 @@ class FAISSIndexManager:
                 for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
                     if idx == -1:
                         continue
-                    results.append({
-                        "Skill": self.skill_names[idx] if 0 <= idx < len(self.skill_names) else "",
-                        "Similarity": float(score),
-                        "Rank": rank,
-                        "Index": int(idx)
-                    })
+                    results.append(
+                        {
+                            "Skill": (self.skill_names[idx] if 0 <= idx < len(self.skill_names) else ""),
+                            "Similarity": float(score),
+                            "Rank": rank,
+                            "Index": int(idx),
+                        }
+                    )
                 return results
 
             # ---------- Filtering by allowed_sources -> return ALL matches for those sources ----------
@@ -588,11 +642,11 @@ class FAISSIndexManager:
                 try:
                     if isinstance(self.metadata, pd.DataFrame):
                         row = self.metadata.iloc[int(idx)]
-                        src = str(row.get('taxonomy', '')).strip()
+                        src = str(row.get("taxonomy", "")).strip()
                     elif isinstance(self.metadata, list):
-                        src = str(self.metadata[int(idx)].get('taxonomy', '')).strip()
+                        src = str(self.metadata[int(idx)].get("taxonomy", "")).strip()
                     else:
-                        src = str(self.metadata[int(idx)].get('taxonomy', '')).strip()
+                        src = str(self.metadata[int(idx)].get("taxonomy", "")).strip()
                 except Exception:
                     src = ""
 
@@ -604,16 +658,18 @@ class FAISSIndexManager:
 
             # apply max_results cap if requested (optional safety)
             if max_results is not None and isinstance(max_results, int):
-                filtered = filtered[:int(max_results)]
+                filtered = filtered[: int(max_results)]
 
             results = []
             for rank, (score, idx) in enumerate(filtered, start=1):
-                results.append({
-                    "Skill": self.skill_names[idx],
-                    "Similarity": float(score),
-                    "Rank": rank,
-                    "Index": int(idx)
-                })
+                results.append(
+                    {
+                        "Skill": self.skill_names[idx],
+                        "Similarity": float(score),
+                        "Rank": rank,
+                        "Index": int(idx),
+                    }
+                )
 
             return results
 
