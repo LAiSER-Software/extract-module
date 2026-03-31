@@ -41,6 +41,7 @@ Output/Return Format:
 - List of extracted skills from text
 
 """
+
 """
 Revision History:
 -----------------
@@ -60,14 +61,16 @@ TODO:
 
 """
 
-import re
-import torch
-import numpy as np
 import json
+import re
+
+import numpy as np
+import torch
 
 # Add missing imports
 try:
     from vllm import SamplingParams
+
     VLLM_AVAILABLE = True
 except ImportError:
     VLLM_AVAILABLE = False
@@ -80,46 +83,52 @@ try:
     from laiser.llm_models.llm_router import llm_router
 except ImportError as e:
     print(f"Warning: Could not import llm_router: {e}")
+
     # Provide a fallback function
     def llm_router(*args, **kwargs):
-        raise ImportError("llm_router is not available. Please check your installation.")
+        raise ImportError(
+            "llm_router is not available. Please check your installation."
+        )
+
 
 torch.cuda.empty_cache()
+
 
 def fetch_model_output(response):
     """
     Format the model's output to extract the skill keywords from the get_completion() response
-    
+
     Parameters
     ----------
     input_text : text
-        The model's response after processing the prompt. 
+        The model's response after processing the prompt.
         Contains special tags to identify the start and end of the model's response.
-        
+
     Returns
     -------
     list: List of extracted skills from text
-    
+
     """
     # Find the content between the model start tag and the last <eos> tag
-    pattern = r'[INST]model\s*<eos>(.*?)<eos>\s*$'
+    pattern = r"[INST]model\s*<eos>(.*?)<eos>\s*$"
     match = re.search(pattern, response, re.DOTALL)
 
     if match:
         content = match.group(1).strip()
 
         # Split the content by lines and filter out empty lines
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = [line.strip() for line in content.split("\n") if line.strip()]
 
         # Extract skills (lines starting with '-')
-        skills = [line[1:].strip() for line in lines if line.startswith('-')]
+        skills = [line[1:].strip() for line in lines if line.startswith("-")]
 
         return skills
+
 
 def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
     """
     Get completions for a list of queries using the model
-    
+
     Parameters
     ----------
     queries : list
@@ -130,13 +139,13 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
         The tokenizer to use for encoding the queries
     batch_size : int, optional
         Preferred batch size to use for generating completions
-        
+
     Returns
     -------
     list: List of extracted skills from the text(s)
-    
+
     """
-    
+
     device = "cuda:0"
     results = []
 
@@ -150,14 +159,25 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
     """
 
     for i in range(0, len(queries), batch_size):
-        batch = queries[i:i+batch_size]
+        batch = queries[i : i + batch_size]
         prompts = [prompt_template.format(query=query) for query in batch]
 
-        encodeds = tokenizer(prompts, return_tensors="pt", add_special_tokens=True, padding=True, truncation=True)
+        encodeds = tokenizer(
+            prompts,
+            return_tensors="pt",
+            add_special_tokens=True,
+            padding=True,
+            truncation=True,
+        )
         model_inputs = encodeds.to(device)
 
         with torch.no_grad():
-            generated_ids = model.generate(**model_inputs, max_new_tokens=1000, do_sample=True, pad_token_id=tokenizer.eos_token_id)
+            generated_ids = model.generate(
+                **model_inputs,
+                max_new_tokens=1000,
+                do_sample=True,
+                pad_token_id=tokenizer.eos_token_id,
+            )
 
         decoded = tokenizer.batch_decode(generated_ids, skip_special_tokens=False)
 
@@ -174,10 +194,11 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
 
     return results
 
+
 def get_completion(input_text, text_columns, input_type, model, tokenizer) -> str:
     """
     Get completion for a single query using the model
-    
+
     Parameters
     ----------
     input_text : pandas Series with text data related to Job Description / Syllabus Description / Course Outcomes etc.
@@ -190,13 +211,13 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
         The model to use for generating completions
     tokenizer : tokenizer
         The tokenizer to use for encoding the queries
-        
+
     Returns
     -------
     list: List of extracted skills from the text
-        
+
     """
-    
+
     device = "cuda:0"
 
     if input_type == "job_desc":
@@ -224,43 +245,54 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
         [/INST]
         [INST]model
         """
-        prompt = prompt_template.format(description=input_text[text_columns[0]], learning_outcomes=input_text[text_columns[1]])
+        prompt = prompt_template.format(
+            description=input_text[text_columns[0]],
+            learning_outcomes=input_text[text_columns[1]],
+        )
 
     encodeds = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
 
     model_inputs = encodeds.to(device)
-    
+
     # Issue [GFI]: Redundant code
     with torch.no_grad():
-        generated_ids = model.generate(**model_inputs, max_new_tokens=1000, do_sample=True, pad_token_id=tokenizer.eos_token_id)
+        generated_ids = model.generate(
+            **model_inputs,
+            max_new_tokens=1000,
+            do_sample=True,
+            pad_token_id=tokenizer.eos_token_id,
+        )
 
-
-    generated_ids = model.generate(**model_inputs, max_new_tokens=1000, do_sample=True, pad_token_id=tokenizer.eos_token_id)
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=1000,
+        do_sample=True,
+        pad_token_id=tokenizer.eos_token_id,
+    )
     decoded = tokenizer.decode(generated_ids[0], skip_special_tokens=False)
     response = decoded.split("[INST]model<eos>")[-1].strip()
     processed_response = fetch_model_output(response)
-    return (processed_response)
+    return processed_response
 
 
 def parse_output_vllm(response):
-    
     """
     Parse the model's response to extract key skills, knowledge required, and task abilities.
-    
+
     Parameters
     ----------
     response : str
         The model's response after processing the prompt.
-        
+
     Returns
     -------
     list: List of dictionaries that has levels, KSAs for all the data points in the input text.
-    
+
     """
-    
+
     out = []
     # Split into items, handling optional '->' prefix and multi-line input
-    items = [item.strip() for item in response.split('->') if item.strip()]
+    items = [item.strip() for item in response.split("->") if item.strip()]
 
     for item in items:
         skill_data = {}
@@ -268,24 +300,32 @@ def parse_output_vllm(response):
             # Extract skill
             skill_match = re.search(r"Skill:\s*([^,\n]+)", item)
             if skill_match:
-                skill_data['Skill'] = skill_match.group(1).strip()
+                skill_data["Skill"] = skill_match.group(1).strip()
 
             # Extract level
             level_match = re.search(r"Level:\s*(\d+)", item)
             if level_match:
-                skill_data['Level'] = int(level_match.group(1).strip())
+                skill_data["Level"] = int(level_match.group(1).strip())
 
             # Extract knowledge required (multi-line support with re.DOTALL)
-            knowledge_match = re.search(r"Knowledge Required:\s*(.*?)(?=\s*Task Abilities:|\s*$)", item, re.DOTALL)
+            knowledge_match = re.search(
+                r"Knowledge Required:\s*(.*?)(?=\s*Task Abilities:|\s*$)",
+                item,
+                re.DOTALL,
+            )
             if knowledge_match:
                 knowledge_raw = knowledge_match.group(1).strip()
-                skill_data['Knowledge Required'] = [k.strip() for k in knowledge_raw.split(',') if k.strip()]
+                skill_data["Knowledge Required"] = [
+                    k.strip() for k in knowledge_raw.split(",") if k.strip()
+                ]
 
             # Extract task abilities (multi-line support with re.DOTALL)
             task_match = re.search(r"Task Abilities:\s*(.*?)(?=\s*$)", item, re.DOTALL)
             if task_match:
                 task_raw = task_match.group(1).strip()
-                skill_data['Task Abilities'] = [t.strip() for t in task_raw.split(',') if t.strip()]
+                skill_data["Task Abilities"] = [
+                    t.strip() for t in task_raw.split(",") if t.strip()
+                ]
 
             out.append(skill_data)
         except:
@@ -297,7 +337,7 @@ def parse_output_vllm(response):
 def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas):
     """
     Create a structured prompt for the KSA (Knowledge, Skills, Abilities) extraction task.
-    
+
     Parameters
     ----------
     query : dict
@@ -311,10 +351,10 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
     num_key_tas : str
         The number of key task abilities to extract (e.g., '3-5').
     Returns
-    ------- 
+    -------
     str
-        The formatted prompt for the KSA extraction task.       
-    
+        The formatted prompt for the KSA extraction task.
+
     """
 
     prompt_template = """user
@@ -370,14 +410,18 @@ def create_ksa_prompt(query, input_type, num_key_skills, num_key_kr, num_key_tas
 model
 """
 
-    input_desc = "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
-    
+    input_desc = (
+        "job description"
+        if input_type == "job_desc"
+        else "course syllabus description and its learning outcomes"
+    )
+
     # Convert pandas Series to dict if needed
-    if hasattr(query, 'to_dict'):
+    if hasattr(query, "to_dict"):
         query_dict = query.to_dict()
     else:
         query_dict = query
-    
+
     if input_type == "syllabi":
         input_text = f"""### Input:\n**Course Description:** {query_dict["description"]}\n**Learning Outcomes:** {query_dict["learning_outcomes"]}"""
     else:
@@ -386,15 +430,30 @@ model
     # Prepare ESCO context for each input
     esco_context = []
     top_esco = get_top_esco_skills(input_text, top_k=10)
-    esco_context.append(", ".join([s['Skill'] for s in top_esco]))
-    prompt = prompt_template.format(input_desc=input_desc, num_key_skills=num_key_skills, num_key_kr=num_key_kr, num_key_tas=num_key_tas, input_text=input_text, esco_context_block=esco_context)
+    esco_context.append(", ".join([s["Skill"] for s in top_esco]))
+    prompt = prompt_template.format(
+        input_desc=input_desc,
+        num_key_skills=num_key_skills,
+        num_key_kr=num_key_kr,
+        num_key_tas=num_key_tas,
+        input_text=input_text,
+        esco_context_block=esco_context,
+    )
     return prompt
 
 
-def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_key_kr='3-5', num_key_tas='3-5'):
+def vllm_generate(
+    llm,
+    queries,
+    input_type,
+    batch_size,
+    num_key_skills=5,
+    num_key_kr="3-5",
+    num_key_tas="3-5",
+):
     """
     Generate completions for the whole data using the LLM model with vLLM.
-    
+
     Parameters
     ----------
     llm : model
@@ -411,39 +470,47 @@ def vllm_generate(llm, queries, input_type, batch_size, num_key_skills=5, num_ke
         Number of key knowledge required items to extract from the input text
     num_key_tas : str, optional
         Number of key task abilities items to extract from the input text
-        
+
     Returns
     -------
     list: List of completions generated by the model for the input queries
-    
+
     """
 
     if not VLLM_AVAILABLE:
-        raise ImportError("vLLM is not installed. Please install it to use this function.")
-    
+        raise ImportError(
+            "vLLM is not installed. Please install it to use this function."
+        )
+
     result = []
 
     sampling_params = SamplingParams(max_tokens=1000, seed=42)
 
     for i in range(0, len(queries), batch_size):
-        prompts = [create_ksa_prompt(queries.iloc[j], input_type, num_key_skills, num_key_kr, num_key_tas) for j in range(i, min(i+batch_size, len(queries)))]
+        prompts = [
+            create_ksa_prompt(
+                queries.iloc[j], input_type, num_key_skills, num_key_kr, num_key_tas
+            )
+            for j in range(i, min(i + batch_size, len(queries)))
+        ]
 
         try:
             output = llm.generate(prompts, sampling_params=sampling_params)
             result.extend(output)
         except Exception as e:
-            result.extend([None]*batch_size)
+            result.extend([None] * batch_size)
             print(f"Error generating batch at index {i}: {e}")
             continue
 
     return result
 
 
-def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, batch_size) -> list:
-
+def get_completion_vllm(
+    input_text, text_columns, id_column, input_type, llm, batch_size
+) -> list:
     """
     Get completions for whole input data and parse the required KSAs from the model responses. The input data can be a job description or syllabi data.
-    
+
     Parameters
     ----------
     input_text : pandas DataFrame
@@ -458,18 +525,20 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
         The model to use for generating completions
     batch_size : int, optional
         Preferred batch size to use for generating completions
-        
+
     Returns
     -------
-    list: List of dictionaries that has levels, KSAs for all the data points in the input text. 
+    list: List of dictionaries that has levels, KSAs for all the data points in the input text.
     """
 
     try:
-        result = vllm_generate(llm, input_text, input_type=input_type, batch_size=batch_size)
+        result = vllm_generate(
+            llm, input_text, input_type=input_type, batch_size=batch_size
+        )
     except Exception as e:
         print(f"Error in vLLM generation: {e}")
         return []
-    
+
     parsed_output = []
     for i in range(len(result)):
         if result[i] is not None:
@@ -479,23 +548,38 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
                     # Use iloc to access by position, which matches the result index
                     row_data = input_text.iloc[i]
                     item[id_column] = row_data[id_column]
-                    item['description'] = row_data['description']
-                    if 'learning_outcomes' in input_text.columns:
-                        item['learning_outcomes'] = row_data['learning_outcomes']
+                    item["description"] = row_data["description"]
+                    if "learning_outcomes" in input_text.columns:
+                        item["learning_outcomes"] = row_data["learning_outcomes"]
                 parsed_output.extend(parsed)
             except Exception as e:
                 print(f"Error parsing output for index {i}: {e}")
-                print(f"DataFrame shape: {input_text.shape}, trying to access index {i}")
+                print(
+                    f"DataFrame shape: {input_text.shape}, trying to access index {i}"
+                )
                 print(f"Available indices: {list(input_text.index)}")
                 continue
 
     return parsed_output
 
+
 # ----------------------------------------------------------------------------------
 # NEW HELPER: get_ksa_details
 # ----------------------------------------------------------------------------------
 
-def get_ksa_details(skill: str, description: str, model_id, use_gpu, llm, tokenizer=None, model=None, api_key=None,num_key_kr: int = 3, num_key_tas: int = 3):    
+
+def get_ksa_details(
+    skill: str,
+    description: str,
+    model_id,
+    use_gpu,
+    llm,
+    tokenizer=None,
+    model=None,
+    api_key=None,
+    num_key_kr: int = 3,
+    num_key_tas: int = 3,
+):
     """
     Generate Knowledge Required and Task Abilities for a given skill in the context of the supplied description.
 
@@ -533,10 +617,12 @@ def get_ksa_details(skill: str, description: str, model_id, use_gpu, llm, tokeni
     )
 
     try:
-        raw_text = llm_router(prompt, model_id, use_gpu,llm, tokenizer, model,api_key)     
+        raw_text = llm_router(prompt, model_id, use_gpu, llm, tokenizer, model, api_key)
         json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not json_match:
-            print(f"[get_ksa_details] No JSON match found in response for skill '{skill}'")
+            print(
+                f"[get_ksa_details] No JSON match found in response for skill '{skill}'"
+            )
             return [], []
 
         parsed = json.loads(json_match.group())

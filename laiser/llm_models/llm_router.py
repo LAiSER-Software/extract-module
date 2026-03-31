@@ -41,6 +41,7 @@ Output/Return Format:
 - List of extracted skills from text
 
 """
+
 """
 Revision History:
 -----------------
@@ -49,6 +50,7 @@ Rev No.     Date            Author              Description
 """
 
 import os
+
 import torch
 
 # Import with error handling for optional dependencies
@@ -56,8 +58,13 @@ try:
     from laiser.llm_models.gemini import gemini_generate
 except ImportError as e:
     print(f"Warning: Gemini support not available: {e}")
+
     def gemini_generate(*args, **kwargs):
-        raise ImportError("Gemini support is not available. Please install google-generativeai package.")
+        raise ImportError(
+            "Gemini support is not available. Please install google-generativeai package."
+        )
+
+
 # Import with error handling for optional dependencies
 try:
     from laiser.llm_models.openai import openai_generate
@@ -68,12 +75,18 @@ try:
     from laiser.llm_models.hugging_face_llm import llm_generate_vllm
 except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
+
     def llm_generate_vllm(*args, **kwargs):
-        raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
+        raise ImportError(
+            "HuggingFace LLM support is not available. Please install required packages."
+        )
+
 
 class LLMRouter:
 
-    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None):
+    def __init__(
+        self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None
+    ):
         self.model_id = model_id
         self.use_gpu = use_gpu
         self.hf_token = hf_token
@@ -89,16 +102,16 @@ class LLMRouter:
 
     # ---------------- ROUTER ----------------
     def generate(self, prompt: str):
-        if self.model_id == 'gemini':
+        if self.model_id == "gemini":
             return gemini_generate(prompt, self.api_key)
 
-        if self.model_id == 'openai':
+        if self.model_id == "openai":
             return openai_generate(prompt, self.api_key)
 
         # If a local GGUF model was loaded with llama-cpp-python, use it
         if self.backend == "llama_cpp":
-              print("LLMRouter: routing request to llama_cpp backend")
-              return llama_cpp_chat(prompt, self.llm)
+            print("LLMRouter: routing request to llama_cpp backend")
+            return llama_cpp_chat(prompt, self.llm)
 
         print("LLMRouter: routing request to vLLM/transformer backend")
         return llm_generate_vllm(prompt, self.llm)
@@ -126,8 +139,7 @@ class LLMRouter:
                 print("Initialized llama.cpp CPU backend.")
                 return
 
-
-            if self.model_id == 'gemini':
+            if self.model_id == "gemini":
                 print("Using Gemini API for skill extraction...")
                 return
 
@@ -169,4 +181,6 @@ class LLMRouter:
         self.llm = load_model_from_vllm(self.model_id, self.hf_token)
 
     def _initialize_transformer(self):
-        self.tokenizer, self.model = load_model_from_transformer(self.model_id, self.hf_token)
+        self.tokenizer, self.model = load_model_from_transformer(
+            self.model_id, self.hf_token
+        )

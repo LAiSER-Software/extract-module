@@ -1,6 +1,7 @@
 import os
-import pytest
 import time
+
+import pytest
 
 # ✅ import from wherever you saved that function
 # Example:
@@ -61,13 +62,16 @@ standard_prompt = f"""
         }}
         """
 
+
 @pytest.mark.anthropic
 def test_anthropic_generate_once():
 
     # 3) small retry to survive 429 bursts
     resp_text = ""
-    resp_text = anthropic_generate(prompt=standard_prompt,api_key=os.getenv("ANTHROPIC_API_KEY"),)
-  
+    resp_text = anthropic_generate(
+        prompt=standard_prompt,
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+    )
 
     assert resp_text.strip(), "Empty response from OpenAI"
     print(resp_text)

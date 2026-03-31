@@ -1,6 +1,7 @@
 import os
-import pytest
 import time
+
+import pytest
 
 # ✅ import from wherever you saved that function
 # Example:
@@ -61,6 +62,7 @@ standard_prompt = f"""
         }}
         """
 
+
 @pytest.mark.openai
 def test_openai_generate_once():
     # 1) explicit opt-in so it doesn’t run accidentally
@@ -68,8 +70,10 @@ def test_openai_generate_once():
 
     # 3) small retry to survive 429 bursts
     resp_text = ""
-    resp_text = openai_generate(prompt=standard_prompt,api_key=os.getenv("OPENAI_API_KEY"),)
-  
+    resp_text = openai_generate(
+        prompt=standard_prompt,
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
 
     assert resp_text.strip(), "Empty response from OpenAI"
     print(resp_text)

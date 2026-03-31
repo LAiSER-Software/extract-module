@@ -1,11 +1,12 @@
 import os
-import sys
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 DIST = ROOT / "dist"
+
 
 def run(cmd):
     print("\n>>", cmd)
@@ -14,6 +15,7 @@ def run(cmd):
         print("❌ Command failed")
         sys.exit(result.returncode)
 
+
 def clean():
     print("🧹 Cleaning old builds...")
     shutil.rmtree(ROOT / "build", ignore_errors=True)
@@ -21,17 +23,21 @@ def clean():
     for p in ROOT.glob("*.egg-info"):
         shutil.rmtree(p, ignore_errors=True)
 
+
 def build():
     print("📦 Building package...")
     run("python -m build")
+
 
 def upload_test():
     print("🚀 Uploading to TestPyPI...")
     run("twine upload -r testpypi dist/*")
 
+
 def upload_prod():
     print("🚀 Uploading to PyPI...")
     run("twine upload dist/*")
+
 
 def main():
     if len(sys.argv) < 2:
@@ -52,6 +58,7 @@ def main():
         sys.exit(1)
 
     print("\n✅ Deploy complete!")
+
 
 if __name__ == "__main__":
     main()

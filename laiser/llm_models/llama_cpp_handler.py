@@ -1,8 +1,8 @@
+import gc
 import os
 import re
 from pathlib import Path
-from typing import Optional, List, Any
-import gc
+from typing import Any, List, Optional
 
 try:
     from llama_cpp import Llama  # type: ignore
@@ -21,7 +21,6 @@ def _strip_fences(text: str) -> str:
 
 class LlamaCppBackend:
 
-
     def __init__(
         self,
         model_path: Optional[str] = None,
@@ -38,7 +37,9 @@ class LlamaCppBackend:
 
         model_path = model_path or os.getenv("LAISER_LLAMA_CPP_MODEL_PATH")
         if not model_path:
-            raise ValueError("Set LAISER_LLAMA_CPP_MODEL_PATH or pass model_path to LlamaCppBackend.")
+            raise ValueError(
+                "Set LAISER_LLAMA_CPP_MODEL_PATH or pass model_path to LlamaCppBackend."
+            )
 
         model_path = str(Path(model_path))
         # model_path = str(Path(model_path).expanduser().resolve())
@@ -55,6 +56,7 @@ class LlamaCppBackend:
             # logits_all=False,
             # chat_format=chat_format,
         )
+
     def close(self) -> None:
         """Free llama.cpp resources early (avoid interpreter-shutdown __del__ errors)."""
         llm = getattr(self, "llm", None)
@@ -109,7 +111,9 @@ def llama_cpp_chat(
 ) -> str:
 
     if llama is None:
-        raise ValueError("llama is None; expected an initialized llama_cpp.Llama instance.")
+        raise ValueError(
+            "llama is None; expected an initialized llama_cpp.Llama instance."
+        )
 
     messages = [
         {"role": "system", "content": system},
