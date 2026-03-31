@@ -70,12 +70,7 @@ import pandas as pd
 import requests
 from sentence_transformers import SentenceTransformer
 
-from laiser.config import (
-    COMBINED_SKILLS_URL,
-    DEFAULT_EMBEDDING_MODEL,
-    ESCO_SKILLS_URL,
-    OSN_SKILLS_URL,
-)
+from laiser.config import COMBINED_SKILLS_URL, DEFAULT_EMBEDDING_MODEL, ESCO_SKILLS_URL, OSN_SKILLS_URL
 from laiser.exceptions import FAISSIndexError, LAiSERError
 
 logger = logging.getLogger(__name__)
@@ -675,3 +670,164 @@ class FAISSIndexManager:
 
         except Exception as e:
             raise FAISSIndexError(f"Failed to search similar skills: {repr(e)}")
+
+
+class _BaseTaxonomyFAISSIndexManager:
+    """
+    Shared base for Knowledge and Task FAISS index managers.
+
+    Subclasses must define:
+        INDEX_FILENAME   str  — e.g. "knowledge_v05.index"
+        META_FILENAME    str  — e.g. "knowledge_df.json"
+        CSV_FILENAME     str  — e.g. "knowledge_taxonomy.csv"
+        LABEL            str  — human-readable label for log messages ("Knowledge" / "Task")
+
+    The CSV produced by the pipeline scripts must contain at minimum:
+        name         — concept or task name
+        description  — definition / occupation context
+        taxonomy     — source tag (e.g. "onet_knowledge", "esco_task")
+    Additional columns (field, action_verb, etc.) are preserved in metadata.
+    """
+
+    INDEX_FILENAME: str = ""
+    META_FILENAME: str = ""
+    CSV_FILENAME: str = ""
+    LABEL: str = ""
+
+    def __init__(self, data_access: DataAccessLayer):
+        self.data_access = data_access
+        self.index: Optional[faiss.IndexFlatIP] = None
+        self.metadata: Optional[pd.DataFrame] = None
+        self._item_names: Optional[List[str]] = None
+
+    def initialize_index(self, force_rebuild: bool = False) -> None:
+        """Load existing index + metadata from public/, or build from CSV if missing."""
+        script_dir = Path(__file__).parent
+        index_path = script_dir / "public" / self.INDEX_FILENAME
+        meta_path = script_dir / "public" / self.META_FILENAME
+        csv_path = script_dir / "public" / self.CSV_FILENAME
+
+        # Try loading cached index
+        if not force_rebuild and index_path.exists() and meta_path.exists():
+            try:
+                self.index = self.data_access.load_faiss_index(str(index_path))
+                self.metadata = pd.read_json(str(meta_path), orient="records")
+                logger.info(f"[{self.LABEL}FAISSIndex] Loaded cached index ({len(self.metadata)} entries).")
+                return
+            except Exception as e:
+                logger.warning(f"[{self.LABEL}FAISSIndex] Cache load failed: {e}. Rebuilding from CSV.")
+
+        # Build from CSV
+        if not csv_path.exists():
+            logger.warning(
+                f"[{self.LABEL}FAISSIndex] Taxonomy CSV not found at {csv_path}. "
+                f"Run scripts/build_{self.LABEL.lower()}_index.py to generate it. "
+                f"Alignment for {self.LABEL} will be unavailable."
+            )
+            return
+
+        df = pd.read_csv(str(csv_path), dtype=str)
+        df = df.loc[:, ~df.columns.str.match(r"^Unnamed")]
+
+        # Normalize required columns
+        for col in ("name", "description", "taxonomy"):
+            if col not in df.columns:
+                raise LAiSERError(
+                    f"[{self.LABEL}FAISSIndex] CSV '{csv_path}' missing required column '{col}'. "
+                    "Re-run the pipeline script."
+                )
+            df[col] = df[col].fillna("").astype(str).str.strip()
+
+        df = df.dropna(subset=["name"]).reset_index(drop=True)
+        df = df[df["name"] != ""].reset_index(drop=True)
+        df["taxonomy"] = df["taxonomy"].str.lower()
+        df["text"] = df["name"] + " | " + df["description"]
+
+        # Build FAISS index
+        logger.info(f"[{self.LABEL}FAISSIndex] Building index from {len(df)} entries…")
+        self.index, _ = self.data_access.build_faiss_index(df["text"].tolist())
+        self.metadata = df
+
+        # Persist
+        try:
+            self.data_access.save_faiss_index(self.index, str(index_path))
+            self.data_access.save_skill_metadata_json(self.metadata, str(meta_path))
+            logger.info(f"[{self.LABEL}FAISSIndex] Index saved to {index_path}.")
+        except Exception as e:
+            logger.warning(f"[{self.LABEL}FAISSIndex] Failed to persist index: {e}")
+
+    def get_metadata(self) -> pd.DataFrame:
+        if self.metadata is None:
+            raise FAISSIndexError(f"{self.LABEL} FAISS metadata not initialized. Call initialize_index() first.")
+        return self.metadata
+
+    def search_similar(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int = 25,
+        allowed_sources: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Search for similar items. Returns list of dicts with keys: Name, Similarity, Rank, Index."""
+        if self.index is None or self.metadata is None:
+            return []
+
+        if self._item_names is None:
+            self._item_names = self.metadata["name"].astype(str).tolist()
+
+        try:
+            q = np.asarray(query_embedding, dtype=np.float32)
+            if q.ndim == 1:
+                q = q.reshape(1, -1)
+            if not q.flags["C_CONTIGUOUS"]:
+                q = np.ascontiguousarray(q)
+            faiss.normalize_L2(q)
+
+            ntotal = int(getattr(self.index, "ntotal", 0))
+            if ntotal <= 0:
+                return []
+
+            if not allowed_sources:
+                k = max(1, min(int(top_k), ntotal))
+                scores, indices = self.index.search(q, k)
+                return [
+                    {"Name": self._item_names[idx], "Similarity": float(score), "Rank": r, "Index": int(idx)}
+                    for r, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1)
+                    if idx != -1
+                ]
+
+            allowed_lower = {s.lower() for s in allowed_sources}
+            scores, indices = self.index.search(q, ntotal)
+            filtered = []
+            for score, idx in zip(scores[0], indices[0]):
+                if idx == -1 or idx >= len(self._item_names):
+                    continue
+                src = str(self.metadata.iloc[int(idx)].get("taxonomy", "")).lower()
+                if any(a in src for a in allowed_lower):
+                    filtered.append((float(score), int(idx)))
+
+            filtered.sort(key=lambda x: x[0], reverse=True)
+            return [
+                {"Name": self._item_names[idx], "Similarity": score, "Rank": r, "Index": idx}
+                for r, (score, idx) in enumerate(filtered, start=1)
+            ]
+
+        except Exception as e:
+            raise FAISSIndexError(f"[{self.LABEL}FAISSIndex] Search failed: {repr(e)}")
+
+
+class KnowledgeFAISSIndexManager(_BaseTaxonomyFAISSIndexManager):
+    """FAISS index manager for the Knowledge taxonomy (O*NET Knowledge + ESCO Knowledge)."""
+
+    INDEX_FILENAME = "knowledge_v05.index"
+    META_FILENAME = "knowledge_df.json"
+    CSV_FILENAME = "knowledge_taxonomy.csv"
+    LABEL = "Knowledge"
+
+
+class TaskFAISSIndexManager(_BaseTaxonomyFAISSIndexManager):
+    """FAISS index manager for the Task taxonomy (O*NET Tasks + ESCO Occupation Tasks)."""
+
+    INDEX_FILENAME = "tasks_v05.index"
+    META_FILENAME = "tasks_df.json"
+    CSV_FILENAME = "task_taxonomy.csv"
+    LABEL = "Task"
