@@ -57,7 +57,7 @@ TODO:
 
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -119,11 +119,11 @@ class SkillExtractorRefactored:
         warnings: bool = False,
         allowed_sources: Optional[List[str]] = None,
         extract: List[str] = None,
-    ) -> pd.DataFrame:
+        return_edges: bool = False,
+        similarity_thresholds: Optional[Dict[str, float]] = None,
+    ):
         """
-        Extract and align skills from a dataset (main interface method).
-
-        This method maintains backward compatibility with the original API.
+        Extract and align skills (and optionally Knowledge + Tasks) from a dataset.
 
         Parameters
         ----------
@@ -136,22 +136,31 @@ class SkillExtractorRefactored:
         input_type : str
             Type of input data
         top_k : int, optional
-            Maximum number of aligned skills to return per document (default: 25)
+            Maximum number of aligned items to return per document (default: 25)
         similarity_threshold : float, optional
-            Minimum similarity score for a match to be included (default: 0.20).
-            Higher values = stricter matching, fewer results.
-            Lower values = more lenient matching, more results.
+            Global minimum similarity score applied to all types unless overridden
+            by similarity_thresholds. Defaults to 0.20 for backward compatibility.
+        similarity_thresholds : dict, optional
+            Per-type thresholds. Keys: "skill", "knowledge", "task".
+            Defaults: {"skill": 0.20, "knowledge": 0.45, "task": 0.55}
         levels : bool
             Whether to extract skill levels
         batch_size : int
             Batch size for processing
         warnings : bool
             Whether to show warnings
+        extract : list, optional
+            Types to extract: "skills", "knowledge", "tasks", or ["all"].
+            Defaults to ["skills"] for backward compatibility.
+        return_edges : bool, optional
+            If True, return {"nodes": pd.DataFrame, "edges": pd.DataFrame} where
+            "edges" contains ENABLES edges (Knowledge → Task per skill).
+            If False (default), return a plain pd.DataFrame.
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame with extracted and aligned skills
+        pd.DataFrame  (when return_edges=False)
+        dict          (when return_edges=True): {"nodes": pd.DataFrame, "edges": pd.DataFrame}
         """
         return self.skill_service.extract_and_align_core(
             data=data,
@@ -165,6 +174,8 @@ class SkillExtractorRefactored:
             warnings=warnings,
             allowed_sources=allowed_sources,
             extract=extract,
+            return_edges=return_edges,
+            similarity_thresholds=similarity_thresholds,
         )
 
 

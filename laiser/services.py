@@ -16,6 +16,7 @@ import torch
 from laiser.config import (
     COMBINED_EXTRACTION_PROMPT,
     DEFAULT_BATCH_SIZE,
+    DEFAULT_SIMILARITY_THRESHOLDS,
     DEFAULT_TOP_K,
     KSA_DETAILS_PROMPT,
     KSA_EXTRACTION_PROMPT,
@@ -23,7 +24,7 @@ from laiser.config import (
     SCQF_LEVELS,
     SKILL_EXTRACTION_PROMPT_SYLLABUS,
 )
-from laiser.data_access import DataAccessLayer, FAISSIndexManager
+from laiser.data_access import DataAccessLayer, FAISSIndexManager, KnowledgeFAISSIndexManager, TaskFAISSIndexManager
 from laiser.exceptions import InvalidInputError, LAiSERError
 from laiser.llm_models.llm_router import LLMRouter
 
@@ -329,14 +330,151 @@ class ResponseParser:
             return [], []
 
 
-class SkillAlignmentService:
-    """Service for aligning extracted skills with taxonomies"""
+class AlignmentService:
+    """
+    Generalized alignment service for Skills, Knowledge, and Tasks.
 
-    def __init__(self, data_access: DataAccessLayer, faiss_manager: FAISSIndexManager):
+    Uses any FAISS index manager that exposes:
+        .get_metadata() -> pd.DataFrame
+        .search_similar(query_vec, top_k, allowed_sources) -> List[Dict]  (key "Name")
+        .search_similar_skills(...)  (legacy key "Skill", for FAISSIndexManager)
+    """
+
+    def __init__(self, data_access: DataAccessLayer, faiss_manager):
         self.data_access = data_access
         self.faiss_manager = faiss_manager
-        self.faiss_manager.initialize_index(force_rebuild=False)
+        # FAISSIndexManager.initialize_index is a no-op if already loaded
+        if hasattr(self.faiss_manager, "initialize_index"):
+            self.faiss_manager.initialize_index(force_rebuild=False)
 
+    def align(
+        self,
+        raw_items: List[str],
+        document_id: str = "0",
+        description: str = "",
+        similarity_threshold: float = 0.20,
+        top_k: int = DEFAULT_TOP_K,
+        raw_col: str = "Raw Item",
+        taxonomy_col: str = "Taxonomy Item",
+        allowed_sources: Optional[List[str]] = None,
+        debug: bool = False,
+    ) -> pd.DataFrame:
+        """
+        Align a list of raw extracted strings to the loaded FAISS taxonomy.
+
+        Parameters
+        ----------
+        raw_col : str
+            Name for the "raw extracted" column in the output DataFrame.
+        taxonomy_col : str
+            Name for the "matched taxonomy" column in the output DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame with columns: Research ID, raw_col, taxonomy_col,
+            Taxonomy Description, Taxonomy Source, Correlation Coefficient
+        """
+        mapped_items: List[str] = []
+        raw_matched: List[str] = []
+        taxonomy_descriptions: List[str] = []
+        taxonomy_sources: List[str] = []
+        correlations: List[float] = []
+
+        def log_debug(msg: str):
+            if debug:
+                logger.debug(msg)
+
+        log_debug(f"[align] raw_items={len(raw_items)} threshold={similarity_threshold} top_k={top_k}")
+
+        model = self.data_access.get_embedding_model()
+        try:
+            metadata = self.faiss_manager.get_metadata()
+        except Exception:
+            # Index not yet available — return empty DataFrame
+            return pd.DataFrame(
+                {
+                    "Research ID": pd.Series([], dtype=str),
+                    raw_col: [],
+                    taxonomy_col: [],
+                    "Taxonomy Description": [],
+                    "Taxonomy Source": [],
+                    "Correlation Coefficient": [],
+                }
+            )
+
+        for i, item in enumerate(raw_items):
+            log_debug(f"[item {i}] raw='{item}'")
+            query_vec = model.encode([item], normalize_embeddings=True)
+
+            # Support both legacy FAISSIndexManager (search_similar_skills, key "Skill")
+            # and new managers (search_similar, key "Name")
+            if hasattr(self.faiss_manager, "search_similar"):
+                results = self.faiss_manager.search_similar(
+                    np.array(query_vec).astype("float32"),
+                    top_k=1,
+                    allowed_sources=allowed_sources,
+                )
+                name_key = "Name"
+            else:
+                results = self.faiss_manager.search_similar_skills(
+                    np.array(query_vec).astype("float32"),
+                    top_k=1,
+                    allowed_sources=allowed_sources,
+                )
+                name_key = "Skill"
+
+            if not results:
+                log_debug(f"[item {i}] no results -> skip")
+                continue
+
+            best = results[0]
+            similarity = float(best.get("Similarity", 0.0))
+            meta_idx = best.get("Index")
+            canonical = str(best.get(name_key, "")).strip()
+
+            log_debug(f"[item {i}] best='{canonical}' sim={similarity:.4f}")
+
+            if similarity < similarity_threshold or not canonical:
+                continue
+
+            meta: Dict = {}
+            if meta_idx is not None and isinstance(metadata, pd.DataFrame):
+                idx_int = int(meta_idx)
+                if 0 <= idx_int < len(metadata):
+                    meta = metadata.iloc[idx_int].to_dict()
+
+            taxonomy_description = str(meta.get("description", meta.get("Description", "")))
+            taxonomy_source = str(meta.get("taxonomy", ""))
+
+            mapped_items.append(canonical)
+            raw_matched.append(item)
+            taxonomy_descriptions.append(taxonomy_description)
+            taxonomy_sources.append(taxonomy_source)
+            correlations.append(similarity)
+
+        log_debug(f"[align] matched={len(mapped_items)} of {len(raw_items)}")
+
+        # Apply top_k trim
+        if len(mapped_items) > top_k:
+            combined = sorted(
+                zip(correlations, raw_matched, mapped_items, taxonomy_descriptions, taxonomy_sources),
+                key=lambda x: x[0],
+                reverse=True,
+            )[:top_k]
+            correlations, raw_matched, mapped_items, taxonomy_descriptions, taxonomy_sources = map(list, zip(*combined))
+
+        return pd.DataFrame(
+            {
+                "Research ID": document_id,
+                raw_col: raw_matched,
+                taxonomy_col: mapped_items,
+                "Taxonomy Description": taxonomy_descriptions,
+                "Taxonomy Source": taxonomy_sources,
+                "Correlation Coefficient": correlations,
+            }
+        )
+
+    # ---------- Legacy method kept for backward compatibility ----------
     def align_skills_to_taxonomy(
         self,
         raw_skills: List[str],
@@ -347,118 +485,21 @@ class SkillAlignmentService:
         debug: bool = False,
         allowed_sources: Optional[List[str]] = None,
     ) -> pd.DataFrame:
-        mapped_skills = []
-        raw_skills_matched = []
-        taxonomy_descriptions = []
-        taxonomy_sources = []
-        correlations = []
-
-        def log_debug(msg: str):
-            if debug:
-                logger.debug(msg)
-
-        log_debug(f"[align] raw_skills={len(raw_skills)} threshold={similarity_threshold} top_k={top_k}")
-
-        model = self.data_access.get_embedding_model()
-
-        # metadata loaded once
-        metadata = self.faiss_manager.get_metadata()
-        log_debug(f"[align] metadata type={type(metadata).__name__} len={len(metadata)}")
-        if isinstance(metadata, pd.DataFrame) and not metadata.empty:
-            log_debug(f"[align] metadata columns={list(metadata.columns)}")
-
-        for i, skill in enumerate(raw_skills):
-            log_debug(f"[skill {i}] raw='{skill}'")
-
-            query_vec = model.encode([skill], normalize_embeddings=True)
-
-            results = self.faiss_manager.search_similar_skills(
-                np.array(query_vec).astype("float32"),
-                top_k=1,
-                allowed_sources=allowed_sources,
-            )
-            log_debug(f"[skill {i}] results={results}")
-
-            if not results:
-                log_debug(f"[skill {i}] no results -> skip")
-                continue
-
-            best = results[0]
-            similarity = float(best.get("Similarity", 0.0))
-            meta_idx = best.get("Index")
-            canonical_skill = str(best.get("Skill", "")).strip()
-
-            log_debug(f"[skill {i}] best='{canonical_skill}' sim={similarity:.4f} meta_idx={meta_idx}")
-
-            if similarity < similarity_threshold:
-                log_debug(f"[skill {i}] below threshold -> skip")
-                continue
-            meta = {}
-            if not canonical_skill:
-                log_debug(f"[skill {i}] empty canonical_skill -> skip")
-                continue
-            if meta_idx is None:
-                log_debug(f"[skill {i}] meta_idx is None (search_similar_skills may not return Index)")
-            elif int(meta_idx) >= len(metadata) or int(meta_idx) < 0:
-                log_debug(f"[skill {i}] meta_idx out of range: {meta_idx} (metadata len={len(metadata)})")
-            else:
-                # ✅ DataFrame row by position
-                meta = metadata.iloc[int(meta_idx)].to_dict()
-                log_debug(f"[skill {i}] meta keys={list(meta.keys())}")
-
-            # handle possible key casing differences
-            taxonomy_description = meta.get("description", meta.get("Description", ""))
-            taxonomy_source = meta.get("taxonomy", meta.get("taxonomy", ""))
-
-            log_debug(f"[skill {i}] source='{taxonomy_source}' desc_len={len(taxonomy_description)}")
-
-            mapped_skills.append(canonical_skill)
-            raw_skills_matched.append(skill)
-            taxonomy_descriptions.append(taxonomy_description)
-            taxonomy_sources.append(taxonomy_source)
-            correlations.append(similarity)
-
-        log_debug(f"[align] matched={len(mapped_skills)} of {len(raw_skills)}")
-
-        # Apply top_k limit: sort by correlation (descending) and take top_k
-        if len(mapped_skills) > top_k:
-            log_debug(f"[align] trimming to top_k={top_k}")
-
-            combined = list(
-                zip(
-                    correlations,
-                    raw_skills_matched,
-                    mapped_skills,
-                    taxonomy_descriptions,
-                    taxonomy_sources,
-                )
-            )
-            combined.sort(key=lambda x: x[0], reverse=True)
-            combined = combined[:top_k]
-
-            (
-                correlations,
-                raw_skills_matched,
-                mapped_skills,
-                taxonomy_descriptions,
-                taxonomy_sources,
-            ) = map(
-                list, zip(*combined)
-            )  # ✅ FIX #2: keep lists aligned
-
-        result_df = pd.DataFrame(
-            {
-                "Research ID": document_id,
-                "Raw Skill": raw_skills_matched,
-                "Taxonomy Skill": mapped_skills,
-                "Taxonomy Description": taxonomy_descriptions,
-                "Taxonomy Source": taxonomy_sources,
-                "Correlation Coefficient": correlations,
-            }
+        return self.align(
+            raw_items=raw_skills,
+            document_id=document_id,
+            description=description,
+            similarity_threshold=similarity_threshold,
+            top_k=top_k,
+            raw_col="Raw Skill",
+            taxonomy_col="Taxonomy Skill",
+            allowed_sources=allowed_sources,
+            debug=debug,
         )
 
-        log_debug(f"[align] result_df shape={result_df.shape}")
-        return result_df
+
+# Backward-compatible alias
+SkillAlignmentService = AlignmentService
 
 
 class SkillExtractionService:
@@ -483,8 +524,20 @@ class SkillExtractionService:
         self.model = None
         self.nlp = None
         self.data_access = DataAccessLayer()
+
+        # Skills index (v0.4 / combined taxonomy)
         self.faiss_manager = FAISSIndexManager(self.data_access)
-        self.alignment_service = SkillAlignmentService(self.data_access, self.faiss_manager)
+        self.alignment_service = AlignmentService(self.data_access, self.faiss_manager)
+
+        # Knowledge + Task indexes (v0.5) — initialized lazily; no-op if CSV not yet built
+        self.knowledge_faiss = KnowledgeFAISSIndexManager(self.data_access)
+        self.knowledge_faiss.initialize_index(force_rebuild=False)
+        self.knowledge_alignment = AlignmentService(self.data_access, self.knowledge_faiss)
+
+        self.task_faiss = TaskFAISSIndexManager(self.data_access)
+        self.task_faiss.initialize_index(force_rebuild=False)
+        self.task_alignment = AlignmentService(self.data_access, self.task_faiss)
+
         self.prompt_builder = PromptBuilder()
         self.llm_parser = ResponseParser()
         self.response_parser = ResponseParser()
@@ -496,7 +549,7 @@ class SkillExtractionService:
             backend=self.backend,
         )
 
-        # Initialize FAISS index
+        # Initialize skills FAISS index
         self.faiss_manager.initialize_index(force_rebuild=False)
         # Log router initialization state for debugging
         try:
@@ -519,7 +572,9 @@ class SkillExtractionService:
         warnings: bool = True,
         allowed_sources: Optional[List[str]] = None,
         extract: List[str] = None,
-    ) -> pd.DataFrame:
+        return_edges: bool = False,
+        similarity_thresholds: Optional[Dict[str, float]] = None,
+    ):
         """
         Extract and align skills from a dataset (main interface method).
 
@@ -536,28 +591,36 @@ class SkillExtractionService:
         input_type : str
             Type of input data
         top_k : int, optional
-            Maximum number of aligned skills to return per document (default: 25)
+            Maximum number of aligned items to return per document (default: 25)
         similarity_threshold : float, optional
-            Minimum similarity score for a match to be included (default: 0.20).
-            Higher values = stricter matching, fewer results.
-            Lower values = more lenient matching, more results.
+            Global minimum similarity score applied to all types unless overridden
+            by similarity_thresholds. Defaults to 0.20 for backward compatibility.
+        similarity_thresholds : dict, optional
+            Per-type similarity thresholds. Keys: "skill", "knowledge", "task".
+            Overrides similarity_threshold for each specified type.
+            Defaults: {"skill": 0.20, "knowledge": 0.45, "task": 0.55}
         levels : bool
             Whether to extract skill levels
         batch_size : int
             Batch size for processing
         warnings : bool
             Whether to show warnings
-
         extract : list, optional
             Types to extract. Options: "skills", "knowledge", "tasks".
             Defaults to ["skills"] for backward compatibility.
             Pass ["skills", "knowledge", "tasks"] or ["all"] for full v0.5 extraction.
+        return_edges : bool, optional
+            If True, return a dict {"nodes": pd.DataFrame, "edges": pd.DataFrame}
+            where "edges" contains ENABLES edges (Knowledge → Task co-occurrence per skill).
+            If False (default), return a plain DataFrame — no breaking change.
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame with extracted and aligned items.
-            Includes a "Type" column when extracting more than skills.
+        pd.DataFrame  (when return_edges=False, default)
+            DataFrame with extracted and aligned items. Includes a "Type" column.
+        dict  (when return_edges=True)
+            {"nodes": pd.DataFrame, "edges": pd.DataFrame}
+            edges columns: Research ID, Skill, Knowledge, Task, Edge Type, confidence
         """
         if text_columns is None:
             text_columns = ["description"]
@@ -576,12 +639,21 @@ class SkillExtractionService:
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame(data)
 
-        # Apply defaults for top_k and similarity_threshold
+        # Apply defaults for top_k and similarity thresholds
         effective_top_k = top_k if top_k is not None else DEFAULT_TOP_K
-        effective_threshold = similarity_threshold if similarity_threshold is not None else 0.20
+
+        # Build per-type thresholds: start from DEFAULT_SIMILARITY_THRESHOLDS,
+        # override with the scalar similarity_threshold if provided (backward compat),
+        # then overlay any explicitly provided similarity_thresholds dict.
+        resolved: Dict[str, float] = dict(DEFAULT_SIMILARITY_THRESHOLDS)
+        if similarity_threshold is not None:
+            resolved = {k: similarity_threshold for k in resolved}
+        if similarity_thresholds:
+            resolved.update({k: float(v) for k, v in similarity_thresholds.items()})
 
         try:
             results = []
+            all_edges: List[pd.DataFrame] = []
 
             for idx, row in data.iterrows():
                 try:
@@ -598,7 +670,7 @@ class SkillExtractionService:
                             skills,
                             doc_id,
                             full_description,
-                            similarity_threshold=effective_threshold,
+                            similarity_threshold=resolved["skill"],
                             top_k=effective_top_k,
                             allowed_sources=allowed_sources,
                         )
@@ -617,7 +689,7 @@ class SkillExtractionService:
                                 raw_knowledge,
                                 doc_id,
                                 full_description,
-                                similarity_threshold=effective_threshold,
+                                similarity_threshold=resolved["knowledge"],
                                 top_k=effective_top_k,
                             )
                             aligned_knowledge["Type"] = "knowledge"
@@ -628,11 +700,17 @@ class SkillExtractionService:
                                 raw_tasks,
                                 doc_id,
                                 full_description,
-                                similarity_threshold=effective_threshold,
+                                similarity_threshold=resolved["task"],
                                 top_k=effective_top_k,
                             )
                             aligned_tasks["Type"] = "task"
                             results.extend(aligned_tasks.to_dict("records"))
+
+                        # Derive ENABLES edges (K × T per skill, before alignment)
+                        if return_edges and kt_results:
+                            edges_df = self._derive_enables_edges(kt_results, doc_id)
+                            if not edges_df.empty:
+                                all_edges.append(edges_df)
 
                 except Exception as e:
                     if warnings:
@@ -641,6 +719,15 @@ class SkillExtractionService:
 
             df = pd.DataFrame(results)
             df.to_csv("skills_alignment_results.csv", index=False, encoding="utf-8")
+
+            if return_edges:
+                edges = (
+                    pd.concat(all_edges, ignore_index=True)
+                    if all_edges
+                    else pd.DataFrame(columns=["Research ID", "Skill", "Knowledge", "Task", "Edge Type", "confidence"])
+                )
+                return {"nodes": df, "edges": edges}
+
             return df
 
         except Exception as e:
@@ -748,21 +835,29 @@ class SkillExtractionService:
         """
         Align extracted knowledge items to the Knowledge taxonomy FAISS index.
 
-        Note: Knowledge FAISS index and taxonomy data pipeline are pending v0.5
-        data work. Returns empty DataFrame until index is ready.
+        Falls back to returning raw strings if the index has not been built yet
+        (run scripts/build_knowledge_index.py to build it).
         """
-        # TODO(v0.5): replace with KnowledgeFAISSIndexManager once
-        # knowledge taxonomy data is downloaded, embedded and indexed.
-        logger.warning("Knowledge alignment index not yet available. Returning raw extracted knowledge.")
-        return pd.DataFrame(
-            {
-                "Research ID": document_id,
-                "Raw Knowledge": raw_knowledge,
-                "Taxonomy Knowledge": raw_knowledge,
-                "Taxonomy Description": [""] * len(raw_knowledge),
-                "Taxonomy Source": ["pending"] * len(raw_knowledge),
-                "Correlation Coefficient": [0.0] * len(raw_knowledge),
-            }
+        if self.knowledge_faiss.index is None:
+            logger.warning("Knowledge alignment index not available. Returning raw extracted knowledge.")
+            return pd.DataFrame(
+                {
+                    "Research ID": document_id,
+                    "Raw Knowledge": raw_knowledge,
+                    "Taxonomy Knowledge": raw_knowledge,
+                    "Taxonomy Description": [""] * len(raw_knowledge),
+                    "Taxonomy Source": ["pending"] * len(raw_knowledge),
+                    "Correlation Coefficient": [0.0] * len(raw_knowledge),
+                }
+            )
+        return self.knowledge_alignment.align(
+            raw_items=raw_knowledge,
+            document_id=document_id,
+            description=description,
+            similarity_threshold=similarity_threshold,
+            top_k=top_k,
+            raw_col="Raw Knowledge",
+            taxonomy_col="Taxonomy Knowledge",
         )
 
     def align_extracted_tasks(
@@ -774,23 +869,31 @@ class SkillExtractionService:
         top_k: int = DEFAULT_TOP_K,
     ) -> pd.DataFrame:
         """
-        Align extracted tasks to the Task Abilities taxonomy FAISS index.
+        Align extracted tasks to the Task taxonomy FAISS index.
 
-        Note: Task FAISS index and taxonomy data pipeline are pending v0.5
-        data work. Returns empty DataFrame until index is ready.
+        Falls back to returning raw strings if the index has not been built yet
+        (run scripts/build_task_index.py to build it).
         """
-        # TODO(v0.5): replace with TaskFAISSIndexManager once
-        # task taxonomy data is downloaded, embedded and indexed.
-        logger.warning("Task alignment index not yet available. Returning raw extracted tasks.")
-        return pd.DataFrame(
-            {
-                "Research ID": document_id,
-                "Raw Task": raw_tasks,
-                "Taxonomy Task": raw_tasks,
-                "Taxonomy Description": [""] * len(raw_tasks),
-                "Taxonomy Source": ["pending"] * len(raw_tasks),
-                "Correlation Coefficient": [0.0] * len(raw_tasks),
-            }
+        if self.task_faiss.index is None:
+            logger.warning("Task alignment index not available. Returning raw extracted tasks.")
+            return pd.DataFrame(
+                {
+                    "Research ID": document_id,
+                    "Raw Task": raw_tasks,
+                    "Taxonomy Task": raw_tasks,
+                    "Taxonomy Description": [""] * len(raw_tasks),
+                    "Taxonomy Source": ["pending"] * len(raw_tasks),
+                    "Correlation Coefficient": [0.0] * len(raw_tasks),
+                }
+            )
+        return self.task_alignment.align(
+            raw_items=raw_tasks,
+            document_id=document_id,
+            description=description,
+            similarity_threshold=similarity_threshold,
+            top_k=top_k,
+            raw_col="Raw Task",
+            taxonomy_col="Taxonomy Task",
         )
 
     def align_extracted_skills(
@@ -848,4 +951,46 @@ class SkillExtractionService:
             similarity_threshold,
             top_k,
             allowed_sources,
+        )
+
+    def _derive_enables_edges(
+        self,
+        kt_results: List[Dict[str, Any]],
+        document_id: str,
+    ) -> pd.DataFrame:
+        """
+        Derive ENABLES edges from co-occurrence of Knowledge and Tasks within the same skill.
+
+        For each skill block in kt_results, every (Knowledge, Task) pair is an ENABLES edge:
+        Knowledge ──ENABLES──► Task
+
+        This is derived directly from LLM output before alignment, so it works even
+        when Knowledge/Task FAISS indexes are not yet available.
+
+        Returns
+        -------
+        pd.DataFrame with columns:
+            Research ID, Skill, Knowledge, Task, Edge Type, confidence
+        """
+        rows = []
+        for item in kt_results:
+            skill = item.get("skill", "")
+            knowledge_items = item.get("knowledge", [])
+            task_items = item.get("tasks", [])
+            for k in knowledge_items:
+                for t in task_items:
+                    rows.append(
+                        {
+                            "Research ID": document_id,
+                            "Skill": skill,
+                            "Knowledge": k,
+                            "Task": t,
+                            "Edge Type": "ENABLES",
+                            "confidence": "low",
+                        }
+                    )
+        return (
+            pd.DataFrame(rows)
+            if rows
+            else pd.DataFrame(columns=["Research ID", "Skill", "Knowledge", "Task", "Edge Type", "confidence"])
         )
