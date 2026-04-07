@@ -7,4 +7,4 @@ faiss-cpu>=1.7.0
 certifi>=2023.0.0
 requests>=2.25.0
 psutil
-google-generativeai==0.8.5
+google-generativeai==0.8.6
