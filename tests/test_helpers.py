@@ -13,8 +13,8 @@ def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple
 
     The function is flexible about column names. It will look for:
       - research id: 'Research ID' (fallback: first column)
-      - raw skill: 'Raw Skill' or 'Raw' or 'raw_skill'
-      - taxonomy skill: 'Taxonomy Skill' (used for duplicate detection)
+      - raw skill/concept: 'Raw Concept', 'Raw Skill' or 'Raw'
+      - taxonomy skill/concept: 'Taxonomy Concept' or 'Taxonomy Skill' (used for duplicate detection)
       - taxonomy label column: 'Taxonomy Source' or 'taxonomy' or 'Taxonomy Source'
       - correlation: 'Correlation Coefficient' or 'correlation' or 'Similarity'
     """
@@ -33,10 +33,10 @@ def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple
         return None
 
     research_col = _pick(["Research ID", "research id", "research_id"]) or df.columns[0]
-    raw_col = _pick(["Raw Skill", "raw_skill", "raw skill", "Raw"]) or _pick(
+    raw_col = _pick(["Raw Concept", "Raw Skill", "raw_skill", "raw skill", "Raw"]) or _pick(
         [df.columns[1] if df.shape[1] > 1 else None]
     )
-    tax_skill_col = _pick(["Taxonomy Skill", "taxonomy skill", "taxonomy_skill"])
+    tax_skill_col = _pick(["Taxonomy Concept", "Taxonomy Skill", "taxonomy skill", "taxonomy_skill"])
     taxonomy_col = _pick(["Taxonomy Source", "taxonomy", "Taxonomy Source", "taxonomy_source", "source"])
     corr_col = _pick(
         [
