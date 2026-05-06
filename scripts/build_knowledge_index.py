@@ -2,7 +2,7 @@
 Build the Knowledge FAISS index for LAiSER v0.5.
 
 Sources:
-  1. O*NET Knowledge (Knowledge.txt + Content Model Reference.txt)
+  1. O*NET Knowledge (Knowledge.xlsx + Content Model Reference.xlsx)
      Downloaded from: https://www.onetcenter.org/database.html#individual-files
   2. ESCO Knowledge entries filtered from the ESCO skills CSV
 
@@ -39,9 +39,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Remote source URLs
 # ---------------------------------------------------------------------------
-# O*NET 28.0 individual files (plain-text tab-separated, UTF-8)
-ONET_KNOWLEDGE_URL = "https://www.onetcenter.org/dl_files/database/db_28_0_text/Knowledge.txt"
-ONET_CONTENT_MODEL_URL = "https://www.onetcenter.org/dl_files/database/db_28_0_text/Content%20Model%20Reference.txt"
+# O*NET 30.2 individual Excel files
+ONET_KNOWLEDGE_URL = "https://www.onetcenter.org/dl_files/database/db_30_2_excel/Knowledge.xlsx"
+ONET_CONTENT_MODEL_URL = "https://www.onetcenter.org/dl_files/database/db_30_2_excel/Content%20Model%20Reference.xlsx"
 
 # ESCO skills CSV from LAiSER datasets repo (already used for skills index)
 ESCO_SKILLS_URL = (
@@ -79,13 +79,13 @@ def load_onet_knowledge(onet_dir: Path = None) -> pd.DataFrame:
         knowledge_raw = pd.read_csv(str(knowledge_path), sep="\t", dtype=str)
         ref_raw = pd.read_csv(str(ref_path), sep="\t", dtype=str) if ref_path.exists() else None
     else:
-        knowledge_raw = pd.read_csv(io.StringIO(_fetch(ONET_KNOWLEDGE_URL).decode("utf-8")), sep="\t", dtype=str)
+        knowledge_raw = pd.read_excel(io.BytesIO(_fetch(ONET_KNOWLEDGE_URL)), dtype=str)
         try:
-            ref_raw = pd.read_csv(io.StringIO(_fetch(ONET_CONTENT_MODEL_URL).decode("utf-8")), sep="\t", dtype=str)
+            ref_raw = pd.read_excel(io.BytesIO(_fetch(ONET_CONTENT_MODEL_URL)), dtype=str)
         except Exception:
             ref_raw = None
 
-    # O*NET Knowledge.txt columns:
+    # O*NET Knowledge columns:
     # O*NET-SOC Code | Title | Element ID | Element Name | Scale ID | Data Value | N | SE | Lower CI Bound | Upper CI Bound | Recommend Suppress | Not Relevant
     knowledge_raw.columns = [c.strip() for c in knowledge_raw.columns]
 
@@ -137,7 +137,9 @@ def load_esco_knowledge() -> pd.DataFrame:
     """
     Extract Knowledge entries from the ESCO skills CSV.
 
-    ESCO marks knowledge entries with conceptType containing 'knowledge'.
+    ESCO knowledge entries are identified by `skillType=knowledge` in the
+    current LAiSER ESCO export. `conceptType` is too broad because it is
+    `KnowledgeSkillCompetence` for both skills and knowledge rows.
     Returns DataFrame with columns: name, description, taxonomy, field
     """
     logger.info("Loading ESCO skills CSV for knowledge entries…")
@@ -149,12 +151,14 @@ def load_esco_knowledge() -> pd.DataFrame:
 
     raw.columns = [c.strip() for c in raw.columns]
 
-    # ESCO marks knowledge with conceptType = "KnowledgeSkillCompetence" or similar
-    # Fall back to filtering by preferredLabel + description heuristics if no type column
-    if "conceptType" in raw.columns:
-        knowledge_df = raw[raw["conceptType"].str.lower().str.contains("knowledge", na=False)].copy()
-    elif "skillType" in raw.columns:
+    # Prefer skillType because conceptType is `KnowledgeSkillCompetence` for
+    # the entire ESCO export and would incorrectly include non-knowledge rows.
+    if "skillType" in raw.columns:
         knowledge_df = raw[raw["skillType"].str.lower().str.contains("knowledge", na=False)].copy()
+    elif "skill_type" in raw.columns:
+        knowledge_df = raw[raw["skill_type"].str.lower().str.contains("knowledge", na=False)].copy()
+    elif "conceptType" in raw.columns:
+        knowledge_df = raw[raw["conceptType"].str.lower().str.contains("knowledge", na=False)].copy()
     else:
         logger.warning("ESCO CSV has no conceptType/skillType column — skipping ESCO knowledge.")
         return pd.DataFrame(columns=["name", "description", "taxonomy", "field"])
