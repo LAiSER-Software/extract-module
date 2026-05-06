@@ -261,7 +261,6 @@ class ResponseParser:
             return []
 
     @staticmethod
-    @staticmethod
     def parse_knowledge_task_response(response: str) -> List[Dict[str, Any]]:
         """
         Parse the JSON response from KT_FROM_SKILLS_PROMPT.
@@ -271,19 +270,23 @@ class ResponseParser:
             knowledge List[str]
             tasks     List[str]
         """
-        try:
-            # Strip markdown code fences if present
-            cleaned = re.sub(r"```(?:json)?", "", response).strip().rstrip("`").strip()
-            parsed = json.loads(cleaned)
-            results = parsed.get("results", [])
+        if not response or not response.strip():
+            return []
 
+        def validate(results: Any) -> List[Dict[str, Any]]:
             validated = []
+            if results is None:
+                return validated
+            if not isinstance(results, list):
+                results = [results]
+
             for item in results:
                 if not isinstance(item, dict):
                     continue
-                skill = str(item.get("skill", "")).strip()
-                knowledge = item.get("knowledge", [])
-                tasks = item.get("tasks", [])
+
+                skill = str(item.get("skill", item.get("Skill", ""))).strip()
+                knowledge = item.get("knowledge", item.get("Knowledge", item.get("Knowledge Required", [])))
+                tasks = item.get("tasks", item.get("task", item.get("Task Abilities", [])))
 
                 if not isinstance(knowledge, list):
                     knowledge = [str(knowledge)] if knowledge else []
@@ -294,12 +297,99 @@ class ResponseParser:
                     validated.append(
                         {
                             "skill": skill,
-                            "knowledge": [k.strip() for k in knowledge if k.strip()],
-                            "tasks": [t.strip() for t in tasks if t.strip()],
+                            "knowledge": [str(k).strip() for k in knowledge if str(k).strip()],
+                            "tasks": [str(t).strip() for t in tasks if str(t).strip()],
                         }
                     )
             return validated
 
+        def parse_array_fragment(fragment: str) -> List[str]:
+            fragment = fragment.strip()
+            if not fragment:
+                return []
+
+            try:
+                parsed = json.loads(fragment)
+                if isinstance(parsed, list):
+                    return [str(x).strip() for x in parsed if str(x).strip()]
+            except Exception:
+                pass
+
+            return [m.strip() for m in re.findall(r'"([^"]+)"', fragment) if m.strip()]
+
+        try:
+            candidates: List[str] = []
+            stripped = response.strip()
+
+            fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL)
+            if fenced:
+                candidates.append(fenced.group(1).strip())
+
+            obj_match = re.search(r"\{.*\}", stripped, re.DOTALL)
+            if obj_match:
+                candidates.append(obj_match.group(0).strip())
+
+            list_match = re.search(r"\[.*\]", stripped, re.DOTALL)
+            if list_match:
+                candidates.append(list_match.group(0).strip())
+
+            candidates.append(stripped)
+
+            seen = set()
+            for candidate in candidates:
+                if not candidate or candidate in seen:
+                    continue
+                seen.add(candidate)
+
+                try:
+                    parsed = json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
+                if isinstance(parsed, dict):
+                    for key in ("results", "data", "items"):
+                        validated = validate(parsed.get(key, []))
+                        if validated:
+                            return validated
+
+                    validated = validate([parsed])
+                    if validated:
+                        return validated
+
+                elif isinstance(parsed, list):
+                    validated = validate(parsed)
+                    if validated:
+                        return validated
+
+            block_pattern = re.compile(
+                r'"skill"\s*:\s*"(?P<skill>[^"]+)"'
+                r'.*?"knowledge"\s*:\s*(?P<knowledge>\[[^\]]*\])'
+                r'.*?"tasks"\s*:\s*(?P<tasks>\[[^\]]*\])',
+                re.DOTALL | re.IGNORECASE,
+            )
+
+            fallback_results: List[Dict[str, Any]] = []
+            for match in block_pattern.finditer(stripped):
+                skill = match.group("skill").strip()
+                knowledge = parse_array_fragment(match.group("knowledge"))
+                tasks = parse_array_fragment(match.group("tasks"))
+                if skill:
+                    fallback_results.append(
+                        {
+                            "skill": skill,
+                            "knowledge": knowledge,
+                            "tasks": tasks,
+                        }
+                    )
+
+            if fallback_results:
+                return fallback_results
+
+            logger.warning(
+                "Failed to parse knowledge/task response into usable blocks. Preview: %s",
+                stripped.replace("\n", " ")[:300],
+            )
+            return []
         except Exception as e:
             logger.warning(f"Failed to parse knowledge/task response: {e}")
             return []
@@ -372,12 +462,13 @@ class AlignmentService:
         Returns
         -------
         pd.DataFrame with columns: Research ID, raw_col, taxonomy_col,
-            Taxonomy Description, Taxonomy Source, Correlation Coefficient
+            Taxonomy Description, Taxonomy Source, Source Url, Correlation Coefficient
         """
         mapped_items: List[str] = []
         raw_matched: List[str] = []
         taxonomy_descriptions: List[str] = []
         taxonomy_sources: List[str] = []
+        taxonomy_urls: List[str] = []
         correlations: List[float] = []
 
         def log_debug(msg: str):
@@ -398,6 +489,7 @@ class AlignmentService:
                     taxonomy_col: [],
                     "Taxonomy Description": [],
                     "Taxonomy Source": [],
+                    "Source Url": [],
                     "Correlation Coefficient": [],
                 }
             )
@@ -445,11 +537,13 @@ class AlignmentService:
 
             taxonomy_description = str(meta.get("description", meta.get("Description", "")))
             taxonomy_source = str(meta.get("taxonomy", ""))
+            taxonomy_url = str(meta.get("source_url", meta.get("Source URL", meta.get("sourceUrl", ""))))
 
             mapped_items.append(canonical)
             raw_matched.append(item)
             taxonomy_descriptions.append(taxonomy_description)
             taxonomy_sources.append(taxonomy_source)
+            taxonomy_urls.append(taxonomy_url)
             correlations.append(similarity)
 
         log_debug(f"[align] matched={len(mapped_items)} of {len(raw_items)}")
@@ -457,11 +551,13 @@ class AlignmentService:
         # Apply top_k trim
         if len(mapped_items) > top_k:
             combined = sorted(
-                zip(correlations, raw_matched, mapped_items, taxonomy_descriptions, taxonomy_sources),
+                zip(correlations, raw_matched, mapped_items, taxonomy_descriptions, taxonomy_sources, taxonomy_urls),
                 key=lambda x: x[0],
                 reverse=True,
             )[:top_k]
-            correlations, raw_matched, mapped_items, taxonomy_descriptions, taxonomy_sources = map(list, zip(*combined))
+            correlations, raw_matched, mapped_items, taxonomy_descriptions, taxonomy_sources, taxonomy_urls = map(
+                list, zip(*combined)
+            )
 
         return pd.DataFrame(
             {
@@ -470,6 +566,7 @@ class AlignmentService:
                 taxonomy_col: mapped_items,
                 "Taxonomy Description": taxonomy_descriptions,
                 "Taxonomy Source": taxonomy_sources,
+                "Source Url": taxonomy_urls,
                 "Correlation Coefficient": correlations,
             }
         )
@@ -574,6 +671,7 @@ class SkillExtractionService:
         extract: List[str] = None,
         return_edges: bool = False,
         similarity_thresholds: Optional[Dict[str, float]] = None,
+        timing: bool = False,
     ):
         """
         Extract and align skills from a dataset (main interface method).
@@ -613,11 +711,15 @@ class SkillExtractionService:
             If True, return a dict {"nodes": pd.DataFrame, "edges": pd.DataFrame}
             where "edges" contains ENABLES edges (Knowledge → Task co-occurrence per skill).
             If False (default), return a plain DataFrame — no breaking change.
+        timing : bool, optional
+            Accepted for compatibility with benchmark callers.
 
         Returns
         -------
         pd.DataFrame  (when return_edges=False, default)
-            DataFrame with extracted and aligned items. Includes a "Type" column.
+            DataFrame with normalized mixed-concept rows:
+            Research ID, Type, Raw Concept, Taxonomy Concept,
+            Taxonomy Description, Taxonomy Source, Correlation Coefficient.
         dict  (when return_edges=True)
             {"nodes": pd.DataFrame, "edges": pd.DataFrame}
             edges columns: Research ID, Skill, Knowledge, Task, Edge Type, confidence
@@ -691,6 +793,7 @@ class SkillExtractionService:
                                 full_description,
                                 similarity_threshold=resolved["knowledge"],
                                 top_k=effective_top_k,
+                                allowed_sources=allowed_sources,
                             )
                             aligned_knowledge["Type"] = "knowledge"
                             results.extend(aligned_knowledge.to_dict("records"))
@@ -702,6 +805,7 @@ class SkillExtractionService:
                                 full_description,
                                 similarity_threshold=resolved["task"],
                                 top_k=effective_top_k,
+                                allowed_sources=allowed_sources,
                             )
                             aligned_tasks["Type"] = "task"
                             results.extend(aligned_tasks.to_dict("records"))
@@ -717,7 +821,20 @@ class SkillExtractionService:
                         print(f"Warning: Failed to process row {idx}: {e}")
                     continue
 
-            df = pd.DataFrame(results)
+            df = self._normalize_mixed_concept_rows(pd.DataFrame(results))
+            if not df.empty and len(df) > effective_top_k:
+                if "Correlation Coefficient" in df.columns:
+                    scored_df = df.copy()
+                    scored_df["Correlation Coefficient"] = pd.to_numeric(
+                        scored_df["Correlation Coefficient"], errors="coerce"
+                    )
+                    df = scored_df.sort_values(
+                        by="Correlation Coefficient",
+                        ascending=False,
+                        na_position="last",
+                    ).head(effective_top_k)
+                else:
+                    df = df.head(effective_top_k)
             df.to_csv("skills_alignment_results.csv", index=False, encoding="utf-8")
 
             if return_edges:
@@ -732,6 +849,58 @@ class SkillExtractionService:
 
         except Exception as e:
             raise LAiSERError(f"Batch extraction failed: {e}")
+
+    def _normalize_mixed_concept_rows(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Collapse per-type sparse columns into a unified mixed-concept schema.
+
+        Output columns:
+            Research ID, Type, Raw Concept, Taxonomy Concept,
+            Taxonomy Description, Taxonomy Source, Source Url, Correlation Coefficient
+        """
+        output_columns = [
+            "Research ID",
+            "Type",
+            "Raw Concept",
+            "Taxonomy Concept",
+            "Taxonomy Description",
+            "Taxonomy Source",
+            "Source Url",
+            "Correlation Coefficient",
+        ]
+
+        if df.empty:
+            return pd.DataFrame(columns=output_columns)
+
+        type_to_cols = {
+            "skill": ("Raw Skill", "Taxonomy Skill"),
+            "knowledge": ("Raw Knowledge", "Taxonomy Knowledge"),
+            "task": ("Raw Task", "Taxonomy Task"),
+        }
+
+        normalized_rows: List[Dict[str, Any]] = []
+        for _, row in df.iterrows():
+            item_type = str(row.get("Type", "") or "").strip().lower()
+            raw_col, taxonomy_col = type_to_cols.get(item_type, ("Raw Concept", "Taxonomy Concept"))
+
+            raw_value = row.get(raw_col, row.get("Raw Concept", ""))
+            taxonomy_value = row.get(taxonomy_col, row.get("Taxonomy Concept", ""))
+
+            normalized_rows.append(
+                {
+                    "Research ID": row.get("Research ID", ""),
+                    "Type": item_type or str(row.get("Type", "") or ""),
+                    "Raw Concept": raw_value,
+                    "Taxonomy Concept": taxonomy_value,
+                    "Taxonomy Description": row.get("Taxonomy Description", ""),
+                    "Taxonomy Source": row.get("Taxonomy Source", ""),
+                    "Source Url": row.get("Source Url", row.get("Taxonomy URL", "")),
+                    "Correlation Coefficient": row.get("Correlation Coefficient", ""),
+                }
+            )
+
+        normalized = pd.DataFrame(normalized_rows)
+        return normalized.loc[:, output_columns]
 
     def _deduplicate(self, items: List[str], semantic_threshold: float = 0.92) -> List[str]:
         """
@@ -831,6 +1000,7 @@ class SkillExtractionService:
         description: str = "",
         similarity_threshold: float = 0.20,
         top_k: int = DEFAULT_TOP_K,
+        allowed_sources: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """
         Align extracted knowledge items to the Knowledge taxonomy FAISS index.
@@ -847,6 +1017,7 @@ class SkillExtractionService:
                     "Taxonomy Knowledge": raw_knowledge,
                     "Taxonomy Description": [""] * len(raw_knowledge),
                     "Taxonomy Source": ["pending"] * len(raw_knowledge),
+                    "Source Url": [""] * len(raw_knowledge),
                     "Correlation Coefficient": [0.0] * len(raw_knowledge),
                 }
             )
@@ -858,6 +1029,7 @@ class SkillExtractionService:
             top_k=top_k,
             raw_col="Raw Knowledge",
             taxonomy_col="Taxonomy Knowledge",
+            allowed_sources=allowed_sources,
         )
 
     def align_extracted_tasks(
@@ -867,6 +1039,7 @@ class SkillExtractionService:
         description: str = "",
         similarity_threshold: float = 0.20,
         top_k: int = DEFAULT_TOP_K,
+        allowed_sources: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """
         Align extracted tasks to the Task taxonomy FAISS index.
@@ -883,6 +1056,7 @@ class SkillExtractionService:
                     "Taxonomy Task": raw_tasks,
                     "Taxonomy Description": [""] * len(raw_tasks),
                     "Taxonomy Source": ["pending"] * len(raw_tasks),
+                    "Source Url": [""] * len(raw_tasks),
                     "Correlation Coefficient": [0.0] * len(raw_tasks),
                 }
             )
@@ -894,6 +1068,7 @@ class SkillExtractionService:
             top_k=top_k,
             raw_col="Raw Task",
             taxonomy_col="Taxonomy Task",
+            allowed_sources=allowed_sources,
         )
 
     def align_extracted_skills(
@@ -945,12 +1120,12 @@ class SkillExtractionService:
             raw_skills = [str(raw_skills)] if raw_skills else []
 
         return self.alignment_service.align_skills_to_taxonomy(
-            raw_skills,
-            document_id,
-            description,
-            similarity_threshold,
-            top_k,
-            allowed_sources,
+            raw_skills=raw_skills,
+            document_id=document_id,
+            description=description,
+            similarity_threshold=similarity_threshold,
+            top_k=top_k,
+            allowed_sources=allowed_sources,
         )
 
     def _derive_enables_edges(
