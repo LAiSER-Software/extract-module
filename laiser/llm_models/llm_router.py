@@ -103,9 +103,9 @@ class LLMRouter:
         self._initialize_components()
 
     # ---------------- ROUTER ----------------
-    def generate(self, prompt: str):
+    def generate(self, prompt: str, **kwargs):
         if self.model_id == "gemini":
-            return gemini_generate(prompt, self.api_key)
+            return gemini_generate(prompt, self.api_key, **kwargs)
 
         if self.model_id == "openai":
             return openai_generate(prompt, self.api_key)

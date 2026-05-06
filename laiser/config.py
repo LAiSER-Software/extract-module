@@ -65,9 +65,9 @@ SIMILARITY_THRESHOLD = 0.85
 
 # Per-type similarity thresholds for v0.5 KST extraction
 DEFAULT_SIMILARITY_THRESHOLDS = {
-    "skill": 0.20,
-    "knowledge": 0.45,
-    "task": 0.55,
+    "skill": 0.60,
+    "knowledge": 0.50,
+    "task": 0.50,
 }
 
 # ESCO Configuration
