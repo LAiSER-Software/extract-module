@@ -2,7 +2,7 @@
 Build the Task FAISS index for LAiSER v0.5.
 
 Sources:
-  1. O*NET Task Statements (Task Statements.txt)
+  1. O*NET Task Statements (Task Statements.xlsx)
      Downloaded from: https://www.onetcenter.org/database.html#individual-files
   2. ESCO Occupation Tasks filtered from the ESCO occupations CSV
 
@@ -38,8 +38,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Remote source URLs
 # ---------------------------------------------------------------------------
-ONET_TASKS_URL = "https://www.onetcenter.org/dl_files/database/db_28_0_text/Task%20Statements.txt"
-ONET_OCCUPATION_URL = "https://www.onetcenter.org/dl_files/database/db_28_0_text/Occupation%20Data.txt"
+ONET_TASKS_URL = "https://www.onetcenter.org/dl_files/database/db_30_2_excel/Task%20Statements.xlsx"
+ONET_OCCUPATION_URL = "https://www.onetcenter.org/dl_files/database/db_30_2_excel/Occupation%20Data.xlsx"
 
 # ESCO occupations CSV — tasks are embedded as "essential" / "optional" skill statements
 # We use the ESCO skills CSV which includes occupational context via altLabels
@@ -77,28 +77,42 @@ def load_onet_tasks(onet_dir: Path = None) -> pd.DataFrame:
 
     Returns DataFrame with columns: name, description, taxonomy, action_verb
     """
+    preserve_all_rows = False
     if onet_dir:
-        tasks_path = onet_dir / "Task Statements.txt"
-        occ_path = onet_dir / "Occupation Data.txt"
-        if not tasks_path.exists():
-            raise FileNotFoundError(f"Task Statements.txt not found in {onet_dir}")
-        tasks_raw = pd.read_csv(str(tasks_path), sep="\t", dtype=str)
-        occ_raw = pd.read_csv(str(occ_path), sep="\t", dtype=str) if occ_path.exists() else None
+        tasks_xlsx_path = onet_dir / "Task Statements.xlsx"
+        tasks_txt_path = onet_dir / "Task Statements.txt"
+        occ_xlsx_path = onet_dir / "Occupation Data.xlsx"
+        occ_txt_path = onet_dir / "Occupation Data.txt"
+
+        if tasks_xlsx_path.exists():
+            tasks_raw = pd.read_excel(str(tasks_xlsx_path), dtype=str)
+            preserve_all_rows = True
+        elif tasks_txt_path.exists():
+            tasks_raw = pd.read_csv(str(tasks_txt_path), sep="\t", dtype=str)
+        else:
+            raise FileNotFoundError(f"Task Statements.xlsx or Task Statements.txt not found in {onet_dir}")
+
+        if occ_xlsx_path.exists():
+            occ_raw = pd.read_excel(str(occ_xlsx_path), dtype=str)
+        elif occ_txt_path.exists():
+            occ_raw = pd.read_csv(str(occ_txt_path), sep="\t", dtype=str)
+        else:
+            occ_raw = None
     else:
-        tasks_raw = pd.read_csv(io.StringIO(_fetch(ONET_TASKS_URL).decode("utf-8")), sep="\t", dtype=str)
+        tasks_raw = pd.read_excel(io.BytesIO(_fetch(ONET_TASKS_URL)), dtype=str)
         try:
-            occ_raw = pd.read_csv(io.StringIO(_fetch(ONET_OCCUPATION_URL).decode("utf-8")), sep="\t", dtype=str)
+            occ_raw = pd.read_excel(io.BytesIO(_fetch(ONET_OCCUPATION_URL)), dtype=str)
         except Exception:
             occ_raw = None
 
     tasks_raw.columns = [c.strip() for c in tasks_raw.columns]
 
-    # O*NET Task Statements.txt columns:
+    # O*NET Task Statements columns:
     # O*NET-SOC Code | Title | Task ID | Task | Task Type | Incumbents Responding | Date | Domain Source
-    if "Task Type" in tasks_raw.columns:
+    if not preserve_all_rows and "Task Type" in tasks_raw.columns:
         tasks_raw = tasks_raw[tasks_raw["Task Type"].str.strip() == "Core"].copy()
 
-    if "Incumbents Responding" in tasks_raw.columns:
+    if not preserve_all_rows and "Incumbents Responding" in tasks_raw.columns:
         tasks_raw["Incumbents Responding"] = pd.to_numeric(tasks_raw["Incumbents Responding"], errors="coerce")
         tasks_raw = tasks_raw[tasks_raw["Incumbents Responding"] >= ONET_MIN_INCUMBENTS_PCT]
 
@@ -127,14 +141,16 @@ def load_onet_tasks(onet_dir: Path = None) -> pd.DataFrame:
         title_col = next((c for c in tasks_raw.columns if c.lower() == "title"), None)
         tasks_raw["_occ_title"] = tasks_raw[title_col].fillna("").str.strip() if title_col else ""
 
-    # Deduplicate by task text (same task appears across many occupations)
-    tasks_dedup = tasks_raw.drop_duplicates(subset=["Task"]).reset_index(drop=True)
-
     result = pd.DataFrame()
-    result["name"] = tasks_dedup["Task"]
-    result["description"] = (tasks_dedup["_occ_title"] + " | " + tasks_dedup["Task"]).str.strip(" |")
+    task_rows = (
+        tasks_raw.reset_index(drop=True)
+        if preserve_all_rows
+        else tasks_raw.drop_duplicates(subset=["Task"]).reset_index(drop=True)
+    )
+    result["name"] = task_rows["Task"]
+    result["description"] = (task_rows["_occ_title"] + " | " + task_rows["Task"]).str.strip(" |")
     result["taxonomy"] = "onet_task"
-    result["action_verb"] = tasks_dedup["Task"].apply(_extract_action_verb)
+    result["action_verb"] = task_rows["Task"].apply(_extract_action_verb)
 
     result = result[result["name"] != ""].reset_index(drop=True)
     logger.info(f"O*NET Tasks: {len(result)} unique core task statements")
@@ -145,7 +161,10 @@ def load_esco_tasks() -> pd.DataFrame:
     """
     Extract task-like entries from the ESCO skills CSV.
 
-    ESCO marks task competences with skillType containing 'task' or 'activity'.
+    ESCO task-like entries may appear either as explicit task/activity rows or,
+    in the current ESCO export used by LAiSER, as action-oriented
+    `skill/competence` rows. We exclude `knowledge` rows and keep explicit task
+    labels when present.
     Returns DataFrame with columns: name, description, taxonomy, action_verb
     """
     logger.info("Loading ESCO skills CSV for task entries…")
@@ -157,10 +176,17 @@ def load_esco_tasks() -> pd.DataFrame:
 
     raw.columns = [c.strip() for c in raw.columns]
 
-    # Filter for task/activity skill type
-    type_col = next((c for c in raw.columns if c.lower() in ("skilltype", "concepttype", "skill_type")), None)
+    # Filter for task/activity rows first. The current ESCO skills export uses
+    # `skill/competence` for operational capabilities such as "manage musical
+    # staff", so fall back to those rows when explicit task/activity labels are
+    # absent.
+    preferred_type_columns = ("skillType", "skill_type", "conceptType")
+    type_col = next((c for c in preferred_type_columns if c in raw.columns), None)
     if type_col:
-        task_df = raw[raw[type_col].str.lower().str.contains("task|activit", na=False, regex=True)].copy()
+        type_values = raw[type_col].fillna("").str.lower().str.strip()
+        explicit_task_mask = type_values.str.contains("task|activit", na=False, regex=True)
+        skill_competence_mask = type_values.eq("skill/competence") | type_values.eq("skill competence")
+        task_df = raw[explicit_task_mask | skill_competence_mask].copy()
     else:
         logger.warning("ESCO CSV has no skillType/conceptType column — skipping ESCO tasks.")
         return pd.DataFrame(columns=["name", "description", "taxonomy", "action_verb"])
@@ -197,7 +223,12 @@ def build_task_taxonomy(onet_dir: Path = None) -> pd.DataFrame:
 
     combined = pd.concat([onet_df, esco_df], ignore_index=True)
     combined["name"] = combined["name"].str.strip()
-    combined = combined[combined["name"] != ""].drop_duplicates(subset=["name"]).reset_index(drop=True)
+
+    preserve_onet_instances = onet_dir is not None and (onet_dir / "Task Statements.xlsx").exists()
+    combined = combined[combined["name"] != ""]
+    if not preserve_onet_instances:
+        combined = combined.drop_duplicates(subset=["name"])
+    combined = combined.reset_index(drop=True)
 
     logger.info(f"Combined task taxonomy: {len(combined)} unique entries (O*NET + ESCO)")
     return combined
