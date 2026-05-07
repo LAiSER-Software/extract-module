@@ -37,7 +37,7 @@ dependencies = [
     "certifi>=2023.0.0",
     "requests>=2.25.0",
     "psutil",
-    "google-generativeai==0.8.5"
+    "google-genai>=0.8.0"
 ]
 
 [project.optional-dependencies]
@@ -63,12 +63,24 @@ Documentation = "https://github.com/LAiSER-Software/extract-module/blob/main/REA
 
 [tool.setuptools]
 packages = {find = {where = ["."], include = ["laiser*"]}}
+include-package-data = false
 
 [tool.setuptools.dynamic]
 version = {attr = "laiser.__version__"}
 
 [tool.setuptools.package-data]
-laiser = ["public/*"]
+laiser = [
+    "public/faiss_skills.csv",
+    "public/knowledge_df.json",
+    "public/knowledge_taxonomy.csv",
+    "public/knowledge_v05.index",
+    "public/skills_df.json",
+    "public/skills_v04.index",
+    "public/task_taxonomy.csv",
+    "public/tasks_df.json",
+    "public/tasks_v05.index",
+]
+
 
 [tool.black]
 target-version = ["py311"]

@@ -63,6 +63,13 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 # Similarity thresholds
 SIMILARITY_THRESHOLD = 0.85
 
+# Per-type similarity thresholds for v0.5 KST extraction
+DEFAULT_SIMILARITY_THRESHOLDS = {
+    "skill": 0.60,
+    "knowledge": 0.50,
+    "task": 0.50,
+}
+
 # ESCO Configuration
 ESCO_SKILLS_URL = (
     "https://raw.githubusercontent.com/LAiSER-Software/datasets/refs/heads/master/taxonomies/ESCO_skills_Taxonomy.csv"
@@ -163,15 +170,17 @@ COMBINED_EXTRACTION_PROMPT = """
     ---
 
     STEP 2 — SKILL EXTRACTION
-    From the filtered content identified in Step 1, extract only the concrete, job-relevant skills that are explicitly stated or strongly implied as required or preferred for the role.
+    From the filtered content identified in Step 1, extract the 8 to 10 most critical skills for this role.
 
     Extraction rules:
-    - Include technical tools, programming languages, frameworks, methodologies, domain knowledge, and clearly-stated professional skills.
-    - Include a skill if it is clearly mentioned or strongly implied as necessary for the role.
+    - Prioritize skills that are central to the role — tools, languages, methodologies, and domain expertise that define the job.
+    - If a skill is mentioned multiple times or listed as a core requirement, it ranks higher.
+    - Consolidate related skills into one — do not list "statistics", "probability", and "optimization" separately if they all point to the same core skill.
     - Exclude generic soft traits, company values, and general workplace behaviors unless used in a specific technical or professional context.
     - Exclude generic terms (e.g. \"communication\", \"leadership\") unless applied in a concrete technical or domain-specific context.
     - Use concise noun phrases only (1-5 words per skill). Do not use full sentences.
     - Do not invent skills or make assumptions beyond what the text states.
+    - Return a maximum of 10 skills. If fewer than 10 are clearly supported, return only those.
 
     Examples of correct extraction:
     - Input: \"Experience with deep learning, natural language processing, or application of large language models is preferred.\"
@@ -264,6 +273,90 @@ For the skill above produce:
 Respond strictly in valid JSON with the exact keys 'Knowledge Required' and 'Task Abilities'.
 [/INST]
 [INST]model"""
+
+KT_FROM_SKILLS_PROMPT = """
+You are an expert workforce analyst. A set of skills has already been extracted from the job description below.
+
+STEP 1 — FILTER (internal only, do not output)
+Before extracting anything, mentally remove the following from the job description:
+- Company names, slogans, branding, mission statements (e.g. "BCG X", "own your tomorrow")
+- Office locations, salaries, benefits, legal boilerplate, EEO statements
+- Culture language ("fast-paced", "self-motivated", "join us", "passionate")
+- Internal product names, team names, or proprietary systems
+- HR and scheduling information
+
+STEP 2 — EXTRACT
+For each extracted skill below, use only the filtered job content to identify Knowledge and Tasks.
+
+━━━ KNOWLEDGE ━━━
+Named academic fields, scientific theories, or technical subjects that a person must study to develop this skill.
+Think: what is the course title or textbook chapter that teaches this?
+
+RULES:
+- Exactly 2 items per skill
+- 2-4 words, named concept only — no adjectives like "advanced", "modern", "complex"
+- Must be a proper named field: "Bayesian inference", "linear algebra", "graph theory", "stochastic processes"
+- Do NOT repeat a knowledge item already listed for another skill in this response
+- REJECT: anything ending in "principles", "methods", "techniques", "practices", "concepts", "approaches"
+- REJECT: "X methodologies", "X strategies", "X theory" where X is vague (e.g. "data science theory")
+
+  GOOD: "statistical inference", "gradient descent", "linear algebra", "transformer architecture",
+        "dynamic programming", "Bayesian statistics", "queueing theory", "convex optimization"
+  BAD:  "data science methodologies", "ML techniques", "software development principles",
+        "analytical modeling principles", "quantitative analysis techniques"
+
+━━━ TASKS ━━━
+Full-sentence job activities written in the style of an O*NET task statement or resume bullet.
+Must describe a specific, observable action with a direct object — not a goal, outcome, or capability.
+
+RULES:
+- Exactly 2 items per skill
+- 8-15 words per task — full sentence, not a phrase
+- Format: [Action verb] + [specific object] + [method/tool/context]
+- The direct object must be specific — "neural network models", "SQL queries", "regression models", not "solutions" or "results"
+- BANNED verbs/patterns: "Apply X", "Use X", "Work with X", "Enable X", "Understand X",
+  "Build X solutions", "Implement X solutions", "Deploy X solutions", "Solve X challenges",
+  "Frame X", "Distill X", "Explain sophisticated X"
+- REJECT any task under 7 words
+- REJECT any task where the object is generic: "solutions", "results", "insights", "challenges", "impact"
+
+  GOOD: "Train and evaluate gradient boosting models using scikit-learn and cross-validation"
+        "Write optimized SQL queries to extract and aggregate large-scale datasets"
+        "Debug and profile Python scripts to identify performance bottlenecks"
+        "Formulate linear programming models to minimize operational costs"
+        "Design A/B experiments and compute statistical significance of results"
+        "Build interactive dashboards in Tableau to visualize KPI trends"
+
+  BAD:  "Apply data science methods"  ← too short, no object
+        "Design innovative algorithms"  ← "innovative" is filler, object is vague
+        "Implement scalable solutions"  ← "solutions" is not a direct object
+        "Deploy AI solutions"  ← 3 words, no context
+        "Understand machine learning underpinnings"  ← cognitive state, not an action
+        "Work with development tools"  ← banned pattern
+
+QUANTITY RULES:
+- Return exactly 2 knowledge items per skill
+- Return exactly 2 task items per skill
+- Only include what is clearly supported by the filtered job content
+- Do NOT invent knowledge or tasks not implied by the job description
+
+Job Description:
+{description}
+
+Extracted Skills:
+{skills}
+
+Return ONLY valid JSON in this exact format with no explanation:
+{{
+  "results": [
+    {{
+      "skill": "skill name exactly as provided",
+      "knowledge": ["named field 1", "named field 2"],
+      "tasks": ["Full sentence task with specific object and method", "Full sentence task with specific object and method"]
+    }}
+  ]
+}}
+"""
 
 # File paths
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
