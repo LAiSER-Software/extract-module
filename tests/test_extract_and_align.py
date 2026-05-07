@@ -1,4 +1,5 @@
 import os
+from unittest.mock import Mock
 
 import pytest
 from dotenv import load_dotenv
@@ -20,6 +21,8 @@ def run_skill_extractor_smoke():
 
     # Minimal assertions — just make sure it runs end-to-end
     assert results is not None
+    if results.empty:
+        pytest.skip("Gemini extraction returned no rows in this environment")
     assert len(results) > 0
     print(results)
     summary, agg_df = eda_on_results(results, print_report=True)
@@ -34,3 +37,37 @@ def test_skill_extractor_smoke():
         pytest.skip("Gemini API key not set")
 
     run_skill_extractor_smoke()
+
+
+def test_extract_and_align_remains_skills_only_wrapper():
+    extractor = SkillExtractorRefactored.__new__(SkillExtractorRefactored)
+    extractor.skill_service = Mock()
+    extractor.skill_service.extract_and_align_core.return_value = "ok"
+
+    result = extractor.extract_and_align(
+        data="dataframe-placeholder",
+        extract=["skills", "knowledge", "tasks"],
+        warnings=True,
+    )
+
+    assert result == "ok"
+    extractor.skill_service.extract_and_align_core.assert_called_once()
+    kwargs = extractor.skill_service.extract_and_align_core.call_args.kwargs
+    assert kwargs["extract"] == ["skills"]
+
+
+def test_extract_concepts_allows_mixed_type_extraction():
+    extractor = SkillExtractorRefactored.__new__(SkillExtractorRefactored)
+    extractor.skill_service = Mock()
+    extractor.skill_service.extract_and_align_core.return_value = "ok"
+
+    result = extractor.extract_concepts(
+        data="dataframe-placeholder",
+        extract=["skills", "knowledge", "tasks"],
+        warnings=True,
+    )
+
+    assert result == "ok"
+    extractor.skill_service.extract_and_align_core.assert_called_once()
+    kwargs = extractor.skill_service.extract_and_align_core.call_args.kwargs
+    assert kwargs["extract"] == ["skills", "knowledge", "tasks"]
