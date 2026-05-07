@@ -1,1 +1,12 @@
-recursive-include laiser/public *
+include laiser/public/faiss_skills.csv
+include laiser/public/knowledge_df.json
+include laiser/public/knowledge_taxonomy.csv
+include laiser/public/knowledge_v05.index
+include laiser/public/skills_df.json
+include laiser/public/skills_v04.index
+include laiser/public/task_taxonomy.csv
+include laiser/public/tasks_df.json
+include laiser/public/tasks_v05.index
+exclude laiser/public/Task Statements.xlsx
+exclude laiser/public/combined.csv
+exclude laiser/public/skill_embeddings.npy
