@@ -64,7 +64,10 @@ class PromptBuilder:
         )
 
         if input_type == "syllabus":
-            input_text = f"### Input:\\n**Course Description:** {query.get('description', '')}\\n**Learning Outcomes:** {query.get('learning_outcomes', '')}"
+            input_text = (
+                f"### Input:\\n**Course Description:** {query.get('description', '')}"
+                f"\\n**Learning Outcomes:** {query.get('learning_outcomes', '')}"
+            )
         else:
             input_text = f"### Input:\\n{query.get('description', '')}"
 
@@ -650,9 +653,8 @@ class SkillExtractionService:
         self.faiss_manager.initialize_index(force_rebuild=False)
         # Log router initialization state for debugging
         try:
-            print(
-                f"SkillExtractionService: router.llama_llm present: {getattr(self.router, 'llama_llm', None) is not None}"
-            )
+            llama_present = getattr(self.router, "llama_llm", None) is not None
+            print(f"SkillExtractionService: router.llama_llm present: {llama_present}")
         except Exception:
             pass
 
