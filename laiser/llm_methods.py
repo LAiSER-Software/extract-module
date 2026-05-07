@@ -85,7 +85,10 @@ except ImportError as e:
 
     # Provide a fallback function
     def llm_router(*args, **kwargs):
-        raise ImportError("llm_router is not available. Please check your installation.")
+        raise ImportError(
+            "llm_router is not available. Please check your installation."
+        )
+
 
 
 torch.cuda.empty_cache()
@@ -517,7 +520,9 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
     """
 
     try:
-        result = vllm_generate(llm, input_text, input_type=input_type, batch_size=batch_size)
+        result = vllm_generate(
+            llm, input_text, input_type=input_type, batch_size=batch_size
+        )
     except Exception as e:
         print(f"Error in vLLM generation: {e}")
         return []
@@ -537,7 +542,9 @@ def get_completion_vllm(input_text, text_columns, id_column, input_type, llm, ba
                 parsed_output.extend(parsed)
             except Exception as e:
                 print(f"Error parsing output for index {i}: {e}")
-                print(f"DataFrame shape: {input_text.shape}, trying to access index {i}")
+                print(
+                    f"DataFrame shape: {input_text.shape}, trying to access index {i}"
+                )
                 print(f"Available indices: {list(input_text.index)}")
                 continue
 
@@ -601,7 +608,9 @@ def get_ksa_details(
         raw_text = llm_router(prompt, model_id, use_gpu, llm, tokenizer, model, api_key)
         json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not json_match:
-            print(f"[get_ksa_details] No JSON match found in response for skill '{skill}'")
+            print(
+                f"[get_ksa_details] No JSON match found in response for skill '{skill}'"
+            )
             return [], []
 
         parsed = json.loads(json_match.group())

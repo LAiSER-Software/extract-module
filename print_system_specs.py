@@ -19,7 +19,9 @@ from typing import Any, Dict, Optional
 def _safe_run(cmd, timeout: float = 5.0):
     """Run a command safely with a timeout; return (code, stdout, stderr)."""
     try:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        p = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         try:
             out, err = p.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:

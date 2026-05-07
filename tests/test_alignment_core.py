@@ -88,7 +88,9 @@ def test_align_skills_to_taxonomy_real_flow():
 
     # Minimal, meaningful assertions
     assert isinstance(df, pd.DataFrame)
-    assert set(["Raw Skill", "Taxonomy Skill", "Correlation Coefficient"]).issubset(df.columns)
+    assert set(["Raw Skill", "Taxonomy Skill", "Correlation Coefficient"]).issubset(
+        df.columns
+    )
 
     # For these common skills, we usually expect at least one match if index is healthy.
     # (We don't assert exact mapping because taxonomies may change.)

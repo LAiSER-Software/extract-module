@@ -76,6 +76,8 @@ def eda_on_results(results: pd.DataFrame, *, print_report: bool = True) -> Tuple
         core_cols.append("taxonomy")
     if "Taxonomy Description" in df.columns:
         core_cols.append("Taxonomy Description")
+    if "Source URL" in df.columns:
+        core_cols.append("Source URL")
     if "Correlation Coefficient" in df.columns:
         core_cols.append("Correlation Coefficient")
 
