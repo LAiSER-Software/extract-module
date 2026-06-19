@@ -7,7 +7,6 @@ import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
-from laiser.llm_models.llm_router import LLMRouter
 
 
 def _parse_skills_from_response(response: str) -> List[str]:
@@ -68,6 +67,8 @@ def _parse_skills_from_response(response: str) -> List[str]:
 
 
 def run_skill_extractor_smoke():
+    pytest.importorskip("google.genai")
+    from laiser.llm_models.llm_router import LLMRouter
 
     raw_description = (
         "POSITION SUMMARY: This position requires curriculum development, claim processing, "
@@ -131,8 +132,7 @@ def run_skill_extractor_smoke():
 
 @pytest.mark.llm_cloud
 def test_cloud_llm():
-    # Skip cleanly if API key not present
-    # if not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
-    #     pytest.skip("Gemini API key not set")
+    if not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
+        pytest.skip("Gemini API key not set")
 
     run_skill_extractor_smoke()

@@ -2,13 +2,6 @@ import os
 
 import pytest
 
-import pytest
-
-# ✅ import from wherever you saved that function
-# Example:
-# from laiser.llm_models.openai_helper import openai_generate
-from laiser.llm_models.openai import openai_generate
-
 raw_description = (
     "POSITION SUMMARY: This position requires curriculum development, claim processing, "
     "and provider data services experience.\n\n"
@@ -66,8 +59,11 @@ standard_prompt = f"""
 
 @pytest.mark.openai
 def test_openai_generate_once():
-    # 1) explicit opt-in so it doesn’t run accidentally
-    # 3) small retry to survive 429 bursts
+    if not os.getenv("OPENAI_API_KEY"):
+        pytest.skip("OpenAI API key not set")
+
+    from laiser.llm_models.openai import openai_generate
+
     resp_text = ""
     resp_text = openai_generate(
         prompt=standard_prompt,

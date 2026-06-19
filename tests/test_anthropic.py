@@ -2,13 +2,6 @@ import os
 
 import pytest
 
-import pytest
-
-# ✅ import from wherever you saved that function
-# Example:
-# from laiser.llm_models.openai_helper import openai_generate
-from laiser.llm_models.anthropic import anthropic_generate
-
 raw_description = (
     "POSITION SUMMARY: This position requires curriculum development, claim processing, "
     "and provider data services experience.\n\n"
@@ -66,8 +59,11 @@ standard_prompt = f"""
 
 @pytest.mark.anthropic
 def test_anthropic_generate_once():
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        pytest.skip("Anthropic API key not set")
 
-    # 3) small retry to survive 429 bursts
+    from laiser.llm_models.anthropic import anthropic_generate
+
     resp_text = ""
     resp_text = anthropic_generate(
         prompt=standard_prompt,
