@@ -11,10 +11,10 @@
 LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
 - [About](#about)
+- [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Setup and Installation](#setup-and-installation)
 - [Usage](#usage)
-  - [Google Colab Setup](#google-colab-setup)
 - [Funding](#funding)
 - [Authors](#authors)
 - [Partners](#partners)
@@ -27,25 +27,48 @@ By leveraging state-of-the-art AI models, LAiSER automates the process of identi
 
 The tool emphasizes standardization and transparency, offering a common framework that bridges the communication gap between different stakeholders. With LAiSER, educators can better align their teaching methods with industry requirements, and employers can more effectively identify the competencies required for their teams. The result is a more efficient and strategic approach to skill development, benefiting the entire ecosystem.
 
+## Architecture
+
+LAiSER uses a four-stage extraction and alignment pipeline:
+
+1. Extraction
+   Input text is normalized by input type and passed through prompt construction and LLM inference to produce raw concept candidates.
+2. Parsing and deduplication
+   Model output is parsed into structured concepts and filtered through exact and semantic deduplication.
+3. Taxonomy alignment
+   Extracted concepts are matched against bundled taxonomy indexes using embedding-based similarity search and threshold filtering.
+4. Output normalization
+   Alignment results are converted into a unified tabular schema, with optional edge generation for graph-style outputs.
+
 ## Requirements
-- Python version >= Python 3.9. 
-- A GPU with atleast 15GB video memory is essential for running this tool on large datasets.
+- Python version `>=3.8`.
+- The package supports the current tested matrix through Python `3.13`.
+- A GPU is recommended for heavy local model workflows, but API-backed extraction can run CPU-only.
+- Provider-specific environment variables may be required depending on backend:
+  - `GEMINI_API_KEY` or `GOOGLE_API_KEY`
+  - `OPENAI_API_KEY`
 
 ## Setup and Installation
 
-- Install LAiSER using pip:
+- Install LAiSER from PyPI:
 
-  ### For GPU support (recommended if you have a CUDA-capable GPU):
   ```shell
-  pip install laiser[gpu]
+  pip install laiser
   ```
-  ### For CPU-only environments:
-  ```shell
-  pip install laiser[cpu]
-  ```
-  ### By default, torch and vllm GPU dependencies are included. Only when using the [cpu] extra will these GPU dependencies be excluded.
 
-**NOTE**: Python 3.9 or later, *preferably 3.12*, is expected to be installed on your system. If you don't have Python installed, you can download it from [here](https://www.python.org/downloads/).
+- Install with GPU extras:
+
+  ```shell
+  pip install "laiser[gpu]"
+  ```
+
+- Install development dependencies from source:
+
+  ```shell
+  pip install -e ".[dev]"
+  ```
+
+**NOTE**: Python 3.8 or later is required. Python 3.12 or 3.13 is recommended for current development and CI parity.
 
 You can check if your machine has a GPU available with:
 ```shell
@@ -54,41 +77,95 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 ## Usage
 
-As of now LAiSER can be used a python package in Google Colab or a local machine with GPU access. The steps to setup the tool are as follows:
+LAiSER is used as a Python package. The recommended API is `SkillExtractorRefactored`.
 
-### Google Colab Setup
-LAiSER's Jupyter notebook is, currently, the fastest way to get started with the tool. You can access the notebook [here](https://github.com/LAiSER-Software/extract-module/blob/main/dev_space/Extract%20Function%20Colab%20Execution.ipynb).
+### Basic job description extraction
 
-- Once the notebook is imported in google colaboratory, connect to a GPU-accelerated runtime(T4 GPU) and run the cells in the notebook.
+```python
+import os
+import pandas as pd
 
-- Sample code to import and verify laiser module
+from laiser.skill_extractor_refactored import SkillExtractorRefactored
 
-  **Using the new refactored API (recommended):**
-  ```python
-  from laiser.skill_extractor_refactored import SkillExtractorRefactored
-  print('\n\nInitializing the Skill Extractor...')
-  # Replace 'your_model_id' and 'your_hf_token' with your actual credentials.
-  model_id = "your_model_id"  # e.g., "microsoft/DialoGPT-medium"
-  hf_token = "your_hf_token"
-  use_gpu = True  # Change to False if you are not using a GPU
-  se = SkillExtractorRefactored(model_id=model_id, hf_token=hf_token, use_gpu=use_gpu)
-  print('The Skill Extractor has been initialized successfully!\n')
-  print("LAiSER package loaded successfully!")
-  ```
+data = pd.DataFrame(
+    [
+        {
+            "Research ID": "job-001",
+            "description": "Build production machine learning systems in Python.",
+        }
+    ]
+)
 
-  **Legacy API (backward compatibility):**
-  ```python
-  from laiser.skill_extractor import Skill_Extractor
-  print('\n\nInitializing the Skill Extractor...')
-  # Replace 'your_model_id' and 'your_hf_token' with your actual credentials.
-  AI_MODEL_ID = "your_model_id"  # e.g., "bert-base-uncased"
-  HF_TOKEN = "your_hf_token"
-  use_gpu = True  # Change to False if you are not using a GPU
-  se = Skill_Extractor(AI_MODEL_ID=AI_MODEL_ID, HF_TOKEN=HF_TOKEN, use_gpu=use_gpu)
-  print('The Skill Extractor has been initialized successfully!\n')
-  print("LAiSER package loaded successfully!")
-  ```
+extractor = SkillExtractorRefactored(
+    model_id="gemini",
+    api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
+    use_gpu=False,
+)
 
+results = extractor.extract_concepts(
+    data=data,
+    id_column="Research ID",
+    text_columns=["description"],
+    input_type="job_desc",
+    concepts=["skills", "knowledge", "tasks"],
+)
+
+print(results.head())
+```
+
+### Course syllabus extraction
+
+```python
+import os
+import pandas as pd
+
+from laiser.skill_extractor_refactored import SkillExtractorRefactored
+
+data = pd.DataFrame(
+    [
+        {
+            "Research ID": "course-001",
+            "description": "Introduction to data visualization and exploratory analysis.",
+            "learning_outcomes": "Create dashboards, explain patterns in data, and evaluate charts.",
+        }
+    ]
+)
+
+extractor = SkillExtractorRefactored(
+    model_id="gemini",
+    api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
+    use_gpu=False,
+)
+
+results = extractor.extract_concepts(
+    data=data,
+    id_column="Research ID",
+    text_columns=["description", "learning_outcomes"],
+    input_type="course_syllabi",
+    concepts=["skills"],
+)
+
+print(results.head())
+```
+
+### Common runtime options
+
+- `model_id`
+  Provider or model selector such as `gemini` or `openai`
+- `api_key`
+  API key for hosted providers
+- `use_gpu`
+  Enables GPU-backed initialization where supported
+- `allowed_sources`
+  Filters alignment sources such as `["esco"]`, `["onet"]`, or `["osn"]`
+- `top_k`
+  Per-alignment-call cap for matched rows
+- `return_edges`
+  Returns `{nodes, edges}` instead of only normalized rows
+- `output_csv_path`
+  Writes CSV output only when explicitly provided
+
+Additional examples are available in [docs/examples.md](docs/examples.md).
 
 ## Funding
 <div align="center">
