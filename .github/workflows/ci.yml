@@ -255,6 +255,29 @@ jobs:
             }
 
   # ── 7. BUILD ───────────────────────────────────────────────────────────────
+  compatibility:
+    name: Compatibility (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Upgrade packaging tools
+        run: python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install package
+        run: python -m pip install .
+
+      - name: Smoke test import
+        run: python -c "import laiser; print(getattr(laiser, '__version__', 'unknown'))"
+
   build:
     name: Build
     runs-on: ubuntu-latest
