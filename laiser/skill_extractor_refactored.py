@@ -149,6 +149,7 @@ class SkillExtractorRefactored:
         return_edges: bool = False,
         similarity_thresholds: Optional[Dict[str, float]] = None,
         timing: bool = False,
+        output_csv_path: Optional[str] = None,
     ):
         """
         Extract concepts from text and align them to taxonomy data.
@@ -188,6 +189,8 @@ class SkillExtractorRefactored:
             If False (default), return a plain pd.DataFrame.
         timing : bool, optional
             If True, print per-stage timing for extraction and alignment steps.
+        output_csv_path : str, optional
+            If provided, write normalized results to this CSV path.
 
         Returns
         -------
@@ -218,6 +221,7 @@ class SkillExtractorRefactored:
             return_edges=return_edges,
             similarity_thresholds=similarity_thresholds,
             timing=timing,
+            output_csv_path=output_csv_path,
         )
 
     def extract_and_align(
@@ -236,6 +240,7 @@ class SkillExtractorRefactored:
         return_edges: bool = False,
         similarity_thresholds: Optional[Dict[str, float]] = None,
         timing: bool = False,
+        output_csv_path: Optional[str] = None,
     ):
         """
         Backward-compatible skills-only extraction wrapper.
@@ -259,6 +264,7 @@ class SkillExtractorRefactored:
             return_edges=return_edges,
             similarity_thresholds=similarity_thresholds,
             timing=timing,
+            output_csv_path=output_csv_path,
         )
 
         if isinstance(result, dict) and isinstance(result.get("nodes"), pd.DataFrame):

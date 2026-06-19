@@ -68,7 +68,7 @@ except ImportError as e:
     print(f"Warning: Gemini support not available: {e}")
 
     def gemini_generate(*args, **kwargs):
-        raise ImportError("Gemini support is not available. Please install google-generativeai package.")
+        raise ImportError("Gemini support is not available. Please install google-genai.")
 
 
 # Import with error handling for optional dependencies

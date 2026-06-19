@@ -35,8 +35,23 @@ class PromptBuilder:
     """Builds prompts for different types of skill extraction tasks"""
 
     @staticmethod
+    def normalize_input_type(input_type: str) -> str:
+        normalized = str(input_type or "").strip().lower()
+        aliases = {
+            "job_desc": "job_desc",
+            "job_description": "job_desc",
+            "syllabus": "syllabus",
+            "course_syllabus": "syllabus",
+            "course_syllabi": "syllabus",
+        }
+        if normalized not in aliases:
+            raise InvalidInputError(f"Unsupported input type: {input_type}")
+        return aliases[normalized]
+
+    @staticmethod
     def build_skill_extraction_prompt(input_text: str, input_type: str) -> str:
         """Build prompt for basic skill extraction"""
+        input_type = PromptBuilder.normalize_input_type(input_type)
         if input_type == "job_desc":
             extraction_prompt = COMBINED_EXTRACTION_PROMPT.format(description=input_text)
             return extraction_prompt
@@ -58,6 +73,7 @@ class PromptBuilder:
         esco_skills: List[str] = None,
     ) -> str:
         """Build prompt for KSA (Knowledge, Skills, Abilities) extraction"""
+        input_type = PromptBuilder.normalize_input_type(input_type)
 
         input_desc = (
             "job description" if input_type == "job_desc" else "course syllabus description and its learning outcomes"
@@ -674,6 +690,7 @@ class SkillExtractionService:
         return_edges: bool = False,
         similarity_thresholds: Optional[Dict[str, float]] = None,
         timing: bool = False,
+        output_csv_path: Optional[str] = None,
     ):
         """
         Extract and align skills from a dataset (main interface method).
@@ -715,6 +732,9 @@ class SkillExtractionService:
             If False (default), return a plain DataFrame — no breaking change.
         timing : bool, optional
             Accepted for compatibility with benchmark callers.
+        output_csv_path : str, optional
+            If provided, write the normalized results DataFrame to this CSV path.
+            No CSV is written by default.
 
         Returns
         -------
@@ -767,7 +787,7 @@ class SkillExtractionService:
                     doc_id = str(input_data["id"])
 
                     # --- Call 1: Skills extraction (always runs — required for Call 2) ---
-                    skills = self.extract_raw_llm_skills(input_data, text_columns)
+                    skills = self.extract_raw_llm_skills(input_data, text_columns, input_type=input_type)
 
                     if "skills" in extract:
                         aligned_skills = self.align_extracted_skills(
@@ -824,20 +844,8 @@ class SkillExtractionService:
                     continue
 
             df = self._normalize_mixed_concept_rows(pd.DataFrame(results))
-            if not df.empty and len(df) > effective_top_k:
-                if "Correlation Coefficient" in df.columns:
-                    scored_df = df.copy()
-                    scored_df["Correlation Coefficient"] = pd.to_numeric(
-                        scored_df["Correlation Coefficient"], errors="coerce"
-                    )
-                    df = scored_df.sort_values(
-                        by="Correlation Coefficient",
-                        ascending=False,
-                        na_position="last",
-                    ).head(effective_top_k)
-                else:
-                    df = df.head(effective_top_k)
-            df.to_csv("skills_alignment_results.csv", index=False, encoding="utf-8")
+            if output_csv_path:
+                df.to_csv(output_csv_path, index=False, encoding="utf-8")
 
             if return_edges:
                 edges = (
@@ -943,11 +951,17 @@ class SkillExtractionService:
 
         return [exact_deduped[i] for i in kept_indices]
 
-    def extract_raw_llm_skills(self, input_data, text_columns):
-
-        text_blob = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
+    def extract_raw_llm_skills(self, input_data, text_columns, input_type: str = "job_desc"):
+        normalized_input_type = self.prompt_builder.normalize_input_type(input_type)
+        if normalized_input_type == "syllabus":
+            prompt_input: Any = {
+                "description": str(input_data.get("description", "")).strip(),
+                "learning_outcomes": str(input_data.get("learning_outcomes", "")).strip(),
+            }
+        else:
+            prompt_input = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
         extraction_prompt = self.prompt_builder.build_skill_extraction_prompt(
-            input_text=text_blob, input_type="job_desc"
+            input_text=prompt_input, input_type=normalized_input_type
         )
         response = self.router.generate(extraction_prompt)
         skills = self.llm_parser._parse_skills_from_response(response)
