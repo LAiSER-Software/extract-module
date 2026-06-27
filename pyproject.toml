@@ -70,15 +70,15 @@ version = {attr = "laiser.__version__"}
 
 [tool.setuptools.package-data]
 laiser = [
-    "public/faiss_skills.csv",
-    "public/knowledge_df.json",
-    "public/knowledge_taxonomy.csv",
-    "public/knowledge_v05.index",
-    "public/skills_df.json",
-    "public/skills_v04.index",
-    "public/task_taxonomy.csv",
-    "public/tasks_df.json",
-    "public/tasks_v05.index",
+    "assets/faiss_skills.csv",
+    "assets/knowledge_df.json",
+    "assets/knowledge_taxonomy.csv",
+    "assets/knowledge_v05.index",
+    "assets/skills_df.json",
+    "assets/skills_v04.index",
+    "assets/task_taxonomy.csv",
+    "assets/tasks_df.json",
+    "assets/tasks_v05.index",
 ]
 
 

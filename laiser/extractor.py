@@ -62,7 +62,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from laiser.config import DEFAULT_BATCH_SIZE
-from laiser.services import SkillExtractionService
+from laiser.extraction.service import SkillExtractionService
 
 
 class SkillExtractorRefactored:
@@ -149,6 +149,7 @@ class SkillExtractorRefactored:
         return_edges: bool = False,
         similarity_thresholds: Optional[Dict[str, float]] = None,
         timing: bool = False,
+        quant: bool = False,
         output_csv_path: Optional[str] = None,
     ):
         """
@@ -200,6 +201,9 @@ class SkillExtractorRefactored:
             Taxonomy Description, Taxonomy Source, Source Url, Correlation Coefficient
         dict          (when return_edges=True): {"nodes": pd.DataFrame, "edges": pd.DataFrame}
         """
+        if quant:
+            timing = True
+
         if concepts is not None and extract is not None and concepts != extract:
             raise ValueError("Pass either `concepts` or `extract`, not both")
 
@@ -240,6 +244,7 @@ class SkillExtractorRefactored:
         return_edges: bool = False,
         similarity_thresholds: Optional[Dict[str, float]] = None,
         timing: bool = False,
+        quant: bool = False,
         output_csv_path: Optional[str] = None,
     ):
         """
@@ -249,6 +254,9 @@ class SkillExtractorRefactored:
         still call `extract_and_align(...)`. It always runs the skills path.
         Use `extract_concepts(...)` for mixed concept extraction.
         """
+        if quant:
+            timing = True
+
         result = self.extract_concepts(
             data=data,
             id_column=id_column,

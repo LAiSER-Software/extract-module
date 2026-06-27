@@ -7,9 +7,9 @@ Sources:
   2. ESCO Knowledge entries filtered from the ESCO skills CSV
 
 Output:
-  laiser/public/knowledge_taxonomy.csv  — unified knowledge taxonomy
-  laiser/public/knowledge_v05.index     — FAISS IndexFlatIP
-  laiser/public/knowledge_df.json       — metadata JSON
+  laiser/assets/knowledge_taxonomy.csv  — unified knowledge taxonomy
+  laiser/assets/knowledge_v05.index     — FAISS IndexFlatIP
+  laiser/assets/knowledge_df.json       — metadata JSON
 
 Usage:
   python scripts/build_knowledge_index.py
@@ -31,7 +31,7 @@ import requests
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from laiser.data_access import DataAccessLayer, KnowledgeFAISSIndexManager  # noqa: E402
+from laiser.taxonomy import DataAccessLayer, KnowledgeFAISSIndexManager  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ ESCO_SKILLS_URL = (
 # Minimum O*NET importance score to include (0–5 scale; 3.0 = "important")
 ONET_MIN_IMPORTANCE = 3.0
 
-OUTPUT_DIR = REPO_ROOT / "laiser" / "public"
+OUTPUT_DIR = REPO_ROOT / "laiser" / "assets"
 
 
 def _fetch(url: str, timeout: int = 60) -> bytes:

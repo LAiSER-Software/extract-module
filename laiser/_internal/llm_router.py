@@ -53,9 +53,9 @@ import os
 
 import torch
 
+from laiser._internal.model_loader import load_model_from_transformer, load_model_from_vllm
 from laiser.exceptions import LAiSERError
-from laiser.llm_models.llama_cpp_handler import llama_cpp_chat
-from laiser.llm_models.model_loader import load_model_from_transformer, load_model_from_vllm
+from laiser.providers.llama_cpp_handler import llama_cpp_chat
 
 MODEL_PATH = os.getenv("LAISER_LLAMA_CPP_MODEL_PATH", "")
 LLAMA_CPP_CTX = int(os.getenv("LLAMA_CPP_CTX", "4096"))
@@ -63,9 +63,9 @@ LLAMA_CPP_THREADS = os.getenv("LLAMA_CPP_THREADS")
 
 # Import with error handling for optional dependencies
 try:
-    from laiser.llm_models.gemini import gemini_generate
+    from laiser.providers.gemini import gemini_generate
 except ImportError as e:
-    print(f"Warning: Gemini support not available: {e}")
+    _IMPORT_WARNINGS = [f"Gemini support not available: {e}"]
 
     def gemini_generate(*args, **kwargs):
         raise ImportError("Gemini support is not available. Please install google-genai.")
@@ -73,14 +73,16 @@ except ImportError as e:
 
 # Import with error handling for optional dependencies
 try:
-    from laiser.llm_models.openai import openai_generate
+    from laiser.providers.openai import openai_generate
 except ImportError as e:
-    print(f"Warning: openai support not available: {e}")
+    _IMPORT_WARNINGS = globals().get("_IMPORT_WARNINGS", [])
+    _IMPORT_WARNINGS.append(f"openai support not available: {e}")
 
 try:
-    from laiser.llm_models.hugging_face_llm import llm_generate_vllm
+    from laiser.providers.hugging_face_llm import llm_generate_vllm
 except ImportError as e:
-    print(f"Warning: HuggingFace LLM support not available: {e}")
+    _IMPORT_WARNINGS = globals().get("_IMPORT_WARNINGS", [])
+    _IMPORT_WARNINGS.append(f"HuggingFace LLM support not available: {e}")
 
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
@@ -112,17 +114,14 @@ class LLMRouter:
 
         # If a local GGUF model was loaded with llama-cpp-python, use it
         if self.backend == "llama_cpp":
-            print("LLMRouter: routing request to llama_cpp backend")
             return llama_cpp_chat(prompt, self.llm)
 
-        print("LLMRouter: routing request to vLLM/transformer backend")
         return llm_generate_vllm(prompt, self.llm)
 
     # ---------------- INIT ----------------
     def _initialize_components(self):
         try:
             if self.backend == "llama_cpp":
-                print("Using llama-cpp for skill extraction...")
                 try:
                     from llama_cpp import Llama
                 except ImportError as e:
@@ -138,43 +137,36 @@ class LLMRouter:
                     # logits_all=False,
                     # chat_format="chatml",
                 )
-                print("Initialized llama.cpp CPU backend.")
                 return
 
             if self.model_id == "gemini":
-                print("Using Gemini API for skill extraction...")
                 return
 
             elif self.use_gpu and torch.cuda.is_available():
-                print("GPU available. Attempting to initialize vLLM model...")
                 try:
                     self._initialize_vllm()
                     if self.llm is not None:
-                        print("vLLM initialization successful!")
                         return
-                except Exception as e:
-                    print(f"WARNING: vLLM initialization failed: {e}")
-                    print("Falling back to transformer model...")
+                except Exception:
+                    pass
 
                 try:
                     self._initialize_transformer()
                     if self.model is not None:
-                        print("Transformer model fallback successful!")
                         return
-                except Exception as e:
-                    print(f"WARNING: Transformer model fallback also failed: {e}")
+                except Exception:
+                    pass
 
             else:
-                print("Using CPU/transformer model...")
                 try:
                     self._initialize_transformer()
                     if self.model is not None:
-                        print("Transformer model initialization successful!")
                         return
-                except Exception as e:
-                    print(f"WARNING: Transformer model initialization failed: {e}")
+                except Exception:
+                    pass
 
-            print("WARNING: No model successfully initialized.")
+            if globals().get("_IMPORT_WARNINGS"):
+                raise LAiSERError("; ".join(globals()["_IMPORT_WARNINGS"]))
 
         except Exception as e:
             raise LAiSERError(f"Critical failure during component initialization: {e}")

@@ -7,9 +7,9 @@ Sources:
   2. ESCO Occupation Tasks filtered from the ESCO occupations CSV
 
 Output:
-  laiser/public/task_taxonomy.csv   — unified task taxonomy
-  laiser/public/tasks_v05.index     — FAISS IndexFlatIP
-  laiser/public/tasks_df.json       — metadata JSON
+  laiser/assets/task_taxonomy.csv   — unified task taxonomy
+  laiser/assets/tasks_v05.index     — FAISS IndexFlatIP
+  laiser/assets/tasks_df.json       — metadata JSON
 
 Usage:
   python scripts/build_task_index.py
@@ -30,7 +30,7 @@ import requests
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from laiser.data_access import DataAccessLayer, TaskFAISSIndexManager  # noqa: E402
+from laiser.taxonomy import DataAccessLayer, TaskFAISSIndexManager  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ ESCO_OCCUPATIONS_URL = (
 # Minimum O*NET incumbents responding % to include a task (0–100; 50 = majority reported it)
 ONET_MIN_INCUMBENTS_PCT = 50.0
 
-OUTPUT_DIR = REPO_ROOT / "laiser" / "public"
+OUTPUT_DIR = REPO_ROOT / "laiser" / "assets"
 
 
 def _fetch(url: str, timeout: int = 60) -> bytes:

@@ -4,14 +4,14 @@ LAiSER - Leveraging Artificial Intelligence for Skills Extraction and Research
 A Python package for extracting and aligning skills from text using AI models.
 """
 
-__version__ = "0.5"
+__version__ = "1.0"
 
 # Import main classes for easy access
 try:
-    from .skill_extractor_refactored import SkillExtractorRefactored
+    from .extractor import SkillExtractorRefactored
 
     # Make both available
-    __all__ = ["SkillExtractorRefactored"]
+    __all__ = ["SkillExtractor", "SkillExtractorRefactored"]
 except ImportError as e:
     # Handle cases where dependencies might not be available
     import warnings
