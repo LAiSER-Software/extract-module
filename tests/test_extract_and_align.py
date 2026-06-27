@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pytest
 from dotenv import load_dotenv
 
-from laiser.skill_extractor_refactored import SkillExtractorRefactored
+from laiser.extractor import SkillExtractorRefactored
 from tests.test_helpers import eda_on_results, sample_data
 
 load_dotenv()

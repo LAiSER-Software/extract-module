@@ -8,12 +8,12 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from laiser.skill_extractor_refactored import SkillExtractorRefactored
+from laiser.extractor import SkillExtractorRefactored
 from tests.test_helpers import sample_data
 
 load_dotenv()
 
-SAMPLE_JOB = sample_data().iloc[[2]]
+SAMPLE_JOB = sample_data().iloc[[1]]
 
 
 @pytest.mark.library
@@ -29,11 +29,10 @@ def test_kst_extraction():
         id_column="Research ID",
         text_columns=["description"],
         extract=["skills", "knowledge", "tasks"],
+        quant=True,
         warnings=True,
     )
     assert results is not None
-    if results.empty:
-        pytest.skip("Gemini extraction returned no rows in this environment")
     assert len(results) > 0
     assert {
         "Research ID",
