@@ -85,7 +85,7 @@ LAiSER is used as a Python package. The recommended API is `SkillExtractorRefact
 import os
 import pandas as pd
 
-from laiser.skill_extractor_refactored import SkillExtractorRefactored
+from laiser.extractor import SkillExtractorRefactored
 
 data = pd.DataFrame(
     [
@@ -119,7 +119,7 @@ print(results.head())
 import os
 import pandas as pd
 
-from laiser.skill_extractor_refactored import SkillExtractorRefactored
+from laiser.extractor import SkillExtractorRefactored
 
 data = pd.DataFrame(
     [

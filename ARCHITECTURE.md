@@ -176,7 +176,8 @@ df_skills = extractor.extract_and_align(
 
 ### Service Layer Usage
 ```python
-from laiser.services import SkillExtractionService, SkillAlignmentService
+from laiser.extraction.service import SkillExtractionService
+from laiser.alignment.service import SkillAlignmentService
 
 # Direct service usage
 alignment_service = SkillAlignmentService()
