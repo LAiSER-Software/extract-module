@@ -14,6 +14,12 @@ authors:
   - name: Bharat Khandelwal
     orcid: 0009-0001-9491-5468
     affiliation: 1
+  - name: Anket Vilasrao Patil
+    orcid: 0009-0000-0619-4174
+    affiliation: 1
+  - name: Prudhviraju Chekuri
+    orcid: 0009-0003-8682-8406
+    affiliation: 1
 affiliations:
   - name: Program on Skills, Credentials and Workforce Policy, Institute of Public Policy, The George Washington University, USA
     index: 1
