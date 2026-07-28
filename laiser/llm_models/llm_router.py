@@ -53,6 +53,7 @@ import os
 
 import torch
 
+from laiser.config import DEFAULT_TEMPERATURE, GENERATION_SEED
 from laiser.exceptions import LAiSERError
 from laiser.llm_models.llama_cpp_handler import llama_cpp_chat
 from laiser.llm_models.model_loader import load_model_from_transformer, load_model_from_vllm
@@ -88,12 +89,35 @@ except ImportError as e:
 
 class LLMRouter:
 
-    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None):
+    def __init__(
+        self,
+        model_id: str,
+        use_gpu: bool,
+        hf_token=None,
+        api_key=None,
+        backend=None,
+        temperature: float = DEFAULT_TEMPERATURE,
+        seed=GENERATION_SEED,
+    ):
+        """Route generation requests to the configured LLM backend.
+
+        Parameters
+        ----------
+        temperature : float
+            Decoding temperature applied to every backend. Defaults to
+            ``config.DEFAULT_TEMPERATURE`` (0.0), which selects greedy,
+            deterministic decoding.
+        seed : int or None
+            Sampling seed forwarded to every backend that accepts one, so that
+            runs remain reproducible if ``temperature`` is raised above zero.
+        """
         self.model_id = model_id
         self.use_gpu = use_gpu
         self.hf_token = hf_token
         self.api_key = api_key
         self.backend = backend
+        self.temperature = temperature
+        self.seed = seed
 
         self.llm = None
         self.model = None
@@ -104,19 +128,32 @@ class LLMRouter:
 
     # ---------------- ROUTER ----------------
     def generate(self, prompt: str, **kwargs):
+        """Dispatch a prompt to the active backend using deterministic decoding.
+
+        The router's ``temperature`` and ``seed`` are forwarded to every
+        backend, so decoding behaviour is identical regardless of which one is
+        selected. Explicit values in ``kwargs`` take precedence.
+        """
+        kwargs.setdefault("temperature", self.temperature)
+
         if self.model_id == "gemini":
+            kwargs.setdefault("seed", self.seed)
             return gemini_generate(prompt, self.api_key, **kwargs)
 
         if self.model_id == "openai":
-            return openai_generate(prompt, self.api_key)
+            return openai_generate(prompt, self.api_key, temperature=kwargs["temperature"])
 
         # If a local GGUF model was loaded with llama-cpp-python, use it
         if self.backend == "llama_cpp":
             print("LLMRouter: routing request to llama_cpp backend")
-            return llama_cpp_chat(prompt, self.llm)
+            return llama_cpp_chat(
+                prompt, self.llm, temperature=kwargs["temperature"], seed=self.seed
+            )
 
         print("LLMRouter: routing request to vLLM/transformer backend")
-        return llm_generate_vllm(prompt, self.llm)
+        return llm_generate_vllm(
+            prompt, self.llm, temperature=kwargs["temperature"], seed=self.seed
+        )
 
     # ---------------- INIT ----------------
     def _initialize_components(self):

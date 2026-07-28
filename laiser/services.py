@@ -17,7 +17,9 @@ from laiser.config import (
     COMBINED_EXTRACTION_PROMPT,
     DEFAULT_BATCH_SIZE,
     DEFAULT_SIMILARITY_THRESHOLDS,
+    DEFAULT_TEMPERATURE,
     DEFAULT_TOP_K,
+    GENERATION_SEED,
     KSA_DETAILS_PROMPT,
     KSA_EXTRACTION_PROMPT,
     KT_FROM_SKILLS_PROMPT,
@@ -628,6 +630,8 @@ class SkillExtractionService:
         api_key: Optional[str] = None,
         use_gpu: Optional[bool] = None,
         backend: Optional[str] = None,
+        temperature: float = DEFAULT_TEMPERATURE,
+        seed: Optional[int] = GENERATION_SEED,
     ):
 
         self.model_id = model_id
@@ -635,6 +639,8 @@ class SkillExtractionService:
         self.api_key = api_key
         self.use_gpu = use_gpu if use_gpu is not None else torch.cuda.is_available()
         self.backend = backend
+        self.temperature = temperature
+        self.seed = seed
         self.llm = None
         self.tokenizer = None
         self.model = None
@@ -663,6 +669,8 @@ class SkillExtractionService:
             self.hf_token,
             self.api_key,
             backend=self.backend,
+            temperature=self.temperature,
+            seed=self.seed,
         )
 
         # Initialize skills FAISS index

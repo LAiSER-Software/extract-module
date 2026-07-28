@@ -92,6 +92,18 @@ DEFAULT_TOP_K = 25
 MAX_NEW_TOKENS = 1000
 GENERATION_SEED = 42
 
+# Deterministic decoding defaults.
+#
+# LAiSER defaults every LLM backend to greedy decoding so that repeated runs over
+# the same input yield the same generation. DEFAULT_TEMPERATURE = 0.0 selects the
+# highest-probability token at each step; DEFAULT_TOP_P = 1.0 leaves nucleus
+# filtering inactive so that temperature alone governs the decoding behaviour.
+# GENERATION_SEED is supplied to every backend that accepts a sampling seed, so
+# that runs remain reproducible even when a caller deliberately raises the
+# temperature above zero. Callers may override both via SkillExtractorRefactored.
+DEFAULT_TEMPERATURE = float(os.getenv("LAISER_TEMPERATURE", "0.0"))
+DEFAULT_TOP_P = float(os.getenv("LAISER_TOP_P", "1.0"))
+
 # SCQF Level Descriptors
 SCQF_LEVELS: Dict[int, str] = {
     1: "Basic awareness of simple concepts.",
