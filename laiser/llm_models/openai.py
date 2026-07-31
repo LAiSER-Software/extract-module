@@ -4,6 +4,8 @@ from typing import Optional
 
 import requests
 
+from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P
+
 _CODE_FENCE_RE = re.compile(r"```(?:json)?|```", re.IGNORECASE)
 
 
@@ -20,7 +22,17 @@ def openai_generate(
     api_key: Optional[str] = None,
     model: str = "gpt-4.1-mini",
     timeout: int = 60,
+    temperature: float = DEFAULT_TEMPERATURE,
+    top_p: float = DEFAULT_TOP_P,
 ) -> str:
+    """Generate text with the OpenAI Responses API.
+
+    Decoding is deterministic by default: ``temperature`` defaults to
+    ``config.DEFAULT_TEMPERATURE`` (0.0, i.e. greedy decoding) and ``top_p``
+    defaults to ``config.DEFAULT_TOP_P`` (1.0, nucleus filtering inactive).
+    The Responses API does not accept a sampling seed, so reproducibility on
+    this backend rests on greedy decoding alone.
+    """
     api_key = api_key or os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OpenAI API key not provided")
@@ -31,7 +43,12 @@ def openai_generate(
         "Content-Type": "application/json",
     }
 
-    payload = {"model": model, "input": prompt}
+    payload = {
+        "model": model,
+        "input": prompt,
+        "temperature": temperature,
+        "top_p": top_p,
+    }
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout)

@@ -4,6 +4,8 @@ from typing import Optional
 
 import requests
 
+from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P
+
 _CODE_FENCE_RE = re.compile(r"```(?:json)?|```", re.IGNORECASE)
 
 
@@ -21,7 +23,17 @@ def anthropic_generate(
     model: str = "claude-haiku-4-5-20251001",
     timeout: int = 60,
     max_tokens: int = 4096,
+    temperature: float = DEFAULT_TEMPERATURE,
+    top_p: float = DEFAULT_TOP_P,
 ) -> str:
+    """Generate text with the Anthropic Messages API.
+
+    Decoding is deterministic by default: ``temperature`` defaults to
+    ``config.DEFAULT_TEMPERATURE`` (0.0, i.e. greedy decoding). ``top_p`` is
+    only transmitted when it departs from 1.0, because the Messages API
+    discourages setting both ``temperature`` and ``top_p`` in one request.
+    The API does not accept a sampling seed.
+    """
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("Anthropic API key not provided")
@@ -35,8 +47,11 @@ def anthropic_generate(
     payload = {
         "model": model,
         "max_tokens": max_tokens,
+        "temperature": temperature,
         "messages": [{"role": "user", "content": prompt}],
     }
+    if top_p is not None and top_p != 1.0:
+        payload["top_p"] = top_p
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
