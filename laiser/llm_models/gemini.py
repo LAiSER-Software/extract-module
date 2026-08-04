@@ -43,7 +43,7 @@ class GeminiAPI:
         response_schema: Optional[Any] = None,
     ) -> str:
         try:
-            config_kwargs = {"temperature": 0.0}
+            config_kwargs = {"temperature": 0.0, "max_output_tokens": self.max_output_tokens}
             if response_mime_type:
                 config_kwargs["response_mime_type"] = response_mime_type
             if response_schema is not None:
