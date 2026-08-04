@@ -61,7 +61,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TEMPERATURE, GENERATION_SEED
+from laiser.config import DEFAULT_BATCH_SIZE
 from laiser.services import SkillExtractionService
 
 
@@ -106,8 +106,6 @@ class SkillExtractorRefactored:
         api_key: Optional[str] = None,
         use_gpu: Optional[bool] = None,
         backend: Optional[str] = None,
-        temperature: float = DEFAULT_TEMPERATURE,
-        seed: Optional[int] = GENERATION_SEED,
     ):
         """
         Initialize the skill extractor.
@@ -124,18 +122,6 @@ class SkillExtractorRefactored:
             Whether to use GPU for model inference
         backend : str, optional
             Backend to use for LLM inference (e.g., "llama_cpp", "huggingface", "openai", "gemini")
-        temperature : float, optional
-            Decoding temperature applied to whichever backend is selected.
-            Defaults to ``config.DEFAULT_TEMPERATURE`` (0.0), which selects
-            greedy decoding and makes repeated runs over the same input
-            reproducible. Raise it only when sampled variation is wanted.
-        seed : int, optional
-            Sampling seed forwarded to every backend that accepts one (vLLM,
-            llama.cpp, Gemini, and local Transformers). Defaults to
-            ``config.GENERATION_SEED``. Set to ``None`` to leave the seed
-            unset. The OpenAI Responses API and the Anthropic Messages API do
-            not accept a seed, so on those backends reproducibility rests on
-            greedy decoding alone.
         """
         # Initialize service layer
         self.skill_service = SkillExtractionService(
@@ -144,8 +130,6 @@ class SkillExtractorRefactored:
             hf_token=hf_token,
             use_gpu=use_gpu,
             backend=backend,
-            temperature=temperature,
-            seed=seed,
         )
 
     def extract_concepts(
