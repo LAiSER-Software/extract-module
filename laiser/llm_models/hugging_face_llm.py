@@ -52,7 +52,7 @@ Rev No.     Date            Author              Description
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P, GENERATION_SEED
+from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P, GENERATION_SEED, MAX_NEW_TOKENS
 
 try:
     from vllm import SamplingParams
@@ -71,6 +71,7 @@ def llm_generate(
     use_gpu: bool,
     temperature: float = DEFAULT_TEMPERATURE,
     seed: int = GENERATION_SEED,
+    max_new_tokens: int = MAX_NEW_TOKENS,
 ):
     """Generate text with a local HuggingFace Transformers model.
 
@@ -80,6 +81,10 @@ def llm_generate(
     re-enabling sampling. When a caller raises the temperature above zero,
     ``seed`` is applied through ``torch.manual_seed`` so the run stays
     reproducible.
+
+    Only the newly generated tokens are decoded. Returning the prompt as well
+    would hand the downstream response parser the prompt's own JSON examples
+    alongside the model's answer.
     """
     if tokenizer is None or model is None:
         quantization_config = BitsAndBytesConfig(load_in_8bit=True)
@@ -96,7 +101,7 @@ def llm_generate(
         torch.manual_seed(seed)
 
     generation_kwargs = {
-        "max_new_tokens": 100,
+        "max_new_tokens": max_new_tokens,
         "pad_token_id": tokenizer.pad_token_id,
         "eos_token_id": tokenizer.eos_token_id,
         "do_sample": do_sample,
@@ -107,7 +112,8 @@ def llm_generate(
 
     outputs = model.generate(**inputs, **generation_kwargs)
 
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    prompt_length = inputs["input_ids"].shape[-1]
+    return tokenizer.decode(outputs[0][prompt_length:], skip_special_tokens=True)
 
 
 def llm_generate_vllm(

@@ -78,10 +78,17 @@ try:
 except ImportError as e:
     print(f"Warning: openai support not available: {e}")
 
+    def openai_generate(*args, **kwargs):
+        raise ImportError("OpenAI support is not available. Please install requests.")
+
+
 try:
-    from laiser.llm_models.hugging_face_llm import llm_generate_vllm
+    from laiser.llm_models.hugging_face_llm import llm_generate, llm_generate_vllm
 except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
+
+    def llm_generate(*args, **kwargs):
+        raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
 
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
@@ -133,26 +140,50 @@ class LLMRouter:
         The router's ``temperature`` and ``seed`` are forwarded to every
         backend, so decoding behaviour is identical regardless of which one is
         selected. Explicit values in ``kwargs`` take precedence.
+
+        Local generation dispatches on what ``_initialize_components`` actually
+        loaded rather than on the model identifier. A vLLM engine is used when
+        one was initialized; otherwise the Transformers model is used, which is
+        the fallback ``_initialize_components`` selects when vLLM is
+        unavailable or when running on CPU. Neither being present raises rather
+        than calling a backend with ``None``.
         """
         kwargs.setdefault("temperature", self.temperature)
+        kwargs.setdefault("seed", self.seed)
+        temperature = kwargs["temperature"]
+        seed = kwargs["seed"]
 
         if self.model_id == "gemini":
-            kwargs.setdefault("seed", self.seed)
             return gemini_generate(prompt, self.api_key, **kwargs)
 
         if self.model_id == "openai":
-            return openai_generate(prompt, self.api_key, temperature=kwargs["temperature"])
+            return openai_generate(prompt, self.api_key, temperature=temperature)
 
         # If a local GGUF model was loaded with llama-cpp-python, use it
         if self.backend == "llama_cpp":
             print("LLMRouter: routing request to llama_cpp backend")
-            return llama_cpp_chat(
-                prompt, self.llm, temperature=kwargs["temperature"], seed=self.seed
+            return llama_cpp_chat(prompt, self.llm, temperature=temperature, seed=seed)
+
+        if self.llm is not None:
+            print("LLMRouter: routing request to vLLM backend")
+            return llm_generate_vllm(prompt, self.llm, temperature=temperature, seed=seed)
+
+        if self.model is not None:
+            print("LLMRouter: routing request to transformer backend")
+            return llm_generate(
+                prompt,
+                self.tokenizer,
+                self.model,
+                self.model_id,
+                self.use_gpu,
+                temperature=temperature,
+                seed=seed,
             )
 
-        print("LLMRouter: routing request to vLLM/transformer backend")
-        return llm_generate_vllm(
-            prompt, self.llm, temperature=kwargs["temperature"], seed=self.seed
+        raise LAiSERError(
+            "No local model is available for generation: neither a vLLM engine nor a "
+            f"Transformers model was initialized for model_id {self.model_id!r}. "
+            "Check the initialization warnings emitted by _initialize_components."
         )
 
     # ---------------- INIT ----------------
