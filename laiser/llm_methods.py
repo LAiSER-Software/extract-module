@@ -75,7 +75,6 @@ except ImportError:
     VLLM_AVAILABLE = False
     SamplingParams = None
 
-from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P, GENERATION_SEED
 from laiser.utils import get_top_esco_skills
 
 # Import llm_router with error handling
@@ -176,7 +175,7 @@ def get_completion_batch(queries: list, model, tokenizer, batch_size=2) -> list:
             generated_ids = model.generate(
                 **model_inputs,
                 max_new_tokens=1000,
-                do_sample=DEFAULT_TEMPERATURE > 0.0,
+                do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
             )
 
@@ -260,14 +259,14 @@ def get_completion(input_text, text_columns, input_type, model, tokenizer) -> st
         generated_ids = model.generate(
             **model_inputs,
             max_new_tokens=1000,
-            do_sample=DEFAULT_TEMPERATURE > 0.0,
+            do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
         )
 
     generated_ids = model.generate(
         **model_inputs,
         max_new_tokens=1000,
-        do_sample=DEFAULT_TEMPERATURE > 0.0,
+        do_sample=True,
         pad_token_id=tokenizer.eos_token_id,
     )
     decoded = tokenizer.decode(generated_ids[0], skip_special_tokens=False)
@@ -477,12 +476,7 @@ def vllm_generate(
 
     result = []
 
-    sampling_params = SamplingParams(
-        max_tokens=1000,
-        temperature=DEFAULT_TEMPERATURE,
-        top_p=DEFAULT_TOP_P,
-        seed=GENERATION_SEED,
-    )
+    sampling_params = SamplingParams(max_tokens=1000, seed=42)
 
     for i in range(0, len(queries), batch_size):
         prompts = [
