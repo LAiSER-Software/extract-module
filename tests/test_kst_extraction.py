@@ -13,7 +13,7 @@ from tests.test_helpers import sample_data
 
 load_dotenv()
 
-SAMPLE_JOB = sample_data().iloc[[2]]
+SAMPLE_JOB = sample_data().iloc[[1]]
 
 
 @pytest.mark.library
