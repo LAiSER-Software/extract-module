@@ -149,7 +149,7 @@ def load_onet_tasks(onet_dir: Path = None) -> pd.DataFrame:
     )
     result["name"] = task_rows["Task"]
     result["description"] = (task_rows["_occ_title"] + " | " + task_rows["Task"]).str.strip(" |")
-    result["taxonomy"] = "onet_task"
+    result["taxonomy"] = "onet"
     result["action_verb"] = task_rows["Task"].apply(_extract_action_verb)
 
     result = result[result["name"] != ""].reset_index(drop=True)
@@ -208,7 +208,7 @@ def load_esco_tasks() -> pd.DataFrame:
     result["name"] = task_df[name_col].str.strip()
     result["description"] = task_df[desc_col].str.strip() if desc_col else result["name"]
     result["description"] = result["description"].fillna(result["name"])
-    result["taxonomy"] = "esco_task"
+    result["taxonomy"] = "esco"
     result["action_verb"] = result["name"].apply(_extract_action_verb)
 
     result = result.dropna(subset=["name"]).drop_duplicates(subset=["name"]).reset_index(drop=True)
