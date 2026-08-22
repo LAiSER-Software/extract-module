@@ -78,7 +78,12 @@ def gemini_generate(
     response_schema: Optional[Any] = None,
 ) -> str:
     """Send `prompt` to Gemini and return generated text."""
-    client = GeminiAPI(api_key=api_key, model_name=model_name, timeout=timeout)
+    client = GeminiAPI(
+        api_key=api_key,
+        model_name=model_name,
+        timeout=timeout,
+        max_output_tokens=max_output_tokens,
+    )
     return client.generate_with_config(
         prompt,
         response_mime_type=response_mime_type,

@@ -81,9 +81,11 @@ class SkillExtractorRefactored:
         expanded: List[str] = []
         seen = set()
         source_map = {
-            "esco": ["esco", "esco_knowledge", "esco_task"],
-            "onet": ["onet_skill", "onet_tech", "onet_knowledge", "onet_task"],
+            "esco": ["esco"],
+            "onet": ["onet"],
             "osn": ["osn"],
+            "uk": ["ukos"],
+            "ukos": ["ukos"],
         }
 
         for source in allowed_sources:
