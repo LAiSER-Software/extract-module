@@ -7,6 +7,7 @@ on:
 
 jobs:
   changelog:
+    if: ${{ false }}
     name: Generate Changelog
     runs-on: ubuntu-latest
     permissions:

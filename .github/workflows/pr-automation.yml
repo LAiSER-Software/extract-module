@@ -11,6 +11,7 @@ permissions:
 jobs:
   # ── 1. AI PR DESCRIPTION ──────────────────────────────────────────────────
   ai-description:
+    if: ${{ false }}
     name: AI PR Description
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +39,7 @@ jobs:
 
   # ── 2. REVIEW TIME LABEL ──────────────────────────────────────────────────
   review-time-label:
+    if: ${{ false }}
     name: Review Time Label
     runs-on: ubuntu-latest
     steps:

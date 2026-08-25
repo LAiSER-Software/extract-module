@@ -185,3 +185,5 @@ prompt_runs/*
 
 skills_alignment_results.csv
 weighted alignment tests/
+
+laiser/public/skill_embeddings.npy
