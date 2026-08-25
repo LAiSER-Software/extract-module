@@ -7,6 +7,7 @@ on:
 
 jobs:
   deploy-prod:
+    if: ${{ false }}
     name: Build & Publish to PyPI
     runs-on: ubuntu-latest
     environment:

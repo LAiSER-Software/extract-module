@@ -6,6 +6,7 @@ on:
 
 jobs:
   deploy-preview:
+    if: ${{ false }}
     name: Publish Preview to TestPyPI
     runs-on: ubuntu-latest
     environment:
