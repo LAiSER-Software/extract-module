@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it as below.
+title: 'LAiSER: A Taxonomy-Aware Framework for Skill Extraction and Research'
+type: software
+authors:
+- given-names: Satya Phanindra Kumar
+  family-names: Kalaga
+  orcid: https://orcid.org/0009-0004-6447-3760
+- given-names: Bharat
+  family-names: Khandelwal
+  orcid: https://orcid.org/0009-0001-9491-5468
+- given-names: Anket Vilasrao
+  family-names: Patil
+  orcid: https://orcid.org/0009-0000-0619-4174
+- given-names: Prudhviraju
+  family-names: Chekuri
+  orcid: https://orcid.org/0009-0003-8682-8406
+repository-code: https://github.com/LAiSER-Software/extract-module
+license: BSD-3-Clause
