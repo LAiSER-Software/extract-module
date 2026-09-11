@@ -176,6 +176,8 @@ tests/*
 
 # But keep pytest test files
 !tests/test_*.py
+!tests/__init__.py
+!tests/conftest.py
 
 store/*
 
