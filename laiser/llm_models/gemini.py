@@ -13,6 +13,7 @@ DEFAULT_GEMINI_MODEL = os.getenv("LAISER_GEMINI_MODEL", "gemini-2.5-flash")
 DEFAULT_GEMINI_TIMEOUT = float(os.getenv("LAISER_GEMINI_TIMEOUT", "60"))
 DEFAULT_MAX_OUTPUT_TOKENS = int(os.getenv("LAISER_GEMINI_MAX_OUTPUT_TOKENS", "4096"))
 
+
 class GeminiAPI:
     """Small wrapper to keep backward compatibility with older imports."""
 

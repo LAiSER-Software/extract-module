@@ -5,6 +5,7 @@ A Python package for extracting and aligning skills from text using AI models.
 """
 
 import os
+
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 __version__ = "1.0.1"
 

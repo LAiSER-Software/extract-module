@@ -629,7 +629,6 @@ class SkillExtractionService:
         use_gpu: Optional[bool] = None,
         backend: Optional[str] = None,
     ):
-
         self.model_id = model_id
         self.hf_token = hf_token
         self.api_key = api_key

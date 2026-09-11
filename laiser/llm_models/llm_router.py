@@ -87,7 +87,6 @@ except ImportError as e:
 
 
 class LLMRouter:
-
     def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None):
         self.model_id = model_id
         self.use_gpu = use_gpu
