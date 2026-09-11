@@ -11,7 +11,7 @@ permissions:
 jobs:
   # ── 1. AI PR DESCRIPTION ──────────────────────────────────────────────────
   ai-description:
-    if: ${{ false }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     name: AI PR Description
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +39,7 @@ jobs:
 
   # ── 2. REVIEW TIME LABEL ──────────────────────────────────────────────────
   review-time-label:
-    if: ${{ false }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     name: Review Time Label
     runs-on: ubuntu-latest
     steps:

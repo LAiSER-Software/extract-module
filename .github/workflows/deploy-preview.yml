@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy-preview:
-    if: ${{ false }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     name: Publish Preview to TestPyPI
     runs-on: ubuntu-latest
     environment:

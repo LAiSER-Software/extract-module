@@ -1,10 +1,21 @@
 name: Draft PDF
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - paper.md
+      - paper.bib
+      - .github/workflows/draft-pdf.yml
+  pull_request:
+    paths:
+      - paper.md
+      - paper.bib
 
 jobs:
   paper:
-    if: ${{ false }}
     runs-on: ubuntu-latest
     name: Paper Draft
     steps:

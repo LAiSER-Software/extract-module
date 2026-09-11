@@ -5,11 +5,10 @@ on:
   push:
     branches:
       - main
-      - development
+      - dev
 
 jobs:
   analyze:
-    if: ${{ false }}
     name: CodeQL Analysis
     runs-on: ubuntu-latest
     permissions:
