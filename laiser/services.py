@@ -1002,12 +1002,14 @@ class SkillExtractionService:
         response = self.router.generate(prompt)
         results = self.llm_parser.parse_knowledge_task_response(response)
 
-        logger.warning(
-            "KT model response: %d parsed blocks, %d chars; preview=%s; tail=%s",
+        # Counts only on the success path: this runs for every record, and the
+        # response is model output derived from caller-supplied job text, which
+        # does not belong in retained logs at warning level. The parse-failure
+        # branch below still emits a short preview for diagnosis.
+        logger.debug(
+            "KT model response: %d parsed blocks, %d chars",
             len(results),
             len(response),
-            response.strip().replace("\n", " ")[:500],
-            response.strip().replace("\n", " ")[-500:],
         )
 
         if not results:
