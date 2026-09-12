@@ -41,7 +41,7 @@ LAiSER uses a four-stage extraction and alignment pipeline:
    Alignment results are converted into a unified tabular schema, with optional edge generation for graph-style outputs.
 
 ## Requirements
-- Python version `>=3.8`.
+- Python version `>=3.10`.
 - The package supports the current tested matrix through Python `3.13`.
 - A GPU is recommended for heavy local model workflows, but API-backed extraction can run CPU-only.
 - Provider-specific environment variables may be required depending on backend:
@@ -68,7 +68,7 @@ LAiSER uses a four-stage extraction and alignment pipeline:
   pip install -e ".[dev]"
   ```
 
-**NOTE**: Python 3.8 or later is required. Python 3.12 or 3.13 is recommended for current development and CI parity.
+**NOTE**: Python 3.10 or later is required. Python 3.12 or 3.13 is recommended for current development and CI parity.
 
 You can check if your machine has a GPU available with:
 ```shell

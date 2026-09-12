@@ -28,12 +28,16 @@ def test_initialize_index_full_flow_subtests():
     public_dir.mkdir(exist_ok=True)
 
     artifacts = [paths["index"], paths["json"], paths["npy"]]
+    # skill_embeddings.npy is a build product and is gitignored, so a fresh
+    # checkout never has it and the cached-load path does not produce one.
+    # Only the committed artifacts can be expected before a rebuild has run.
+    committed_artifacts = [paths["index"], paths["json"]]
 
     # ---- Step 1: init using existing files (or build if missing) ----
     index1, metadata = manager.initialize_index(force_rebuild=False)
     check.is_not_none(index1, "step1: index1 should not be None")
     check.is_true(isinstance(index1, faiss.Index), "step1: index1 should be a FAISS Index")
-    for p in artifacts:
+    for p in committed_artifacts:
         check.is_true(p.exists(), f"step1: artifact should exist: {p.name}")
 
     # ---- Step 2: init again without rebuild ----

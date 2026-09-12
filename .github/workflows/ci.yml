@@ -59,7 +59,12 @@ jobs:
         # credentials skip themselves when the key is absent (see the guards in
         # tests/test_openai.py, test_anthropic.py, test_kst_extraction.py and
         # test_llm_cloud.py), so the battery runs green without any token.
-        run: pytest tests/ -v -rs --cov=laiser --cov-report=term-missing
+        #
+        # The `index` marker is deselected: test_index_process.py force-rebuilds
+        # the skills index, which embeds ~54k taxonomy entries and takes about
+        # 17 minutes on a runner. It stays runnable locally with
+        # `pytest -m index`.
+        run: pytest tests/ -v -rs -m "not index" --cov=laiser --cov-report=term-missing
 
   # ── 3. SECURITY ────────────────────────────────────────────────────────────
   security:
@@ -81,7 +86,12 @@ jobs:
             ${{ runner.os }}-pip-security-
 
       - name: Install dependencies
-        run: pip install -e ".[dev]" bandit pip-audit
+        # setuptools is upgraded first: the runner image ships 79.0.1, which
+        # PYSEC-2026-3447 affects (fixed in 83.0.0). pip-audit audits the whole
+        # environment, so the runner's own build tooling shows up as a finding.
+        run: |
+          pip install --upgrade pip "setuptools>=83.0.0"
+          pip install -e ".[dev]" bandit pip-audit
 
       - name: bandit (code scan)
         run: bandit -r laiser/ -ll
@@ -130,7 +140,9 @@ jobs:
   dead-code:
     name: Dead Code
     # Reports by commenting on the PR, so there is nothing to post to on a push.
-    if: github.event_name == 'pull_request'
+    # Fork PRs get a read-only GITHUB_TOKEN regardless of the permissions block
+    # below, so posting a comment there would 403.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -211,8 +223,8 @@ jobs:
   # ── 7. COMPLEXITY ──────────────────────────────────────────────────────────
   complexity:
     name: Complexity
-    # Same as dead-code: PR comment is the only output, so skip on push.
-    if: github.event_name == 'pull_request'
+    # Same as dead-code: PR comment is the only output, and fork PRs cannot post.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
