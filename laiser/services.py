@@ -668,8 +668,8 @@ class SkillExtractionService:
         self.faiss_manager.initialize_index(force_rebuild=False)
         # Log router initialization state for debugging
         try:
-            llama_present = getattr(self.router, "llama_llm", None) is not None
-            print(f"SkillExtractionService: router.llama_llm present: {llama_present}")
+            llama_present = self.backend == "llama_cpp" and getattr(self.router, "llm", None) is not None
+            print(f"SkillExtractionService: llama.cpp model loaded: {llama_present}")
         except Exception:
             pass
 
@@ -707,18 +707,19 @@ class SkillExtractionService:
         input_type : str
             Type of input data
         top_k : int, optional
-            Maximum number of aligned items to return per document (default: 25)
+            Maximum number of aligned matches per concept type, per document
+            (default: DEFAULT_TOP_K, 25). Each type is aligned in its own call.
         similarity_threshold : float, optional
-            Global minimum similarity score applied to all types unless overridden
-            by similarity_thresholds. Defaults to 0.20 for backward compatibility.
+            One minimum similarity score applied to every type. When omitted, the
+            per-type defaults below apply.
         similarity_thresholds : dict, optional
-            Per-type similarity thresholds. Keys: "skill", "knowledge", "task".
-            Overrides similarity_threshold for each specified type.
-            Defaults: {"skill": 0.20, "knowledge": 0.45, "task": 0.55}
+            Per-type minimums, keys "skill", "knowledge", "task". Overrides
+            similarity_threshold for the types it names.
+            Defaults: DEFAULT_SIMILARITY_THRESHOLDS, {"skill": 0.60, "knowledge": 0.50, "task": 0.50}
         levels : bool
-            Whether to extract skill levels
+            Accepted for compatibility; currently has no effect.
         batch_size : int
-            Batch size for processing
+            Accepted for compatibility; currently has no effect.
         warnings : bool
             Whether to show warnings
         extract : list, optional
@@ -740,7 +741,7 @@ class SkillExtractionService:
         pd.DataFrame  (when return_edges=False, default)
             DataFrame with normalized mixed-concept rows:
             Research ID, Type, Raw Concept, Taxonomy Concept,
-            Taxonomy Description, Taxonomy Source, Correlation Coefficient.
+            Taxonomy Description, Taxonomy Source, Source Url, Correlation Coefficient.
         dict  (when return_edges=True)
             {"nodes": pd.DataFrame, "edges": pd.DataFrame}
             edges columns: Research ID, Skill, Knowledge, Task, Edge Type, confidence

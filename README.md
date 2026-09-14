@@ -5,48 +5,50 @@
 <div align="center">
 <img src="https://i.imgur.com/XznvjNi.png" width="70%"/>
 <h1>Leveraging ​Artificial ​Intelligence for ​Skill ​Extraction &​ Research (LAiSER)</h1>
+
+<a href="https://laiser-software.github.io/extract-module/"><b>Documentation</b></a> ·
+<a href="https://pypi.org/project/laiser/"><b>PyPI</b></a> ·
+<a href="https://github.com/LAiSER-Software/laiser-cookbook"><b>Cookbook notebooks</b></a>
 </div>
 
+LAiSER turns free text such as job postings and course syllabi into structured skills, knowledge and tasks, each matched to an entry in ESCO, O\*NET, the UK Skills Classification or the Open Skills Network.
+
 ### Contents
-LAiSER is a tool that helps learners, educators and employers share trusted and mutually intelligible information about skills​.
 
 - [About](#about)
 - [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Setup and Installation](#setup-and-installation)
 - [Usage](#usage)
+- [Try it in Google Colab](#try-it-in-google-colab)
 - [Funding](#funding)
 - [Authors](#authors)
 - [Partners](#partners)
 
 ## About
 
-LAiSER is an innovative tool that harnesses the power of artificial intelligence to simplify the extraction and analysis of skills. It is designed for learners, educators, and employers who want to gain reliable insights into skill sets, ensuring that the information shared is both trusted and mutually intelligible across various sectors.
+LAiSER is a Python package for turning unstructured text about work and learning into structured, comparable skill data.
 
-By leveraging state-of-the-art AI models, LAiSER automates the process of identifying and classifying skills from diverse data sources. This not only saves time but also enhances accuracy, making it easier for users to discover emerging trends and in-demand skills.
+You give it a table of documents — job postings, course descriptions, syllabi. For each document, a language model extracts the skills it describes and, optionally, the knowledge and tasks behind them. LAiSER then matches every extracted phrase to its closest entries in established taxonomies using embedding similarity. The result is a table with one row per match: the phrase as written, the taxonomy entry it corresponds to, which taxonomy that entry comes from, and a similarity score.
 
-The tool emphasizes standardization and transparency, offering a common framework that bridges the communication gap between different stakeholders. With LAiSER, educators can better align their teaching methods with industry requirements, and employers can more effectively identify the competencies required for their teams. The result is a more efficient and strategic approach to skill development, benefiting the entire ecosystem.
+Because results point at shared taxonomy entries rather than free-text phrases, they can be counted and compared across sources — the skills employers ask for can be set against the skills a program teaches, or tracked across thousands of postings.
+
+The language model can be a hosted API (Gemini or OpenAI) or a model running on your own machine, including on CPU with no API key. Taxonomy alignment always runs locally against indexes bundled with the package.
 
 ## Architecture
 
-LAiSER uses a four-stage extraction and alignment pipeline:
+LAiSER runs four stages for every document:
 
-1. Extraction
-   Input text is normalized by input type and passed through prompt construction and LLM inference to produce raw concept candidates.
-2. Parsing and deduplication
-   Model output is parsed into structured concepts and filtered through exact and semantic deduplication.
-3. Taxonomy alignment
-   Extracted concepts are matched against bundled taxonomy indexes using embedding-based similarity search and threshold filtering.
-4. Output normalization
-   Alignment results are converted into a unified tabular schema, with optional edge generation for graph-style outputs.
+1. **Extraction** — The text is placed into a prompt for its input type and sent to the language model, which returns candidate concepts.
+2. **Parsing and deduplication** — The response is parsed into phrases. Exact duplicates are dropped and near-duplicates are collapsed by embedding similarity.
+3. **Taxonomy alignment** — Each phrase is embedded and searched against bundled FAISS indexes of taxonomy entries. Matches above a per-type similarity threshold are kept.
+4. **Output** — Matches are returned as a single table, optionally with graph edges linking knowledge areas to the tasks they enable.
 
 ## Requirements
-- Python version `>=3.10`.
-- The package supports the current tested matrix through Python `3.13`.
-- A GPU is recommended for heavy local model workflows, but API-backed extraction can run CPU-only.
-- Provider-specific environment variables may be required depending on backend:
-  - `GEMINI_API_KEY` or `GOOGLE_API_KEY`
-  - `OPENAI_API_KEY`
+
+- Python `>=3.10`; CI tests 3.10 through 3.13.
+- No GPU or API key is required. A GPU speeds up larger local models; hosted providers need their own API key.
+- Supported model providers and their settings are listed in the [documentation](https://laiser-software.github.io/extract-module/providers/).
 
 ## Setup and Installation
 
@@ -68,9 +70,8 @@ LAiSER uses a four-stage extraction and alignment pipeline:
   pip install -e ".[dev]"
   ```
 
-**NOTE**: Python 3.10 or later is required. Python 3.12 or 3.13 is recommended for current development and CI parity.
-
 You can check if your machine has a GPU available with:
+
 ```shell
 python -c "import torch; print(torch.cuda.is_available())"
 ```
@@ -79,7 +80,40 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 LAiSER is used as a Python package. The recommended API is `SkillExtractorRefactored`.
 
-### Basic job description extraction
+### Without an API key
+
+This runs a small open model locally on CPU. The model downloads on first use.
+
+```python
+import pandas as pd
+
+from laiser.skill_extractor_refactored import SkillExtractorRefactored
+
+data = pd.DataFrame(
+    [
+        {
+            "Research ID": "job-001",
+            "description": "Build production machine learning systems in Python.",
+        }
+    ]
+)
+
+extractor = SkillExtractorRefactored(model_id="Qwen/Qwen2.5-0.5B-Instruct", use_gpu=False)
+
+results = extractor.extract_concepts(
+    data=data,
+    id_column="Research ID",
+    text_columns=["description"],
+    input_type="job_desc",
+    concepts=["skills"],
+)
+
+print(results[["Raw Concept", "Taxonomy Concept", "Taxonomy Source", "Correlation Coefficient"]])
+```
+
+Small local models are convenient for trying LAiSER out; hosted or larger models extract more reliably.
+
+### Job description extraction with Gemini
 
 ```python
 import os
@@ -152,22 +186,29 @@ print(results.head())
 
 ### Common runtime options
 
-- `model_id`
-  Provider or model selector such as `gemini` or `openai`
-- `api_key`
-  API key for hosted providers
-- `use_gpu`
-  Enables GPU-backed initialization where supported
-- `allowed_sources`
-  Filters alignment sources. Available sources are `["esco"]`, `["onet"]`, `["osn"]`, and `["ukos"]`.
-- `top_k`
-  Per-alignment-call cap for matched rows
-- `return_edges`
-  Returns `{nodes, edges}` instead of only normalized rows
-- `output_csv_path`
-  Writes CSV output only when explicitly provided
+| Option | Description |
+|---|---|
+| `model_id` | `"gemini"`, `"openai"`, or a Hugging Face model id to run locally |
+| `api_key` | API key for hosted providers |
+| `use_gpu` | run local models on GPU where available |
+| `backend` | `"llama_cpp"` to run a local GGUF model |
+| `concepts` | `["skills"]` (default), or add `"knowledge"` and `"tasks"` |
+| `allowed_sources` | taxonomies to align against: `"esco"`, `"onet"`, `"osn"`, `"ukos"` |
+| `top_k` | maximum aligned matches per concept type, per document (default 25) |
+| `return_edges` | return `{nodes, edges}` instead of only the results table |
+| `output_csv_path` | also write the results to this CSV file |
 
-Additional examples are available in [docs/examples.md](docs/examples.md).
+Every option is described in the [usage guide](https://laiser-software.github.io/extract-module/usage/), and more snippets are in [docs/examples.md](docs/examples.md).
+
+## Try it in Google Colab
+
+The [cookbook](https://github.com/LAiSER-Software/laiser-cookbook) has complete analyses that open directly in Colab:
+
+| Notebook | |
+|---|---|
+| Job skill analysis for job seekers | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LAiSER-Software/laiser-cookbook/blob/main/recipes/Job_Skill_Analysis/Job_Skill_Analysis_for_Job_Seekers.ipynb) |
+| University program skill analysis | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LAiSER-Software/laiser-cookbook/blob/main/recipes/University_Program_Skill_Analysis/University_Program_Skill_Analysis.ipynb) |
+| Pay equity analysis | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LAiSER-Software/laiser-cookbook/blob/main/recipes/Pay_Equity_Analysis/Pay_Equity_Analysis_Based_on_Skills.ipynb) |
 
 ## Funding
 <div align="center">
