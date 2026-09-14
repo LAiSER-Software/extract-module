@@ -1,17 +1,21 @@
-name: Changelog
+name: Release Notes
 
+# Release notes are generated per tag and published on the GitHub Release,
+# rather than committed to CHANGELOG.md on main. main is protected (pull
+# request + required checks), so a workflow push there would be rejected, and
+# a bypass would weaken that protection for every other push.
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 concurrency:
-  group: changelog-${{ github.ref }}
+  group: release-notes-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  changelog:
-    name: Generate Changelog
+  release-notes:
+    name: Publish Release Notes
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,24 +25,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
+      - name: Generate notes for this tag
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --verbose
+          # --current: only the commits that belong to the tag being pushed.
+          args: --current --strip header
         env:
-          OUTPUT: CHANGELOG.md
+          OUTPUT: RELEASE_NOTES.md
 
-      - name: Commit changelog
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          if git diff --staged --quiet; then
-            echo "No changelog changes."
-            exit 0
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
           fi
-          git commit -m "docs: update changelog"
-          # main may have moved while this job ran.
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
