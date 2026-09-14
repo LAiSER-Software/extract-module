@@ -176,6 +176,8 @@ tests/*
 
 # But keep pytest test files
 !tests/test_*.py
+!tests/__init__.py
+!tests/conftest.py
 
 store/*
 
@@ -185,3 +187,5 @@ prompt_runs/*
 
 skills_alignment_results.csv
 weighted alignment tests/
+
+laiser/public/skill_embeddings.npy

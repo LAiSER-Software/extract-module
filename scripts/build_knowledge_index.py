@@ -126,7 +126,7 @@ def load_onet_knowledge(onet_dir: Path = None) -> pd.DataFrame:
         elements["description"] = ""
 
     elements["description"] = elements["description"].fillna("").str.strip()
-    elements["taxonomy"] = "onet_knowledge"
+    elements["taxonomy"] = "onet"
     elements["field"] = "workforce"
 
     logger.info(f"O*NET Knowledge: {len(elements)} unique entries")
@@ -181,7 +181,7 @@ def load_esco_knowledge() -> pd.DataFrame:
     result["name"] = knowledge_df[name_col].str.strip()
     result["description"] = knowledge_df[desc_col].str.strip() if desc_col else ""
     result["description"] = result["description"].fillna("")
-    result["taxonomy"] = "esco_knowledge"
+    result["taxonomy"] = "esco"
     result["field"] = "workforce"
 
     result = result.dropna(subset=["name"]).drop_duplicates(subset=["name"]).reset_index(drop=True)

@@ -4,7 +4,10 @@ LAiSER - Leveraging Artificial Intelligence for Skills Extraction and Research
 A Python package for extracting and aligning skills from text using AI models.
 """
 
-__version__ = "0.5"
+import os
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+__version__ = "1.0.1"
 
 # Import main classes for easy access
 try:

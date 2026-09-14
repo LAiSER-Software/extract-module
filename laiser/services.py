@@ -629,7 +629,6 @@ class SkillExtractionService:
         use_gpu: Optional[bool] = None,
         backend: Optional[str] = None,
     ):
-
         self.model_id = model_id
         self.hf_token = hf_token
         self.api_key = api_key
@@ -1002,6 +1001,16 @@ class SkillExtractionService:
         prompt = self.prompt_builder.build_knowledge_task_prompt(text_blob, extracted_skills)
         response = self.router.generate(prompt)
         results = self.llm_parser.parse_knowledge_task_response(response)
+
+        # Counts only on the success path: this runs for every record, and the
+        # response is model output derived from caller-supplied job text, which
+        # does not belong in retained logs at warning level. The parse-failure
+        # branch below still emits a short preview for diagnosis.
+        logger.debug(
+            "KT model response: %d parsed blocks, %d chars",
+            len(results),
+            len(response),
+        )
 
         if not results:
             preview = response.strip().replace("\n", " ")[:200]

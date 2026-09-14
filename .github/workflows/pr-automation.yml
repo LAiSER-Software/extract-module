@@ -11,6 +11,7 @@ permissions:
 jobs:
   # ── 1. AI PR DESCRIPTION ──────────────────────────────────────────────────
   ai-description:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     name: AI PR Description
     runs-on: ubuntu-latest
     steps:
@@ -29,15 +30,24 @@ jobs:
         run: git diff origin/${{ github.base_ref }}...HEAD > pr.diff
 
       - name: Generate and update PR description
+        # Convenience automation, not a gate: a missing, expired or rejected
+        # GEMINI_API_KEY should not show up as a failing check on the PR.
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: python .github/scripts/pr_description.py
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY is not set — skipping AI PR description."
+            exit 0
+          fi
+          python .github/scripts/pr_description.py
 
   # ── 2. REVIEW TIME LABEL ──────────────────────────────────────────────────
   review-time-label:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     name: Review Time Label
     runs-on: ubuntu-latest
     steps:

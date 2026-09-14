@@ -11,7 +11,7 @@ from google.genai import types
 
 DEFAULT_GEMINI_MODEL = os.getenv("LAISER_GEMINI_MODEL", "gemini-2.5-flash")
 DEFAULT_GEMINI_TIMEOUT = float(os.getenv("LAISER_GEMINI_TIMEOUT", "60"))
-DEFAULT_MAX_OUTPUT_TOKENS = int(os.getenv("LAISER_GEMINI_MAX_OUTPUT_TOKENS", "1000"))
+DEFAULT_MAX_OUTPUT_TOKENS = int(os.getenv("LAISER_GEMINI_MAX_OUTPUT_TOKENS", "4096"))
 
 
 class GeminiAPI:
@@ -78,7 +78,12 @@ def gemini_generate(
     response_schema: Optional[Any] = None,
 ) -> str:
     """Send `prompt` to Gemini and return generated text."""
-    client = GeminiAPI(api_key=api_key, model_name=model_name, timeout=timeout)
+    client = GeminiAPI(
+        api_key=api_key,
+        model_name=model_name,
+        timeout=timeout,
+        max_output_tokens=max_output_tokens,
+    )
     return client.generate_with_config(
         prompt,
         response_mime_type=response_mime_type,

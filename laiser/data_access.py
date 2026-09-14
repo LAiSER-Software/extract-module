@@ -251,7 +251,6 @@ class FAISSIndexManager:
 
         # 1) Try to load existing index + metadata unless force_rebuild requested
         if not force_rebuild:
-
             ## Issue: Embedding (npy) is not accessed. Cosine Calculations might be faster if npy is accessed.
             try:
                 self.index = self.data_access.load_faiss_index(str(local_index_path))

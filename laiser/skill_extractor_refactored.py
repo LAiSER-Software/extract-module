@@ -81,9 +81,22 @@ class SkillExtractorRefactored:
         expanded: List[str] = []
         seen = set()
         source_map = {
-            "esco": ["esco", "esco_knowledge", "esco_task"],
-            "onet": ["onet_skill", "onet_tech", "onet_knowledge", "onet_task"],
+            "esco": ["esco"],
+            "onet": ["onet"],
             "osn": ["osn"],
+            "uk": ["ukos"],
+            "ukos": ["ukos"],
+            # Back-compatibility aliases. Before f57e1b6 the taxonomy column
+            # carried provider+type labels ("esco_task", "onet_knowledge", ...)
+            # and callers could pass those directly. The column now holds only
+            # the provider, so the old names would silently match nothing;
+            # fold each one onto its provider instead.
+            "esco_knowledge": ["esco"],
+            "esco_task": ["esco"],
+            "onet_knowledge": ["onet"],
+            "onet_task": ["onet"],
+            "onet_skill": ["onet"],
+            "onet_tech": ["onet"],
         }
 
         for source in allowed_sources:

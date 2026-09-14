@@ -41,7 +41,7 @@ LAiSER uses a four-stage extraction and alignment pipeline:
    Alignment results are converted into a unified tabular schema, with optional edge generation for graph-style outputs.
 
 ## Requirements
-- Python version `>=3.8`.
+- Python version `>=3.10`.
 - The package supports the current tested matrix through Python `3.13`.
 - A GPU is recommended for heavy local model workflows, but API-backed extraction can run CPU-only.
 - Provider-specific environment variables may be required depending on backend:
@@ -68,7 +68,7 @@ LAiSER uses a four-stage extraction and alignment pipeline:
   pip install -e ".[dev]"
   ```
 
-**NOTE**: Python 3.8 or later is required. Python 3.12 or 3.13 is recommended for current development and CI parity.
+**NOTE**: Python 3.10 or later is required. Python 3.12 or 3.13 is recommended for current development and CI parity.
 
 You can check if your machine has a GPU available with:
 ```shell
@@ -108,6 +108,7 @@ results = extractor.extract_concepts(
     text_columns=["description"],
     input_type="job_desc",
     concepts=["skills", "knowledge", "tasks"],
+    allowed_sources=["esco", "onet", "osn", "ukos"],
 )
 
 print(results.head())
@@ -143,6 +144,7 @@ results = extractor.extract_concepts(
     text_columns=["description", "learning_outcomes"],
     input_type="course_syllabi",
     concepts=["skills"],
+    allowed_sources=["esco", "onet", "osn", "ukos"],
 )
 
 print(results.head())
@@ -157,7 +159,7 @@ print(results.head())
 - `use_gpu`
   Enables GPU-backed initialization where supported
 - `allowed_sources`
-  Filters alignment sources such as `["esco"]`, `["onet"]`, or `["osn"]`
+  Filters alignment sources. Available sources are `["esco"]`, `["onet"]`, `["osn"]`, and `["ukos"]`.
 - `top_k`
   Per-alignment-call cap for matched rows
 - `return_edges`
@@ -169,8 +171,9 @@ Additional examples are available in [docs/examples.md](docs/examples.md).
 
 ## Funding
 <div align="center">
-<img src="https://i.imgur.com/XtgngBz.png" width="100px"/>
-<img src="https://i.imgur.com/a2SNYma.jpeg" width="130px"/>
+<img src="https://laiser.gwu.edu/sites/g/files/zaxdzs6976/files/2026-07/gwu.jpg" width="100px" alt="George Washington University"/>
+<img src="https://laiser.gwu.edu/sites/g/files/zaxdzs6976/files/2026-07/gatesfoundation.jpg" width="130px" alt="Gates Foundation"/>
+<img src="https://laiser.gwu.edu/sites/g/files/zaxdzs6976/files/2026-07/walmartfoundation.jpg" width="130px" alt="Walmart Foundation"/>
 </div>
 
 ## Authors

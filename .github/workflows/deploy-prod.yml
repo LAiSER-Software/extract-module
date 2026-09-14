@@ -2,8 +2,8 @@ name: Deploy to PyPI
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 jobs:
   deploy-prod:
@@ -23,6 +23,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(sed -n 's/^__version__ *= *"\(.*\)"/\1/p' laiser/__init__.py)
+          echo "tag=${TAG} package=${PKG}"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match laiser.__version__ (${PKG})"
+            exit 1
+          fi
+
       - name: Build package
         run: |
           pip install build twine
@@ -30,6 +40,24 @@ jobs:
 
       - name: Validate package
         run: twine check dist/*
+
+      - name: Check distribution size against PyPI limit
+        run: |
+          # PyPI rejects any single file over 100 MiB with an opaque 400.
+          LIMIT=104857600
+          STATUS=0
+          for f in dist/*; do
+            SIZE=$(stat -c%s "$f")
+            PCT=$((SIZE * 100 / LIMIT))
+            echo "${f}: ${SIZE} bytes (${PCT}% of limit)"
+            if [ "$SIZE" -gt "$LIMIT" ]; then
+              echo "::error::${f} is ${SIZE} bytes, over PyPI's ${LIMIT} byte per-file limit"
+              STATUS=1
+            elif [ "$PCT" -ge 90 ]; then
+              echo "::warning::${f} is at ${PCT}% of PyPI's per-file limit"
+            fi
+          done
+          exit $STATUS
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

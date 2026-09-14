@@ -1,6 +1,18 @@
 name: Draft PDF
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - paper.md
+      - paper.bib
+      - .github/workflows/draft-pdf.yml
+  pull_request:
+    paths:
+      - paper.md
+      - paper.bib
 
 jobs:
   paper:
@@ -23,4 +35,3 @@ jobs:
           # PDF. Note, this should be the same directory as the input
           # paper.md
           path: paper.pdf
-

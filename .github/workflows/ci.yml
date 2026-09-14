@@ -2,6 +2,10 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+      - dev
 
 jobs:
   # ── 1. LINT ────────────────────────────────────────────────────────────────
@@ -28,6 +32,40 @@ jobs:
         run: isort --check-only .
 
 
+  # ── 2. TEST ────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+
+      - name: Install package and test dependencies
+        run: pip install -e ".[dev]"
+
+      - name: pytest
+        # No secrets are supplied here on purpose. Tests that need provider
+        # credentials skip themselves when the key is absent (see the guards in
+        # tests/test_openai.py, test_anthropic.py, test_kst_extraction.py and
+        # test_llm_cloud.py), so the battery runs green without any token.
+        #
+        # The `index` marker is deselected: test_index_process.py force-rebuilds
+        # the skills index, which embeds ~54k taxonomy entries and takes about
+        # 17 minutes on a runner. It stays runnable locally with
+        # `pytest -m index`.
+        run: pytest tests/ -v -rs -m "not index" --cov=laiser --cov-report=term-missing
+
   # ── 3. SECURITY ────────────────────────────────────────────────────────────
   security:
     name: Security
@@ -48,7 +86,12 @@ jobs:
             ${{ runner.os }}-pip-security-
 
       - name: Install dependencies
-        run: pip install -e ".[dev]" bandit pip-audit
+        # setuptools is upgraded first: the runner image ships 79.0.1, which
+        # PYSEC-2026-3447 affects (fixed in 83.0.0). pip-audit audits the whole
+        # environment, so the runner's own build tooling shows up as a finding.
+        run: |
+          pip install --upgrade pip "setuptools>=83.0.0"
+          pip install -e ".[dev]" bandit pip-audit
 
       - name: bandit (code scan)
         run: bandit -r laiser/ -ll
@@ -57,7 +100,7 @@ jobs:
         # CVE-2026-4539 ignored - affects pygments 2.19.2, no fix available yet
         run: pip-audit --ignore-vuln CVE-2026-4539
 
-  # ── 3. TYPE CHECK ──────────────────────────────────────────────────────────
+  # ── 4. TYPE CHECK ──────────────────────────────────────────────────────────
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
@@ -75,7 +118,7 @@ jobs:
         run: mypy laiser/ --ignore-missing-imports --no-strict-optional
         continue-on-error: true
 
-  # ── 4. LICENSE CHECK ───────────────────────────────────────────────────────
+  # ── 5. LICENSE CHECK ───────────────────────────────────────────────────────
   license-check:
     name: License Check
     runs-on: ubuntu-latest
@@ -93,9 +136,13 @@ jobs:
         # Fail if any GPL licensed dependency is found
         run: pip-licenses --fail-on="GNU General Public License v2 (GPLv2);GNU General Public License v3 (GPLv3);GNU Affero General Public License v3"
 
-  # ── 5. DEAD CODE ───────────────────────────────────────────────────────────
+  # ── 6. DEAD CODE ───────────────────────────────────────────────────────────
   dead-code:
     name: Dead Code
+    # Reports by commenting on the PR, so there is nothing to post to on a push.
+    # Fork PRs get a read-only GITHUB_TOKEN regardless of the permissions block
+    # below, so posting a comment there would 403.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -123,10 +170,16 @@ jobs:
 
       - name: Post code hygiene summary
         uses: actions/github-script@v7
+        env:
+          # Passed via env, never interpolated into the script body: vulture
+          # output contains repo file paths, which are attacker-controlled on
+          # a pull_request and would otherwise break out of the template literal.
+          VULTURE_FOUND: ${{ steps.vulture.outputs.found }}
+          VULTURE_OUTPUT: ${{ steps.vulture.outputs.output }}
         with:
           script: |
-            const found = '${{ steps.vulture.outputs.found }}' === 'true';
-            const output = `${{ steps.vulture.outputs.output }}`.trim();
+            const found = process.env.VULTURE_FOUND === 'true';
+            const output = (process.env.VULTURE_OUTPUT || '').trim();
 
             const lines = found ? output.split('\n') : [];
             const items = lines.map(l => {
@@ -167,9 +220,11 @@ jobs:
               });
             }
 
-  # ── 6. COMPLEXITY ──────────────────────────────────────────────────────────
+  # ── 7. COMPLEXITY ──────────────────────────────────────────────────────────
   complexity:
     name: Complexity
+    # Same as dead-code: PR comment is the only output, and fork PRs cannot post.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -195,9 +250,13 @@ jobs:
 
       - name: Post complexity insights
         uses: actions/github-script@v7
+        env:
+          # See the note in the dead-code job: radon output carries repo file
+          # paths and symbol names, so it is passed as data, not as script text.
+          RADON_OUTPUT: ${{ steps.radon.outputs.output }}
         with:
           script: |
-            const output = `${{ steps.radon.outputs.output }}`.trim();
+            const output = (process.env.RADON_OUTPUT || '').trim();
             if (!output) return;
 
             const lines = output.split('\n');
@@ -254,14 +313,14 @@ jobs:
               });
             }
 
-  # ── 7. BUILD ───────────────────────────────────────────────────────────────
+  # ── 8. BUILD ───────────────────────────────────────────────────────────────
   compatibility:
     name: Compatibility (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -281,7 +340,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, security, type-check, license-check]
+    needs: [lint, test, security, type-check, license-check]
     steps:
       - uses: actions/checkout@v4
 
