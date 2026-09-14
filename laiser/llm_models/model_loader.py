@@ -49,6 +49,7 @@ Rev No.     Date            Author              Description
 [1.0.0]     6/30/2025      Anket Patil          Support transformer and vLLM model initialization
 """
 
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.utils import EntryNotFoundError, RepositoryNotFoundError
 
@@ -64,34 +65,34 @@ except ImportError:
 DEFAULT_TRANSFORMER_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"
 
 
-def load_model_from_transformer(model_id: str = None, token: str = ""):
+def load_model_from_transformer(model_id: str = None, token: str = "", use_gpu: bool = True):
+    """Load a causal LM and its tokenizer with transformers.
+
+    8-bit quantization is applied only when a CUDA device is actually available:
+    bitsandbytes cannot quantize on CPU and raises before any weights load, which
+    made every CPU run fail.
+    """
     model_id = model_id or DEFAULT_TRANSFORMER_MODEL_ID
-    quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+    on_gpu = bool(use_gpu) and torch.cuda.is_available()
+
+    def _load(name):
+        load_kwargs = {"use_auth_token": token}
+        if on_gpu:
+            load_kwargs.update(quantization_config=BitsAndBytesConfig(load_in_8bit=True), device_map="auto")
+        tokenizer = AutoTokenizer.from_pretrained(name, use_auth_token=token, revision="main")  # nosec B615
+        model = AutoModelForCausalLM.from_pretrained(name, revision="main", **load_kwargs)  # nosec B615
+        return tokenizer, model
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_id, use_auth_token=token, revision="main")  # nosec B615
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            use_auth_token=token,
-            revision="main",  # nosec B615
-            quantization_config=quantization_config,
-            device_map="auto",
-        )
+        return _load(model_id)
     except (RepositoryNotFoundError, EntryNotFoundError, OSError) as e:
+        if not on_gpu:
+            # The fallback is a 7B AWQ checkpoint that cannot run on CPU either,
+            # so surface the original error instead of downloading it.
+            raise
         print(f"[WARN] Failed to load model '{model_id}': {e}")
         print(f"[INFO] Falling back to default model: {DEFAULT_TRANSFORMER_MODEL_ID}")
-        tokenizer = AutoTokenizer.from_pretrained(
-            DEFAULT_TRANSFORMER_MODEL_ID, use_auth_token=token, revision="main"
-        )  # nosec B615
-        model = AutoModelForCausalLM.from_pretrained(
-            DEFAULT_TRANSFORMER_MODEL_ID,
-            use_auth_token=token,
-            revision="main",  # nosec B615
-            quantization_config=quantization_config,
-            device_map="auto",
-        )
-
-    return tokenizer, model
+        return _load(DEFAULT_TRANSFORMER_MODEL_ID)
 
 
 DEFAULT_VLLM_MODEL_ID = "TheBloke/Mixtral-7B-Instruct-v0.1-AWQ"

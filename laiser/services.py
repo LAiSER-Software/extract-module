@@ -668,8 +668,8 @@ class SkillExtractionService:
         self.faiss_manager.initialize_index(force_rebuild=False)
         # Log router initialization state for debugging
         try:
-            llama_present = getattr(self.router, "llama_llm", None) is not None
-            print(f"SkillExtractionService: router.llama_llm present: {llama_present}")
+            llama_present = self.backend == "llama_cpp" and getattr(self.router, "llm", None) is not None
+            print(f"SkillExtractionService: llama.cpp model loaded: {llama_present}")
         except Exception:
             pass
 
