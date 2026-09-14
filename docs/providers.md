@@ -13,6 +13,9 @@ Choose the model when you construct the extractor.
 
 `hf_token` is only needed for gated or private Hugging Face models.
 
+Every provider decodes greedily by default, with a fixed seed wherever it accepts one — see
+[Reproducibility](reproducibility.md).
+
 ## Gemini
 
 ```python

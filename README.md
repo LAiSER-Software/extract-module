@@ -192,6 +192,8 @@ print(results.head())
 | `api_key` | API key for hosted providers |
 | `use_gpu` | run local models on GPU where available |
 | `backend` | `"llama_cpp"` to run a local GGUF model |
+| `temperature` | decoding temperature for every backend (default `0.0`, greedy) |
+| `seed` | seed for backends that accept one (default `42`) |
 | `concepts` | `["skills"]` (default), or add `"knowledge"` and `"tasks"` |
 | `allowed_sources` | taxonomies to align against: `"esco"`, `"onet"`, `"osn"`, `"ukos"` |
 | `top_k` | maximum aligned matches per concept type, per document (default 25) |
@@ -199,6 +201,31 @@ print(results.head())
 | `output_csv_path` | also write the results to this CSV file |
 
 Every option is described in the [usage guide](https://laiser-software.github.io/extract-module/usage/), and more snippets are in [docs/examples.md](docs/examples.md).
+
+### Reproducible results
+
+Every backend decodes greedily by default (temperature `0.0`) and uses a fixed seed where the backend accepts one, so repeated runs over the same input give the same result. To make results reproducible for others, pin every setting that affects them:
+
+```python
+extractor = SkillExtractorRefactored(
+    model_id="Qwen/Qwen2.5-0.5B-Instruct",  # pin the model
+    use_gpu=False,
+    temperature=0.0,  # the default: greedy decoding
+    seed=42,  # the default
+)
+
+results = extractor.extract_concepts(
+    data=data,
+    id_column="Research ID",
+    text_columns=["description"],
+    input_type="job_desc",
+    concepts=["skills"],
+    allowed_sources=["esco", "onet", "osn", "ukos"],
+    similarity_thresholds={"skill": 0.60, "knowledge": 0.50, "task": 0.50},  # the defaults
+)
+```
+
+When reporting results, also record the LAiSER version: it fixes the bundled taxonomy data and the embedding model used for alignment (`sentence-transformers/all-MiniLM-L6-v2`). Hosted providers do not guarantee identical output even at temperature `0.0`. See [Reproducibility](https://laiser-software.github.io/extract-module/reproducibility/) for details.
 
 ## Try it in Google Colab
 
