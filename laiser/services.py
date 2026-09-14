@@ -709,12 +709,12 @@ class SkillExtractionService:
         top_k : int, optional
             Maximum number of aligned items to return per document (default: 25)
         similarity_threshold : float, optional
-            Global minimum similarity score applied to all types unless overridden
-            by similarity_thresholds. Defaults to 0.20 for backward compatibility.
+            One minimum similarity score applied to every type. When omitted, the
+            per-type defaults below apply.
         similarity_thresholds : dict, optional
-            Per-type similarity thresholds. Keys: "skill", "knowledge", "task".
-            Overrides similarity_threshold for each specified type.
-            Defaults: {"skill": 0.20, "knowledge": 0.45, "task": 0.55}
+            Per-type minimums, keys "skill", "knowledge", "task". Applied on top of
+            similarity_threshold for the types given.
+            Defaults: DEFAULT_SIMILARITY_THRESHOLDS, {"skill": 0.60, "knowledge": 0.50, "task": 0.50}
         levels : bool
             Whether to extract skill levels
         batch_size : int
@@ -740,7 +740,7 @@ class SkillExtractionService:
         pd.DataFrame  (when return_edges=False, default)
             DataFrame with normalized mixed-concept rows:
             Research ID, Type, Raw Concept, Taxonomy Concept,
-            Taxonomy Description, Taxonomy Source, Correlation Coefficient.
+            Taxonomy Description, Taxonomy Source, Source Url, Correlation Coefficient.
         dict  (when return_edges=True)
             {"nodes": pd.DataFrame, "edges": pd.DataFrame}
             edges columns: Research ID, Skill, Knowledge, Task, Edge Type, confidence
