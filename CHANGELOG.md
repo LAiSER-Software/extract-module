@@ -1,8 +1,12 @@
 # LAiSER Changelog
 
+> **Release notes from v1.0.1 onward are generated from the commit history and published with each
+> [GitHub Release](https://github.com/LAiSER-Software/extract-module/releases).** This file covers
+> earlier versions only and is no longer updated.
+
 This document outlines the changes between versions of the LAiSER (Leveraging Artificial Intelligence for Skill Extraction & Research) package.
 
-## Version 0.2.4 (Current)
+## Version 0.2.4
 
 ### Major Changes
 - Implemented a new taxonomy-aware approach to extract skills aligned with the ESCO taxonomy before LLM inference for KSAs

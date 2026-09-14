@@ -63,3 +63,39 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+
+  # Release notes run only after the package is on PyPI. A tag that fails the
+  # version check, the size check or the upload leaves no GitHub Release behind.
+  # Notes go on the Release rather than into CHANGELOG.md on main: main is
+  # protected, and a bypass for this job would weaken that protection.
+  release-notes:
+    name: Publish Release Notes
+    needs: deploy-prod
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate notes for this tag
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          # --current: only the commits that belong to the tag being pushed.
+          args: --current --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
+          fi
