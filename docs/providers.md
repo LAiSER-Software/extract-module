@@ -31,7 +31,6 @@ read from environment variables:
 | Variable | Default | Effect |
 |---|---|---|
 | `LAISER_GEMINI_MODEL` | `gemini-2.5-flash` | which Gemini model to call |
-| `LAISER_GEMINI_TIMEOUT` | `60` | request timeout in seconds |
 | `LAISER_GEMINI_MAX_OUTPUT_TOKENS` | `4096` | maximum length of each response |
 
 ## OpenAI

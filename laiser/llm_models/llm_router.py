@@ -141,7 +141,8 @@ class LLMRouter:
                 self.llm = Llama(
                     model_path=str(MODEL_PATH),
                     n_ctx=LLAMA_CPP_CTX,
-                    n_threads=LLAMA_CPP_THREADS or None,
+                    # Environment variables are strings; llama.cpp needs an int thread count.
+                    n_threads=int(LLAMA_CPP_THREADS) if LLAMA_CPP_THREADS else None,
                     n_gpu_layers=-1,  # Use GPU if available, else CPU
                     # logits_all=False,
                     # chat_format="chatml",
@@ -166,28 +167,23 @@ class LLMRouter:
                     print(f"WARNING: vLLM initialization failed: {e}")
                     print("Falling back to transformer model...")
 
-                try:
-                    self._initialize_transformer()
-                    if self.model is not None:
-                        print("Transformer model fallback successful!")
-                        return
-                except Exception as e:
-                    print(f"WARNING: Transformer model fallback also failed: {e}")
+                self._initialize_transformer()
+                print("Transformer model fallback successful!")
+                return
 
             else:
                 print("Using CPU/transformer model...")
-                try:
-                    self._initialize_transformer()
-                    if self.model is not None:
-                        print("Transformer model initialization successful!")
-                        return
-                except Exception as e:
-                    print(f"WARNING: Transformer model initialization failed: {e}")
+                self._initialize_transformer()
+                print("Transformer model initialization successful!")
+                return
 
-            print("WARNING: No model successfully initialized.")
-
+        # A local model that fails to load must fail construction. Swallowing the error
+        # left a router with no model, whose every generate() call then failed and was
+        # silently skipped per row by extract_and_align_core.
+        except LAiSERError:
+            raise
         except Exception as e:
-            raise LAiSERError(f"Critical failure during component initialization: {e}")
+            raise LAiSERError(f"Could not initialize model '{self.model_id}': {e}") from e
 
     def _initialize_vllm(self):
         self.llm = load_model_from_vllm(self.model_id, self.hf_token)

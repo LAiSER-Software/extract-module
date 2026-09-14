@@ -194,7 +194,7 @@ print(results.head())
 | `backend` | `"llama_cpp"` to run a local GGUF model |
 | `concepts` | `["skills"]` (default), or add `"knowledge"` and `"tasks"` |
 | `allowed_sources` | taxonomies to align against: `"esco"`, `"onet"`, `"osn"`, `"ukos"` |
-| `top_k` | maximum aligned matches per document (default 25) |
+| `top_k` | maximum aligned matches per concept type, per document (default 25) |
 | `return_edges` | return `{nodes, edges}` instead of only the results table |
 | `output_csv_path` | also write the results to this CSV file |
 

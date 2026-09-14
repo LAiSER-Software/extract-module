@@ -74,7 +74,7 @@ print(results[["Raw Concept", "Taxonomy Concept", "Taxonomy Source", "Correlatio
 
 ## 4. Read the results
 
-`results` is a `DataFrame` with one row per taxonomy match:
+`results` is a `DataFrame` with one row per extracted phrase that matched a taxonomy entry:
 
 | Column | Meaning |
 |---|---|
@@ -87,7 +87,8 @@ print(results[["Raw Concept", "Taxonomy Concept", "Taxonomy Source", "Correlatio
 | `Source Url` | link to the entry, where the taxonomy provides one |
 | `Correlation Coefficient` | similarity between phrase and entry; higher is closer |
 
-One extracted phrase can match several entries, so a document can produce more rows than phrases.
+Each phrase is matched to its single closest taxonomy entry and kept only if that match clears the similarity
+threshold, so a document never produces more rows than the model extracted phrases.
 
 For the input above, the local 0.5B model on a laptop CPU returned:
 

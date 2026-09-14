@@ -707,18 +707,19 @@ class SkillExtractionService:
         input_type : str
             Type of input data
         top_k : int, optional
-            Maximum number of aligned items to return per document (default: 25)
+            Maximum number of aligned matches per concept type, per document
+            (default: DEFAULT_TOP_K, 25). Each type is aligned in its own call.
         similarity_threshold : float, optional
             One minimum similarity score applied to every type. When omitted, the
             per-type defaults below apply.
         similarity_thresholds : dict, optional
-            Per-type minimums, keys "skill", "knowledge", "task". Applied on top of
-            similarity_threshold for the types given.
+            Per-type minimums, keys "skill", "knowledge", "task". Overrides
+            similarity_threshold for the types it names.
             Defaults: DEFAULT_SIMILARITY_THRESHOLDS, {"skill": 0.60, "knowledge": 0.50, "task": 0.50}
         levels : bool
-            Whether to extract skill levels
+            Accepted for compatibility; currently has no effect.
         batch_size : int
-            Batch size for processing
+            Accepted for compatibility; currently has no effect.
         warnings : bool
             Whether to show warnings
         extract : list, optional

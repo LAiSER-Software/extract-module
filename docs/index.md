@@ -17,8 +17,9 @@ For every row in an input table, LAiSER runs four stages:
    knowledge and tasks behind them.
 2. **Parsing and deduplication.** The model's response is parsed into a list of phrases. Exact
    duplicates are removed, then near-duplicates are collapsed using embedding similarity.
-3. **Taxonomy alignment.** Each phrase is embedded and compared against bundled FAISS indexes of
-   taxonomy entries. Matches above a similarity threshold are kept, up to `top_k` per document.
+3. **Taxonomy alignment.** Each phrase is embedded and matched to its closest entry in bundled FAISS
+   indexes of taxonomy entries. Matches above a similarity threshold are kept, up to `top_k` per concept
+   type.
 4. **Output.** Matches are returned as one table with a row per match: the phrase as extracted, the
    taxonomy entry it matched, which taxonomy that entry comes from, and the similarity score.
 

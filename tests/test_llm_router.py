@@ -3,6 +3,7 @@
 import pytest
 import torch
 
+from laiser.exceptions import LAiSERError
 from laiser.llm_models import hugging_face_llm, llm_router, model_loader
 from laiser.llm_models.llm_router import LLMRouter
 
@@ -133,3 +134,46 @@ def test_cpu_load_failure_raises_instead_of_falling_back(monkeypatch):
     with pytest.raises(OSError):
         model_loader.load_model_from_transformer("missing/model", use_gpu=False)
     assert attempted == ["missing/model"]
+
+
+# The tests below go through LLMRouter's constructor, which is what
+# SkillExtractorRefactored builds, rather than the loader alone.
+
+
+def _failing_load(*args, **kwargs):
+    raise OSError("model could not be loaded")
+
+
+def test_cpu_router_raises_when_the_model_cannot_load(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(llm_router, "load_model_from_transformer", _failing_load)
+
+    with pytest.raises(LAiSERError, match="model could not be loaded"):
+        LLMRouter("missing/model", use_gpu=False)
+
+
+def test_gpu_router_raises_when_vllm_and_transformers_both_fail(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(llm_router, "load_model_from_vllm", _failing_load)
+    monkeypatch.setattr(llm_router, "load_model_from_transformer", _failing_load)
+
+    with pytest.raises(LAiSERError, match="model could not be loaded"):
+        LLMRouter("missing/model", use_gpu=True)
+
+
+def test_gpu_router_falls_back_to_transformers_when_vllm_fails(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(llm_router, "load_model_from_vllm", _failing_load)
+    monkeypatch.setattr(llm_router, "load_model_from_transformer", lambda *a, **k: (FakeTokenizer(), FakeModel()))
+
+    router = LLMRouter("some/model", use_gpu=True)
+
+    assert router.llm is None and router.model is not None
+
+
+def test_hosted_provider_loads_no_local_weights(monkeypatch):
+    monkeypatch.setattr(llm_router, "load_model_from_transformer", lambda *a, **k: pytest.fail("loaded local weights"))
+
+    router = LLMRouter("openai", use_gpu=False)
+
+    assert router.model is None and router.llm is None
