@@ -21,7 +21,8 @@ align results against the bundled taxonomies.
 pip install "laiser[gpu]"
 ```
 
-The `gpu` extra adds [vLLM](https://docs.vllm.ai/) for faster local inference on CUDA devices. Check that
+The `gpu` extra adds [vLLM](https://docs.vllm.ai/) for faster local inference on CUDA devices, plus
+`bitsandbytes` and `accelerate`, which LAiSER uses to load a model in 8-bit when vLLM cannot. Check that
 PyTorch can see your GPU:
 
 ```bash

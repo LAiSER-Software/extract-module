@@ -42,6 +42,10 @@ dependencies = [
 [project.optional-dependencies]
 gpu = [
     "vllm>=0.2.0",
+    # When vLLM cannot load a model, LAiSER loads it with transformers in 8-bit,
+    # which needs both of these (minimums are the ones transformers checks for).
+    "bitsandbytes>=0.43.1",
+    "accelerate>=0.26.0",
 ]
 dev = [
     "pytest>=6.0",
