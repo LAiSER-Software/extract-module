@@ -53,6 +53,7 @@ import os
 
 import torch
 
+from laiser.config import DEFAULT_TEMPERATURE, GENERATION_SEED
 from laiser.exceptions import LAiSERError
 from laiser.llm_models.llama_cpp_handler import llama_cpp_chat
 from laiser.llm_models.model_loader import load_model_from_transformer, load_model_from_vllm
@@ -90,12 +91,24 @@ except ImportError as e:
 
 
 class LLMRouter:
-    def __init__(self, model_id: str, use_gpu: bool, hf_token=None, api_key=None, backend=None):
+    def __init__(
+        self,
+        model_id: str,
+        use_gpu: bool,
+        hf_token=None,
+        api_key=None,
+        backend=None,
+        temperature: float = DEFAULT_TEMPERATURE,
+        seed=GENERATION_SEED,
+    ):
         self.model_id = model_id
         self.use_gpu = use_gpu
         self.hf_token = hf_token
         self.api_key = api_key
         self.backend = backend
+        # Applied to every backend; see DEFAULT_TEMPERATURE in laiser/config.py.
+        self.temperature = temperature
+        self.seed = seed
 
         self.llm = None
         self.model = None
@@ -106,25 +119,37 @@ class LLMRouter:
 
     # ---------------- ROUTER ----------------
     def generate(self, prompt: str, **kwargs):
+        """Send a prompt to the active backend.
+
+        The router's temperature and seed apply to every backend. Passing
+        ``temperature=`` or ``seed=`` overrides them for one request, on every
+        backend that accepts that setting.
+        """
+        temperature = kwargs.pop("temperature", self.temperature)
+        seed = kwargs.pop("seed", self.seed)
+
         if self.model_id == "gemini":
-            return gemini_generate(prompt, self.api_key, **kwargs)
+            return gemini_generate(prompt, self.api_key, temperature=temperature, seed=seed, **kwargs)
 
         if self.model_id == "openai":
-            return openai_generate(prompt, self.api_key)
+            # The OpenAI Responses API accepts no seed.
+            return openai_generate(prompt, self.api_key, temperature=temperature)
 
         # If a local GGUF model was loaded with llama-cpp-python, use it
         if self.backend == "llama_cpp":
             print("LLMRouter: routing request to llama_cpp backend")
-            return llama_cpp_chat(prompt, self.llm)
+            return llama_cpp_chat(prompt, self.llm, temperature=temperature, seed=seed)
 
         # A model loaded through transformers (always on CPU, and on GPU when vLLM
         # fails) has no vLLM engine in self.llm, so it must not go to vLLM.
         if self.llm is None and self.model is not None and self.tokenizer is not None:
             print("LLMRouter: routing request to transformers backend")
-            return llm_generate(prompt, self.tokenizer, self.model, self.model_id, self.use_gpu)
+            return llm_generate(
+                prompt, self.tokenizer, self.model, self.model_id, self.use_gpu, temperature=temperature, seed=seed
+            )
 
         print("LLMRouter: routing request to vLLM backend")
-        return llm_generate_vllm(prompt, self.llm)
+        return llm_generate_vllm(prompt, self.llm, temperature=temperature, seed=seed)
 
     # ---------------- INIT ----------------
     def _initialize_components(self):

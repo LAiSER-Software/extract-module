@@ -1,8 +1,11 @@
 import gc
+import inspect
 import os
 import re
 from pathlib import Path
 from typing import Any, List, Optional
+
+from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P, GENERATION_SEED
 
 try:
     from llama_cpp import Llama  # type: ignore
@@ -19,6 +22,18 @@ def _strip_fences(text: str) -> str:
     return text
 
 
+def _llama_accepts_seed(llama: Any) -> bool:
+    """Report whether this llama-cpp-python build accepts a per-call seed.
+
+    Older releases have no ``seed`` argument on ``create_chat_completion``;
+    passing one there raises TypeError, so check the signature first.
+    """
+    try:
+        return "seed" in inspect.signature(llama.create_chat_completion).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 class LlamaCppBackend:
     def __init__(
         self,
@@ -26,8 +41,9 @@ class LlamaCppBackend:
         n_ctx: int = 4096,
         n_threads: Optional[int] = None,
         n_gpu_layers: int = -1,
-        temperature: float = 0.2,
+        temperature: float = DEFAULT_TEMPERATURE,
         chat_format: str = "chatml",
+        seed: Optional[int] = GENERATION_SEED,
     ):
         if Llama is None:
             raise ImportError("llama-cpp-python is not installed. Install it to use the llama_cpp backend.")
@@ -42,6 +58,7 @@ class LlamaCppBackend:
             raise ValueError(f"Model path does not exist: {model_path}")
 
         self.temperature = temperature
+        self.seed = seed
 
         self.llm = Llama(
             model_path=model_path,
@@ -83,8 +100,10 @@ class LlamaCppBackend:
         max_tokens: Optional[int] = None,
         stop: Optional[List[str]] = None,
         temperature: Optional[float] = None,
+        seed: Optional[int] = None,
     ) -> str:
         temperature = self.temperature if temperature is None else temperature
+        seed = self.seed if seed is None else seed
         return llama_cpp_chat(
             prompt,
             self.llm,
@@ -92,6 +111,7 @@ class LlamaCppBackend:
             max_tokens=max_tokens,
             stop=stop,
             temperature=temperature,
+            seed=seed,
         )
 
 
@@ -102,8 +122,14 @@ def llama_cpp_chat(
     system: str = "You are a helpful assistant that outputs in JSON.",
     max_tokens: Optional[int] = None,
     stop: Optional[List[str]] = None,
-    temperature: Optional[float] = None,
+    temperature: Optional[float] = DEFAULT_TEMPERATURE,
+    seed: Optional[int] = GENERATION_SEED,
 ) -> str:
+    """Generate a chat completion with a local llama.cpp model.
+
+    Decoding is greedy by default (temperature 0.0), and ``seed`` is sent
+    whenever the installed llama-cpp-python accepts one.
+    """
     if llama is None:
         raise ValueError("llama is None; expected an initialized llama_cpp.Llama instance.")
 
@@ -119,6 +145,9 @@ def llama_cpp_chat(
         kwargs["stop"] = stop
     if temperature is not None:
         kwargs["temperature"] = temperature
+        kwargs["top_p"] = DEFAULT_TOP_P
+    if seed is not None and _llama_accepts_seed(llama):
+        kwargs["seed"] = seed
 
     resp = llama.create_chat_completion(**kwargs)
     return _strip_fences(resp["choices"][0]["message"]["content"])

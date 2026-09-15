@@ -50,7 +50,11 @@ Rev No.     Date            Author              Description
 """
 
 
-from laiser.config import MAX_NEW_TOKENS
+from typing import Optional
+
+import torch
+
+from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P, GENERATION_SEED, MAX_NEW_TOKENS
 from laiser.llm_models.model_loader import load_model_from_transformer
 
 try:
@@ -63,13 +67,26 @@ except ImportError:
 
 
 def llm_generate(
-    prompt: str, tokenizer, model, model_id: str, use_gpu: bool, max_new_tokens: int = MAX_NEW_TOKENS
+    prompt: str,
+    tokenizer,
+    model,
+    model_id: str,
+    use_gpu: bool,
+    max_new_tokens: int = MAX_NEW_TOKENS,
+    temperature: float = DEFAULT_TEMPERATURE,
+    seed: Optional[int] = GENERATION_SEED,
 ) -> str:
     """Generate a completion with a transformers model.
 
     Returns only the newly generated text. ``model.generate`` returns the prompt
     tokens followed by the completion; decoding all of it hands the prompt's own
     example JSON to the response parser, which can match it instead of the answer.
+
+    Decoding is greedy by default. At temperature 0.0 sampling is switched off
+    explicitly rather than left to the checkpoint, because some checkpoints ship a
+    generation_config.json that enables sampling and would make repeated runs
+    differ. Above 0.0 the model samples, and ``seed`` is applied first so the run
+    is still reproducible.
     """
     if tokenizer is None or model is None:
         tokenizer, model = load_model_from_transformer(model_id, use_gpu=use_gpu)
@@ -84,22 +101,41 @@ def llm_generate(
     inputs = tokenizer(text, return_tensors="pt").to(model.device)
     pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
 
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=max_new_tokens,
-        pad_token_id=pad_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-    )
+    do_sample = temperature is not None and temperature > 0.0
+    generation_kwargs = {
+        "max_new_tokens": max_new_tokens,
+        "pad_token_id": pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+        "do_sample": do_sample,
+    }
+    if do_sample:
+        generation_kwargs["temperature"] = temperature
+        generation_kwargs["top_p"] = DEFAULT_TOP_P
+        if seed is not None:
+            torch.manual_seed(seed)
+
+    outputs = model.generate(**inputs, **generation_kwargs)
 
     completion = outputs[0][inputs["input_ids"].shape[1] :]
     return tokenizer.decode(completion, skip_special_tokens=True).strip()
 
 
-def llm_generate_vllm(prompt, llm):
+def llm_generate_vllm(
+    prompt,
+    llm,
+    temperature: float = DEFAULT_TEMPERATURE,
+    seed: Optional[int] = GENERATION_SEED,
+    max_tokens: int = 200,
+):
+    """Generate a completion with a vLLM engine.
+
+    Temperature defaults to 0.0 (greedy) rather than vLLM's own default of 1.0,
+    and ``seed`` keeps sampled runs reproducible.
+    """
     if not VLLM_AVAILABLE:
         raise ImportError("vLLM is not installed. Please install it to use this function.")
 
-    sampling_params = SamplingParams(max_tokens=200, seed=42)
+    sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, top_p=DEFAULT_TOP_P, seed=seed)
     result = llm.generate([prompt], sampling_params=sampling_params)
     raw_text = result[0].outputs[0].text.strip()
     return raw_text

@@ -51,6 +51,7 @@ nav:
   - Guides:
       - Usage: usage.md
       - Model providers: providers.md
+      - Reproducibility: reproducibility.md
       - Taxonomies: taxonomies.md
       - Examples: examples.md
       - Cookbook notebooks: cookbook.md

@@ -95,10 +95,12 @@ For the input above, the local 0.5B model on a laptop CPU returned:
 | Type | Raw Concept | Taxonomy Concept | Taxonomy Source | Correlation Coefficient |
 |---|---|---|---|---:|
 | skill | Python programming | Program in Python | `ukos` | 0.70 |
+| skill | Machine learning | Use machine learning to create or improve solutions | `ukos` | 0.66 |
 | skill | Docker | Docker | `onet` | 0.75 |
 
-Model output varies between runs and between models. A hosted or larger model typically extracts more
-concepts from the same text — this small model missed "machine learning" and "AWS".
+Decoding is greedy by default, so running this again returns the same rows — see
+[Reproducibility](reproducibility.md). Different models extract different concepts: a hosted or larger model
+typically finds more, and this small model missed "AWS".
 
 ## Next steps
 
