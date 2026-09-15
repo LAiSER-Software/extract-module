@@ -73,7 +73,8 @@ because LAiSER formats the prompt with the model's chat template when it has one
 ## Local model on GPU
 
 With `use_gpu=True` on a machine with CUDA, LAiSER first tries to load the model with vLLM. If vLLM cannot
-load it, LAiSER loads it with transformers instead, using 8-bit quantization. Install the GPU extra, which
+load it, LAiSER retries vLLM once with `TheBloke/Mixtral-7B-Instruct-v0.1-AWQ`. Only if that also fails does it
+load the requested model with transformers instead, using 8-bit quantization. Install the GPU extra, which
 includes vLLM plus the `bitsandbytes` and `accelerate` packages that 8-bit loading needs:
 
 ```bash

@@ -9,7 +9,7 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
-from laiser.config import DEFAULT_TEMPERATURE, GENERATION_SEED
+from laiser.config import DEFAULT_TEMPERATURE, DEFAULT_TOP_P, GENERATION_SEED
 
 DEFAULT_GEMINI_MODEL = os.getenv("LAISER_GEMINI_MODEL", "gemini-2.5-flash")
 DEFAULT_GEMINI_TIMEOUT = float(os.getenv("LAISER_GEMINI_TIMEOUT", "60"))
@@ -32,6 +32,7 @@ class GeminiAPI:
         max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
         seed: Optional[int] = GENERATION_SEED,
+        top_p: float = DEFAULT_TOP_P,
     ):
         if not api_key:
             raise ValueError("Gemini API key is required")
@@ -41,6 +42,7 @@ class GeminiAPI:
         self.max_output_tokens = max_output_tokens
         self.temperature = temperature
         self.seed = seed
+        self.top_p = top_p
         self.client = genai.Client(api_key=api_key)
 
     def generate(self, prompt: str) -> str:
@@ -54,7 +56,11 @@ class GeminiAPI:
         response_schema: Optional[Any] = None,
     ) -> str:
         try:
-            config_kwargs = {"temperature": self.temperature, "max_output_tokens": self.max_output_tokens}
+            config_kwargs = {
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+                "max_output_tokens": self.max_output_tokens,
+            }
             if self.seed is not None and _SUPPORTS_SEED:
                 config_kwargs["seed"] = self.seed
             if response_mime_type:
@@ -91,11 +97,12 @@ def gemini_generate(
     response_schema: Optional[Any] = None,
     temperature: float = DEFAULT_TEMPERATURE,
     seed: Optional[int] = GENERATION_SEED,
+    top_p: float = DEFAULT_TOP_P,
 ) -> str:
     """Send `prompt` to Gemini and return generated text.
 
-    Decoding is greedy by default (temperature 0.0), and ``seed`` is sent
-    whenever the installed google-genai release accepts one.
+    Decoding is greedy by default (temperature 0.0, top_p 1.0), and ``seed`` is
+    sent whenever the installed google-genai release accepts one.
     """
     client = GeminiAPI(
         api_key=api_key,
@@ -104,6 +111,7 @@ def gemini_generate(
         max_output_tokens=max_output_tokens,
         temperature=temperature,
         seed=seed,
+        top_p=top_p,
     )
     return client.generate_with_config(
         prompt,

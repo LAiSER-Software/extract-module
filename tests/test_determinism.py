@@ -2,8 +2,10 @@
 
 Language models sample their output, so the same input can produce different
 generations across runs and across backends (JOSS review #424). LAiSER limits
-this in two ways, and these tests check both without a GPU, a model download or
-a paid API call:
+this in two ways, and these tests check both without a GPU, an API key or a
+language model download. The alignment tests do load the sentence-transformers
+embedding model used for alignment, which Hugging Face downloads on first use,
+as tests/test_alignment_core.py already does:
 
 - Decoding: every backend defaults to greedy decoding and a fixed seed. Checked
   against each entry point's defaults and against the parameters each backend
@@ -25,16 +27,26 @@ from laiser import config
 pytestmark = pytest.mark.determinism
 
 
+# Third-party packages a backend module may legitimately lack in a given install.
+# ImportError.name holds the package that failed to import, so a missing optional
+# dependency skips while a broken import inside LAiSER itself still fails.
+_OPTIONAL_PACKAGES = {"google", "vllm", "llama_cpp"}
+
+
 def _import_or_skip(module_path):
-    """Import an optional backend module, skipping when its dependency is absent.
+    """Import a backend module, skipping only when an optional dependency is absent.
 
     pytest.importorskip only skips on ModuleNotFoundError, but ``from google import
-    genai`` without google-genai installed raises a plain ImportError.
+    genai`` without google-genai installed raises a plain ImportError. Any other
+    import failure is re-raised, so a regression cannot turn into a silent skip.
     """
     try:
         return importlib.import_module(module_path)
     except ImportError as e:
-        pytest.skip(f"{module_path} unavailable in this environment: {e}")
+        missing = (e.name or "").split(".")[0]
+        if missing not in _OPTIONAL_PACKAGES:
+            raise
+        pytest.skip(f"{module_path} needs {missing}, which is not installed: {e}")
 
 
 @pytest.fixture
@@ -187,6 +199,7 @@ def test_gemini_request_uses_greedy_decoding_and_seed(monkeypatch):
 
     sent = captured["config"]
     assert sent.temperature == config.DEFAULT_TEMPERATURE
+    assert sent.top_p == config.DEFAULT_TOP_P
     assert sent.max_output_tokens == gemini.DEFAULT_MAX_OUTPUT_TOKENS
     if gemini._SUPPORTS_SEED:
         assert sent.seed == config.GENERATION_SEED
@@ -408,6 +421,12 @@ RAW_SKILLS = [
 
 @pytest.fixture(scope="module")
 def alignment_service():
+    """The real skills alignment service.
+
+    Uses the bundled FAISS index and the real sentence-transformers embedding model,
+    which Hugging Face downloads on first use. The model is not stubbed: repeatable
+    embeddings are part of what these tests check.
+    """
     data_access = _import_or_skip("laiser.data_access")
     services = _import_or_skip("laiser.services")
 

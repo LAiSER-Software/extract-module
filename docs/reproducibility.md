@@ -75,15 +75,17 @@ Also record:
 
 - **Hosted models can change.** A provider can update the model behind a name, and providers do not
   guarantee identical output even at temperature `0.0`.
-- **Different models extract different phrases.** Alignment maps different wordings of a skill onto the same
-  taxonomy entry, but it cannot recover a skill a model never extracted. Compare models on the aligned columns,
-  and measure their agreement rather than assuming it.
+- **Different models extract different phrases.** Alignment can map different wordings of a skill onto the
+  same taxonomy entry, but each phrase is matched on its own, so that is likely rather than guaranteed — and
+  alignment cannot recover a skill a model never extracted. Compare models on the aligned columns, and measure
+  their agreement rather than assuming it.
 - **Hardware and library versions matter for local models.** Floating-point results can differ between
   devices and library releases.
 
 ## How it is tested
 
-`tests/test_determinism.py` runs in CI without a GPU, a model download or an API key. It checks that:
+`tests/test_determinism.py` runs in CI without a GPU, an API key or a language model download. The alignment
+checks use the real embedding model, which Hugging Face downloads on first use. It checks that:
 
 - every public entry point defaults to temperature `0.0`, and every seedable one to seed `42`;
 - the decoding parameters each backend actually receives match those defaults, and per-call overrides reach
