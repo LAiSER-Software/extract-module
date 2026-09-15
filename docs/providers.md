@@ -47,7 +47,7 @@ configurable through LAiSER.
 
 ## Local model on CPU
 
-Any Hugging Face causal language model can run on CPU, with no API key:
+Hugging Face causal language models in standard precision run on CPU with no API key. Pass the model explicitly:
 
 ```python
 extractor = SkillExtractorRefactored(
@@ -55,6 +55,11 @@ extractor = SkillExtractorRefactored(
     use_gpu=False,
 )
 ```
+
+!!! note "Always pass a `model_id` on CPU"
+    Without one, LAiSER uses `TheBloke/Mixtral-7B-Instruct-v0.1-AWQ`. That checkpoint is AWQ-quantized for
+    GPUs and does not load on CPU, so creating the extractor fails. The same is true of other checkpoints
+    quantized for GPUs.
 
 The weights download on first use and are cached by Hugging Face. Instruction-tuned models work best,
 because LAiSER formats the prompt with the model's chat template when it has one. Each response is capped at
@@ -67,15 +72,20 @@ because LAiSER formats the prompt with the model's chat template when it has one
 
 ## Local model on GPU
 
-With `use_gpu=True` on a machine with CUDA, LAiSER loads the model with vLLM, falling back to transformers
-with 8-bit quantization if vLLM cannot load it. Install the GPU extra first:
+With `use_gpu=True` on a machine with CUDA, LAiSER first tries to load the model with vLLM. If vLLM cannot
+load it, LAiSER loads it with transformers instead, using 8-bit quantization. Install the GPU extra, which
+includes vLLM plus the `bitsandbytes` and `accelerate` packages that 8-bit loading needs:
 
 ```bash
 pip install "laiser[gpu]"
 ```
 
-If a GPU model fails to load, LAiSER falls back to `TheBloke/Mixtral-7B-Instruct-v0.1-AWQ`. On CPU there is
-no fallback: a model that fails to load raises the original error.
+If transformers cannot find or read the requested checkpoint either, LAiSER tries
+`TheBloke/Mixtral-7B-Instruct-v0.1-AWQ` instead. Only a missing or unreadable checkpoint triggers that
+retry; other load errors are not retried. On CPU there is no retry.
+
+When no model can be loaded, creating the extractor raises `LAiSERError`, with the underlying exception
+attached as its `__cause__`.
 
 ## llama.cpp (local GGUF)
 
