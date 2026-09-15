@@ -61,7 +61,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from laiser.config import DEFAULT_BATCH_SIZE
+from laiser.config import DEFAULT_BATCH_SIZE, DEFAULT_TEMPERATURE, GENERATION_SEED
 from laiser.services import SkillExtractionService
 
 
@@ -119,6 +119,8 @@ class SkillExtractorRefactored:
         api_key: Optional[str] = None,
         use_gpu: Optional[bool] = None,
         backend: Optional[str] = None,
+        temperature: float = DEFAULT_TEMPERATURE,
+        seed: Optional[int] = GENERATION_SEED,
     ):
         """
         Initialize the skill extractor.
@@ -135,6 +137,15 @@ class SkillExtractorRefactored:
             Whether to use GPU for model inference
         backend : str, optional
             Backend to use for LLM inference (e.g., "llama_cpp", "huggingface", "openai", "gemini")
+        temperature : float, optional
+            Decoding temperature for whichever backend is used. Defaults to 0.0
+            (greedy decoding), so repeated runs over the same input produce the
+            same extraction. Raise it only when varied output is wanted.
+        seed : int, optional
+            Seed for backends that accept one: vLLM, llama.cpp, Gemini, and local
+            Transformers models when temperature is above 0. Defaults to 42; pass
+            None to leave it unset. The OpenAI API accepts no seed, so there
+            reproducibility rests on greedy decoding alone.
         """
         # Initialize service layer
         self.skill_service = SkillExtractionService(
@@ -143,6 +154,8 @@ class SkillExtractorRefactored:
             hf_token=hf_token,
             use_gpu=use_gpu,
             backend=backend,
+            temperature=temperature,
+            seed=seed,
         )
 
     def extract_concepts(

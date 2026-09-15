@@ -92,6 +92,16 @@ DEFAULT_TOP_K = 25
 MAX_NEW_TOKENS = 1000
 GENERATION_SEED = 42
 
+# Decoding defaults. Every backend decodes greedily unless told otherwise, so that
+# repeated runs over the same input produce the same generation. A temperature of
+# 0.0 always takes the most probable token; top_p = 1.0 leaves nucleus filtering
+# off so temperature alone controls decoding. GENERATION_SEED is passed to every
+# backend that accepts one, which keeps runs reproducible when a caller samples
+# deliberately with a higher temperature. Override per extractor with
+# temperature= and seed=, or through these environment variables.
+DEFAULT_TEMPERATURE = float(os.getenv("LAISER_TEMPERATURE", "0.0"))
+DEFAULT_TOP_P = float(os.getenv("LAISER_TOP_P", "1.0"))
+
 # SCQF Level Descriptors
 SCQF_LEVELS: Dict[int, str] = {
     1: "Basic awareness of simple concepts.",

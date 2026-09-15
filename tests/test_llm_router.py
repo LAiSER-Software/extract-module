@@ -51,6 +51,7 @@ def _bare_router(**attrs):
     router.use_gpu = False
     router.hf_token = router.api_key = router.backend = None
     router.llm = router.model = router.tokenizer = router.nlp = None
+    router.temperature, router.seed = 0.0, 42
     for key, value in attrs.items():
         setattr(router, key, value)
     return router
@@ -69,7 +70,7 @@ def test_transformers_model_is_routed_to_transformers_generate(monkeypatch):
 
 def test_vllm_engine_still_routes_to_vllm(monkeypatch):
     monkeypatch.setattr(llm_router, "llm_generate", lambda *args, **kwargs: pytest.fail("routed to transformers"))
-    monkeypatch.setattr(llm_router, "llm_generate_vllm", lambda prompt, llm: f"vllm:{llm}")
+    monkeypatch.setattr(llm_router, "llm_generate_vllm", lambda prompt, llm, **kwargs: f"vllm:{llm}")
 
     assert _bare_router(llm="engine").generate("prompt") == "vllm:engine"
 
