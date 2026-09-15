@@ -178,17 +178,20 @@ class SkillExtractorRefactored:
         input_type : str
             Type of input data
         top_k : int, optional
-            Maximum number of aligned items to return per document (default: 25)
+            Maximum number of aligned matches per concept type, per document
+            (default: 25). With skills, knowledge and tasks all requested, one
+            document can return up to three times this many rows.
         similarity_threshold : float, optional
-            Global minimum similarity score applied to all types unless overridden
-            by similarity_thresholds. Defaults to 0.20 for backward compatibility.
+            One minimum similarity score applied to every type. When omitted, the
+            per-type defaults below apply.
         similarity_thresholds : dict, optional
-            Per-type thresholds. Keys: "skill", "knowledge", "task".
-            Defaults: {"skill": 0.20, "knowledge": 0.45, "task": 0.55}
+            Per-type minimums, keys "skill", "knowledge", "task". Overrides
+            similarity_threshold for the types it names.
+            Defaults: {"skill": 0.60, "knowledge": 0.50, "task": 0.50}
         levels : bool
-            Whether to extract skill levels
+            Accepted for compatibility; currently has no effect.
         batch_size : int
-            Batch size for processing
+            Accepted for compatibility; currently has no effect.
         warnings : bool
             Whether to show warnings
         concepts : list, optional
@@ -201,7 +204,7 @@ class SkillExtractorRefactored:
             "edges" contains ENABLES edges (Knowledge → Task per skill).
             If False (default), return a plain pd.DataFrame.
         timing : bool, optional
-            If True, print per-stage timing for extraction and alignment steps.
+            Accepted for compatibility with benchmark callers; currently has no effect.
         output_csv_path : str, optional
             If provided, write normalized results to this CSV path.
 

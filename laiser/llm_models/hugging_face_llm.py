@@ -49,7 +49,9 @@ Rev No.     Date            Author              Description
 [1.0.0]     6/30/2025      Anket Patil          Modularize LLM generation logic for transformers and vLLM
 """
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+from laiser.config import MAX_NEW_TOKENS
+from laiser.llm_models.model_loader import load_model_from_transformer
 
 try:
     from vllm import SamplingParams
@@ -60,25 +62,37 @@ except ImportError:
     SamplingParams = None  # Optional fallback
 
 
-def llm_generate(prompt: str, tokenizer, model, model_id: str, use_gpu: bool):
-    if tokenizer is None or model is None:
-        quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+def llm_generate(
+    prompt: str, tokenizer, model, model_id: str, use_gpu: bool, max_new_tokens: int = MAX_NEW_TOKENS
+) -> str:
+    """Generate a completion with a transformers model.
 
-        tokenizer = AutoTokenizer.from_pretrained(model_id, revision="main")  # nosec B615
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id, revision="main", quantization_config=quantization_config, device_map="auto"  # nosec B615
+    Returns only the newly generated text. ``model.generate`` returns the prompt
+    tokens followed by the completion; decoding all of it hands the prompt's own
+    example JSON to the response parser, which can match it instead of the answer.
+    """
+    if tokenizer is None or model is None:
+        tokenizer, model = load_model_from_transformer(model_id, use_gpu=use_gpu)
+
+    text = prompt
+    if getattr(tokenizer, "chat_template", None):
+        # Instruct models expect their chat format; raw text is often echoed or ignored.
+        text = tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}], tokenize=False, add_generation_prompt=True
         )
 
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+    pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
 
     outputs = model.generate(
         **inputs,
-        max_new_tokens=100,
-        pad_token_id=tokenizer.pad_token_id,
+        max_new_tokens=max_new_tokens,
+        pad_token_id=pad_token_id,
         eos_token_id=tokenizer.eos_token_id,
     )
 
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    completion = outputs[0][inputs["input_ids"].shape[1] :]
+    return tokenizer.decode(completion, skip_special_tokens=True).strip()
 
 
 def llm_generate_vllm(prompt, llm):

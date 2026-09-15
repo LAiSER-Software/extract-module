@@ -78,9 +78,12 @@ except ImportError as e:
     print(f"Warning: openai support not available: {e}")
 
 try:
-    from laiser.llm_models.hugging_face_llm import llm_generate_vllm
+    from laiser.llm_models.hugging_face_llm import llm_generate, llm_generate_vllm
 except ImportError as e:
     print(f"Warning: HuggingFace LLM support not available: {e}")
+
+    def llm_generate(*args, **kwargs):
+        raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
 
     def llm_generate_vllm(*args, **kwargs):
         raise ImportError("HuggingFace LLM support is not available. Please install required packages.")
@@ -114,7 +117,13 @@ class LLMRouter:
             print("LLMRouter: routing request to llama_cpp backend")
             return llama_cpp_chat(prompt, self.llm)
 
-        print("LLMRouter: routing request to vLLM/transformer backend")
+        # A model loaded through transformers (always on CPU, and on GPU when vLLM
+        # fails) has no vLLM engine in self.llm, so it must not go to vLLM.
+        if self.llm is None and self.model is not None and self.tokenizer is not None:
+            print("LLMRouter: routing request to transformers backend")
+            return llm_generate(prompt, self.tokenizer, self.model, self.model_id, self.use_gpu)
+
+        print("LLMRouter: routing request to vLLM backend")
         return llm_generate_vllm(prompt, self.llm)
 
     # ---------------- INIT ----------------
@@ -132,7 +141,8 @@ class LLMRouter:
                 self.llm = Llama(
                     model_path=str(MODEL_PATH),
                     n_ctx=LLAMA_CPP_CTX,
-                    n_threads=LLAMA_CPP_THREADS or None,
+                    # Environment variables are strings; llama.cpp needs an int thread count.
+                    n_threads=int(LLAMA_CPP_THREADS) if LLAMA_CPP_THREADS else None,
                     n_gpu_layers=-1,  # Use GPU if available, else CPU
                     # logits_all=False,
                     # chat_format="chatml",
@@ -140,8 +150,10 @@ class LLMRouter:
                 print("Initialized llama.cpp CPU backend.")
                 return
 
-            if self.model_id == "gemini":
-                print("Using Gemini API for skill extraction...")
+            if self.model_id in ("gemini", "openai"):
+                # Hosted providers need no local weights. Without this, "openai" fell
+                # through and was looked up as a Hugging Face model id.
+                print(f"Using {self.model_id} API for skill extraction...")
                 return
 
             elif self.use_gpu and torch.cuda.is_available():
@@ -155,31 +167,26 @@ class LLMRouter:
                     print(f"WARNING: vLLM initialization failed: {e}")
                     print("Falling back to transformer model...")
 
-                try:
-                    self._initialize_transformer()
-                    if self.model is not None:
-                        print("Transformer model fallback successful!")
-                        return
-                except Exception as e:
-                    print(f"WARNING: Transformer model fallback also failed: {e}")
+                self._initialize_transformer()
+                print("Transformer model fallback successful!")
+                return
 
             else:
                 print("Using CPU/transformer model...")
-                try:
-                    self._initialize_transformer()
-                    if self.model is not None:
-                        print("Transformer model initialization successful!")
-                        return
-                except Exception as e:
-                    print(f"WARNING: Transformer model initialization failed: {e}")
+                self._initialize_transformer()
+                print("Transformer model initialization successful!")
+                return
 
-            print("WARNING: No model successfully initialized.")
-
+        # A local model that fails to load must fail construction. Swallowing the error
+        # left a router with no model, whose every generate() call then failed and was
+        # silently skipped per row by extract_and_align_core.
+        except LAiSERError:
+            raise
         except Exception as e:
-            raise LAiSERError(f"Critical failure during component initialization: {e}")
+            raise LAiSERError(f"Could not initialize model '{self.model_id}': {e}") from e
 
     def _initialize_vllm(self):
         self.llm = load_model_from_vllm(self.model_id, self.hf_token)
 
     def _initialize_transformer(self):
-        self.tokenizer, self.model = load_model_from_transformer(self.model_id, self.hf_token)
+        self.tokenizer, self.model = load_model_from_transformer(self.model_id, self.hf_token, use_gpu=self.use_gpu)
