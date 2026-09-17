@@ -76,10 +76,15 @@ def load_model_from_transformer(model_id: str = None, token: str = "", use_gpu: 
     on_gpu = bool(use_gpu) and torch.cuda.is_available()
 
     def _load(name):
-        load_kwargs = {"use_auth_token": token}
+        # transformers 5 removed `use_auth_token`; an unrecognised keyword is passed on
+        # to the model's constructor, which rejects it. `token` is the current
+        # argument. Send it only when a token was actually given, so public models
+        # load the same way on every transformers version.
+        auth = {"token": token} if token else {}
+        load_kwargs = dict(auth)
         if on_gpu:
             load_kwargs.update(quantization_config=BitsAndBytesConfig(load_in_8bit=True), device_map="auto")
-        tokenizer = AutoTokenizer.from_pretrained(name, use_auth_token=token, revision="main")  # nosec B615
+        tokenizer = AutoTokenizer.from_pretrained(name, revision="main", **auth)  # nosec B615
         model = AutoModelForCausalLM.from_pretrained(name, revision="main", **load_kwargs)  # nosec B615
         return tokenizer, model
 
