@@ -11,7 +11,7 @@ CSV files in `laiser/public/`.
 | `esco` | [ESCO](https://esco.ec.europa.eu/) — European Skills, Competences, Qualifications and Occupations | `data.europa.eu/esco/...` |
 | `onet` | [O\*NET](https://www.onetcenter.org/) — US Occupational Information Network (database 30.2) | `onetcenter.org` |
 | `ukos` | [UK Skills Classification](https://skillsclassification.org/) | `skillsclassification.org` |
-| `osn` | [Open Skills Network](https://www.openskillsnetwork.org/) | `osmt.wgu.edu` |
+| `osn` | [Open Skills Network](https://osmt.wgu.edu/), via WGU's Open Skills Management Tool | `osmt.wgu.edu` |
 
 ## Entries per concept type
 
