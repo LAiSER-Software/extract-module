@@ -137,6 +137,45 @@ def test_cpu_load_failure_raises_instead_of_falling_back(monkeypatch):
     assert attempted == ["missing/model"]
 
 
+def _record_from_pretrained(monkeypatch):
+    calls = {"tokenizer": [], "model": []}
+
+    def tokenizer_from_pretrained(name, **kwargs):
+        calls["tokenizer"].append(kwargs)
+        return FakeTokenizer()
+
+    def model_from_pretrained(name, **kwargs):
+        calls["model"].append(kwargs)
+        return FakeModel()
+
+    monkeypatch.setattr(model_loader.AutoTokenizer, "from_pretrained", tokenizer_from_pretrained)
+    monkeypatch.setattr(model_loader.AutoModelForCausalLM, "from_pretrained", model_from_pretrained)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    return calls
+
+
+def test_loader_sends_token_not_use_auth_token(monkeypatch):
+    """transformers 5 removed use_auth_token and forwards unknown keywords to the model, which rejects them."""
+    calls = _record_from_pretrained(monkeypatch)
+
+    model_loader.load_model_from_transformer("some/model", token="hf_example", use_gpu=False)
+
+    for kwargs in calls["tokenizer"] + calls["model"]:
+        assert "use_auth_token" not in kwargs
+    assert calls["tokenizer"][0]["token"] == "hf_example"
+    assert calls["model"][0]["token"] == "hf_example"
+
+
+@pytest.mark.parametrize("token", [None, ""])
+def test_loader_sends_no_token_for_public_models(monkeypatch, token):
+    calls = _record_from_pretrained(monkeypatch)
+
+    model_loader.load_model_from_transformer("some/model", token=token, use_gpu=False)
+
+    assert "token" not in calls["tokenizer"][0]
+    assert "token" not in calls["model"][0]
+
+
 # The tests below go through LLMRouter's constructor, which is what
 # SkillExtractorRefactored builds, rather than the loader alone.
 
