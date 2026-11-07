@@ -33,7 +33,7 @@ You give it a table of documents — job postings, course descriptions, syllabi.
 
 Because results point at shared taxonomy entries rather than free-text phrases, they can be counted and compared across sources — the skills employers ask for can be set against the skills a program teaches, or tracked across thousands of postings.
 
-The language model can be a hosted API (Gemini or OpenAI) or a model running on your own machine, including on CPU with no API key. Taxonomy alignment always runs locally against indexes bundled with the package.
+The language model can be a hosted API (Gemini or OpenAI) or a model running on your own machine, including on CPU with no API key. Taxonomy alignment always runs locally against indexes prepared during setup.
 
 ## Architecture
 
@@ -41,7 +41,7 @@ LAiSER runs four stages for every document:
 
 1. **Extraction** — The text is placed into a prompt for its input type and sent to the language model, which returns candidate concepts.
 2. **Parsing and deduplication** — The response is parsed into phrases. Exact duplicates are dropped and near-duplicates are collapsed by embedding similarity.
-3. **Taxonomy alignment** — Each phrase is embedded and searched against bundled FAISS indexes of taxonomy entries. Matches above a per-type similarity threshold are kept.
+3. **Taxonomy alignment** — Each phrase is embedded and searched against local FAISS indexes of taxonomy entries. Matches above a per-type similarity threshold are kept.
 4. **Output** — Matches are returned as a single table, optionally with graph edges linking knowledge areas to the tasks they enable.
 
 ## Requirements
@@ -56,12 +56,14 @@ LAiSER runs four stages for every document:
 
   ```shell
   pip install laiser
+  laiser setup
   ```
 
 - Install with GPU extras:
 
   ```shell
   pip install "laiser[gpu]"
+  laiser setup
   ```
 
 - Install development dependencies from source:
@@ -225,7 +227,7 @@ results = extractor.extract_concepts(
 )
 ```
 
-When reporting results, also record the LAiSER version: it fixes the bundled taxonomy data and the embedding model used for alignment (`sentence-transformers/all-MiniLM-L6-v2`). Hosted providers do not guarantee identical output even at temperature `0.0`. See [Reproducibility](https://laiser-software.github.io/extract-module/reproducibility/) for details.
+When reporting results, also record the LAiSER version: it pins the taxonomy data and the embedding model used for alignment (`sentence-transformers/all-MiniLM-L6-v2`). Hosted providers do not guarantee identical output even at temperature `0.0`. See [Reproducibility](https://laiser-software.github.io/extract-module/reproducibility/) for details.
 
 ## Try it in Google Colab
 

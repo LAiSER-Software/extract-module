@@ -1,0 +1,37 @@
+{
+  "version": "taxonomy-v1",
+  "release_url": "https://github.com/LAiSER-Software/extract-module/releases/download",
+  "embedding_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "bundles": {
+    "skills": {
+      "skills_v04.index": {
+        "size": 41702445,
+        "sha256": "7ce221e34d82d84834bdde281c856d4b8fbbea238d33a351b27d62fae090ddef"
+      },
+      "skills_df.json": {
+        "size": 17447006,
+        "sha256": "a2e3af040711cbdb197156a3b4fb2fddbb9549436ab8eb40dc597e697cf4748b"
+      }
+    },
+    "knowledge": {
+      "knowledge_v05.index": {
+        "size": 12761133,
+        "sha256": "0eca417c323aa8904f2958c7a9c06eca46f1cb1610a838615f0f3c30ff601782"
+      },
+      "knowledge_df.json": {
+        "size": 3939145,
+        "sha256": "5f3fef364481b1ea19b88a0fafa4576286f5d375e8e9180c029aee898b6fb3fb"
+      }
+    },
+    "tasks": {
+      "tasks_v05.index": {
+        "size": 80016429,
+        "sha256": "7386969b9ddb56303b3ffd8c7b98921ef35829b85ad679a47ee777bf6c06bb9a"
+      },
+      "tasks_df.json": {
+        "size": 23418740,
+        "sha256": "9fb5afffc24182893e5c29cf6d7055f2d7311e72ec014fea4da6cf561900d889"
+      }
+    }
+  }
+}

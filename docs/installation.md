@@ -10,15 +10,22 @@
 
 ```bash
 pip install laiser
+laiser setup
 ```
 
-This installs everything needed to extract with a hosted provider or a local transformers model, and to
-align results against the bundled taxonomies.
+Run `laiser setup` once before extracting. It downloads the package's taxonomy bundles from GitHub Releases,
+checks their integrity, and prepares the alignment embedding model. No provider API key is needed for setup.
+
+The taxonomy bundles total about 125 MiB compressed and are cached under `~/.cache/laiser` by default.
+Set `LAISER_CACHE_DIR` to use a different taxonomy cache directory. The embedding model uses the
+Hugging Face cache, which can be set with `HF_HOME`. Use the same cache settings for setup and extraction.
+Re-running setup reuses the prepared files.
 
 ### GPU inference with vLLM
 
 ```bash
 pip install "laiser[gpu]"
+laiser setup
 ```
 
 The `gpu` extra adds [vLLM](https://docs.vllm.ai/) for faster local inference on CUDA devices, plus
@@ -49,12 +56,11 @@ pip install -e ".[dev]"
 
 The `dev` extra adds the test and lint tooling used in CI.
 
-## What downloads on first use
+The checkout includes the taxonomy files. Run `laiser setup` to prepare its alignment embedding model
+ahead of time as well.
 
-!!! note "First run is slower"
-    The taxonomy indexes are part of the package, but two things are fetched the first time they are
-    needed and cached afterwards by Hugging Face:
+## Language models
 
-    - the sentence-embedding model used for alignment and deduplication
-      (`sentence-transformers/all-MiniLM-L6-v2`), and
-    - the language model itself, if you use a local model rather than a hosted API.
+Setup prepares the taxonomy data and the embedding model used for alignment. If you choose a local
+language model for extraction, that model has its own download. Hosted providers such as Gemini still
+need network access when extracting from text.

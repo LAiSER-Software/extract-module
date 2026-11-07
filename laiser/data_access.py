@@ -72,8 +72,15 @@ from sentence_transformers import SentenceTransformer
 
 from laiser.config import COMBINED_SKILLS_URL, DEFAULT_EMBEDDING_MODEL, ESCO_SKILLS_URL, OSN_SKILLS_URL
 from laiser.exceptions import FAISSIndexError, LAiSERError
+from laiser.taxonomy_assets import MANIFEST, is_source_checkout, prepared_bundle
 
 logger = logging.getLogger(__name__)
+
+
+def load_embedding_model(*, local_files_only: bool) -> SentenceTransformer:
+    return SentenceTransformer(
+        DEFAULT_EMBEDDING_MODEL, revision=MANIFEST["embedding_revision"], local_files_only=local_files_only
+    )
 
 
 class DataAccessLayer:
@@ -89,7 +96,13 @@ class DataAccessLayer:
     def get_embedding_model(self) -> SentenceTransformer:
         """Get or initialize the embedding model"""
         if self.embedding_model is None:
-            self.embedding_model = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
+            local_files_only = not is_source_checkout()
+            try:
+                self.embedding_model = load_embedding_model(local_files_only=local_files_only)
+            except OSError as exc:
+                if not local_files_only:
+                    raise
+                raise LAiSERError("The alignment embedding model is missing. Run 'laiser setup'.") from exc
         return self.embedding_model
 
     # -------------------------
@@ -203,6 +216,14 @@ class DataAccessLayer:
         except Exception as e:
             raise FAISSIndexError(f"Failed to load FAISS index: {e}")
 
+    def load_prepared_index(self, kind, index_name, metadata_name):
+        directory = prepared_bundle(kind)
+        index = self.load_faiss_index(str(directory / index_name))
+        metadata = pd.read_json(directory / metadata_name, orient="records")
+        if index is None or index.ntotal != len(metadata):
+            raise FAISSIndexError(f"The {kind} index and metadata do not match at {directory}.")
+        return index, metadata
+
     def download_faiss_index(self, url: str, local_path: str) -> bool:
         """Download FAISS index from URL"""
         try:
@@ -248,6 +269,14 @@ class FAISSIndexManager:
         local_json_path = script_dir / "public" / "skills_df.json"
         local_npy_path = script_dir / "public" / "skill_embeddings.npy"
         local_combined_csv_path = script_dir / "public" / "faiss_skills.csv"
+
+        if not is_source_checkout():
+            if force_rebuild:
+                raise LAiSERError("Rebuilding taxonomy indexes requires a source checkout.")
+            self.index, self.metadata = self.data_access.load_prepared_index(
+                "skills", local_index_path.name, local_json_path.name
+            )
+            return self.index, self.metadata
 
         # 1) Try to load existing index + metadata unless force_rebuild requested
         if not force_rebuild:
@@ -692,6 +721,7 @@ class _BaseTaxonomyFAISSIndexManager:
     META_FILENAME: str = ""
     CSV_FILENAME: str = ""
     LABEL: str = ""
+    BUNDLE: str = ""
 
     def __init__(self, data_access: DataAccessLayer):
         self.data_access = data_access
@@ -705,6 +735,14 @@ class _BaseTaxonomyFAISSIndexManager:
         index_path = script_dir / "public" / self.INDEX_FILENAME
         meta_path = script_dir / "public" / self.META_FILENAME
         csv_path = script_dir / "public" / self.CSV_FILENAME
+
+        if not is_source_checkout():
+            if force_rebuild:
+                raise LAiSERError("Rebuilding taxonomy indexes requires a source checkout.")
+            self.index, self.metadata = self.data_access.load_prepared_index(
+                self.BUNDLE, self.INDEX_FILENAME, self.META_FILENAME
+            )
+            return
 
         # Try loading cached index
         if not force_rebuild and index_path.exists() and meta_path.exists():
@@ -821,6 +859,7 @@ class KnowledgeFAISSIndexManager(_BaseTaxonomyFAISSIndexManager):
     META_FILENAME = "knowledge_df.json"
     CSV_FILENAME = "knowledge_taxonomy.csv"
     LABEL = "Knowledge"
+    BUNDLE = "knowledge"
 
 
 class TaskFAISSIndexManager(_BaseTaxonomyFAISSIndexManager):
@@ -830,3 +869,4 @@ class TaskFAISSIndexManager(_BaseTaxonomyFAISSIndexManager):
     META_FILENAME = "tasks_df.json"
     CSV_FILENAME = "task_taxonomy.csv"
     LABEL = "Task"
+    BUNDLE = "tasks"

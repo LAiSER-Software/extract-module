@@ -31,13 +31,16 @@ dependencies = [
     "transformers>=4.20.0",
     "pandas>=1.3.0",
     "numpy>=1.21.0",
-    "sentence-transformers>=2.2.0",
+    "sentence-transformers>=3.0.0",
     "faiss-cpu>=1.7.0",
     "certifi>=2023.0.0",
     "requests>=2.25.0",
     "psutil",
     "google-genai>=0.8.0"
 ]
+
+[project.scripts]
+laiser = "laiser.taxonomy_assets:main"
 
 [project.optional-dependencies]
 gpu = [
@@ -73,17 +76,7 @@ include-package-data = false
 version = {attr = "laiser.__version__"}
 
 [tool.setuptools.package-data]
-laiser = [
-    "public/faiss_skills.csv",
-    "public/knowledge_df.json",
-    "public/knowledge_taxonomy.csv",
-    "public/knowledge_v05.index",
-    "public/skills_df.json",
-    "public/skills_v04.index",
-    "public/task_taxonomy.csv",
-    "public/tasks_df.json",
-    "public/tasks_v05.index",
-]
+laiser = ["taxonomy-assets.json"]
 
 
 [tool.black]
