@@ -1,6 +1,6 @@
 # Model providers
 
-The language model does the extraction step; alignment always runs locally against the bundled indexes.
+The language model does the extraction step; alignment always runs locally against the local indexes.
 Choose the model when you construct the extractor.
 
 | You pass | Runs on | Needs |

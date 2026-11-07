@@ -21,7 +21,7 @@ For Transformers models, sampling is turned off explicitly rather than left to t
 ship a `generation_config.json` that enables sampling, which would otherwise make repeated runs differ.
 
 Alignment is deterministic as well. Each extracted phrase is embedded with a fixed sentence-transformer model
-and matched by exact search against the bundled taxonomy index, so the same phrase always resolves to the same
+and matched by exact search against the local taxonomy index, so the same phrase always resolves to the same
 taxonomy entry with the same similarity score.
 
 ## Changing the defaults
@@ -67,7 +67,7 @@ results = extractor.extract_concepts(
 
 Also record:
 
-- **the LAiSER version** — it fixes the bundled taxonomy data and the embedding model used for alignment,
+- **the LAiSER version** — it pins the taxonomy data and the embedding model used for alignment,
   `sentence-transformers/all-MiniLM-L6-v2`;
 - **the model revision**, for Hugging Face models that may be updated under the same name.
 

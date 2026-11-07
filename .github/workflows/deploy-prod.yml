@@ -59,6 +59,20 @@ jobs:
           done
           exit $STATUS
 
+      - name: Verify taxonomy release assets are available
+        run: |
+          python - <<'PYTHON'
+          import json
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+
+          manifest = json.loads(Path("laiser/taxonomy-assets.json").read_text())
+          for kind in manifest["bundles"]:
+              url = f"{manifest['release_url']}/{manifest['version']}/{kind}.zip"
+              with urlopen(Request(url, method="HEAD"), timeout=30):  # nosec B310
+                  print(f"Available: {url}")
+          PYTHON
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

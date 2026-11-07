@@ -1,0 +1,28 @@
+name: Publish taxonomy data
+
+on:
+  push:
+    tags:
+      - "taxonomy-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build verified bundles
+        run: python scripts/build_taxonomy_bundles.py "$GITHUB_REF_NAME" dist/taxonomy
+
+      - name: Publish GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/taxonomy/*.zip --verify-tag --latest=false \
+            --title "LAiSER $GITHUB_REF_NAME" --notes-file docs/taxonomies.md

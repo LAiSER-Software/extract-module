@@ -1,6 +1,6 @@
 # Taxonomies
 
-Extracted concepts are aligned against taxonomy indexes that ship inside the package. Each index is a
+Extracted concepts are aligned against local taxonomy indexes prepared by `laiser setup`. Each index is a
 FAISS inner-product index over sentence embeddings of the entries' names and descriptions, built from the
 CSV files in `laiser/public/`.
 

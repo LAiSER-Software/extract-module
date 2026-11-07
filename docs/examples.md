@@ -6,12 +6,14 @@ This file contains copy-paste examples for the current refactored API.
 
 ```bash
 pip install laiser
+laiser setup
 ```
 
 GPU-enabled install:
 
 ```bash
 pip install "laiser[gpu]"
+laiser setup
 ```
 
 ## 2. Skills Only From a Job Description

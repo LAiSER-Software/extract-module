@@ -28,6 +28,7 @@ from laiser.config import (
 from laiser.data_access import DataAccessLayer, FAISSIndexManager, KnowledgeFAISSIndexManager, TaskFAISSIndexManager
 from laiser.exceptions import InvalidInputError, LAiSERError
 from laiser.llm_models.llm_router import LLMRouter
+from laiser.taxonomy_assets import is_source_checkout
 
 logger = logging.getLogger(__name__)
 
@@ -645,7 +646,7 @@ class SkillExtractionService:
         self.faiss_manager = FAISSIndexManager(self.data_access)
         self.alignment_service = AlignmentService(self.data_access, self.faiss_manager)
 
-        # Knowledge + Task indexes (v0.5) — initialized lazily; no-op if CSV not yet built
+        # Knowledge and task indexes (v0.5)
         self.knowledge_faiss = KnowledgeFAISSIndexManager(self.data_access)
         self.knowledge_faiss.initialize_index(force_rebuild=False)
         self.knowledge_alignment = AlignmentService(self.data_access, self.knowledge_faiss)
@@ -669,6 +670,8 @@ class SkillExtractionService:
 
         # Initialize skills FAISS index
         self.faiss_manager.initialize_index(force_rebuild=False)
+        if not is_source_checkout():
+            self.data_access.get_embedding_model()
         # Log router initialization state for debugging
         try:
             llama_present = self.backend == "llama_cpp" and getattr(self.router, "llm", None) is not None
