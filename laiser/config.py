@@ -224,8 +224,6 @@ COMBINED_EXTRACTION_PROMPT = """
     }}
 """
 
-## ISSUE: Prompt for course syllabi
-SKILL_EXTRACTION_PROMPT_SYLLABUS = """ Work in progress"""
 KSA_EXTRACTION_PROMPT = """[INST]user
 **Objective:** Given a {input_desc}, complete the following tasks with structured outputs.
 

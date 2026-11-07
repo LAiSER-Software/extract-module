@@ -24,7 +24,6 @@ from laiser.config import (
     KSA_EXTRACTION_PROMPT,
     KT_FROM_SKILLS_PROMPT,
     SCQF_LEVELS,
-    SKILL_EXTRACTION_PROMPT_SYLLABUS,
 )
 from laiser.data_access import DataAccessLayer, FAISSIndexManager, KnowledgeFAISSIndexManager, TaskFAISSIndexManager
 from laiser.exceptions import InvalidInputError, LAiSERError
@@ -52,18 +51,14 @@ class PromptBuilder:
 
     @staticmethod
     def build_skill_extraction_prompt(input_text: str, input_type: str) -> str:
-        """Build prompt for basic skill extraction"""
-        input_type = PromptBuilder.normalize_input_type(input_type)
-        if input_type == "job_desc":
-            extraction_prompt = COMBINED_EXTRACTION_PROMPT.format(description=input_text)
-            return extraction_prompt
-        elif input_type == "syllabus":
-            return SKILL_EXTRACTION_PROMPT_SYLLABUS.format(
-                description=input_text.get("description", ""),
-                learning_outcomes=input_text.get("learning_outcomes", ""),
-            )
-        else:
-            raise InvalidInputError(f"Unsupported input type: {input_type}")
+        """Build the skill extraction prompt.
+
+        Every input type uses the same prompt, so that skills extracted from
+        job postings and from syllabi stay comparable. ``input_type`` is still
+        validated, so an unsupported type fails here.
+        """
+        PromptBuilder.normalize_input_type(input_type)
+        return COMBINED_EXTRACTION_PROMPT.format(description=input_text)
 
     @staticmethod
     def build_ksa_extraction_prompt(
@@ -960,16 +955,11 @@ class SkillExtractionService:
         return [exact_deduped[i] for i in kept_indices]
 
     def extract_raw_llm_skills(self, input_data, text_columns, input_type: str = "job_desc"):
-        normalized_input_type = self.prompt_builder.normalize_input_type(input_type)
-        if normalized_input_type == "syllabus":
-            prompt_input: Any = {
-                "description": str(input_data.get("description", "")).strip(),
-                "learning_outcomes": str(input_data.get("learning_outcomes", "")).strip(),
-            }
-        else:
-            prompt_input = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
+        # Every input type reads the same columns and uses the same prompt. Syllabi
+        # previously went to a placeholder prompt that contained no document text.
+        prompt_input = " ".join(str(input_data.get(col, "")) for col in text_columns).strip()
         extraction_prompt = self.prompt_builder.build_skill_extraction_prompt(
-            input_text=prompt_input, input_type=normalized_input_type
+            input_text=prompt_input, input_type=input_type
         )
         response = self.router.generate(extraction_prompt)
         skills = self.llm_parser._parse_skills_from_response(response)
