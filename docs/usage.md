@@ -9,21 +9,21 @@ All extraction goes through `SkillExtractorRefactored.extract_concepts`. This pa
 |---|---|
 | `data` | a pandas `DataFrame`, one row per document |
 | `id_column` | column holding each document's identifier; copied to the output. Default `"Research ID"` |
-| `text_columns` | columns holding the text to analyse; joined with spaces for job descriptions |
-| `input_type` | what kind of text the rows contain — selects the prompt |
+| `text_columns` | columns holding the text to analyse; joined with spaces |
+| `input_type` | what kind of text the rows contain; every type currently uses the same prompt |
 
 ### Input types
 
 | `input_type` | Use for | Text used |
 |---|---|---|
 | `"job_desc"` (or `"job_description"`) | job postings and role descriptions | every column in `text_columns` |
-| `"syllabus"`, `"course_syllabus"`, `"course_syllabi"` | courses and programs | the `description` and `learning_outcomes` columns — list both in `text_columns` |
+| `"syllabus"`, `"course_syllabus"`, `"course_syllabi"` | courses and programs | every column in `text_columns`, e.g. `["description", "learning_outcomes"]` |
 
-!!! note "List both syllabus columns"
-    The syllabus prompt treats the course description and its learning outcomes separately, reading them
-    from the `description` and `learning_outcomes` columns. Only columns named in `text_columns` are read,
-    so pass `text_columns=["description", "learning_outcomes"]`. With only `description`, the learning
-    outcomes reach the model empty.
+!!! note "One prompt for every input type"
+    Job postings and syllabi go through the same extraction prompt, so skills extracted from either can
+    be compared directly. The prompt is worded for job postings and tells the model to ignore branding,
+    benefits and legal boilerplate; course text passes through it unchanged. List every column you want
+    the model to read in `text_columns`.
 
 ## What to extract
 
